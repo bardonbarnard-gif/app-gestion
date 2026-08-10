@@ -156,7 +156,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (activeBtn) activeBtn.classList.add('bg-white/20', 'text-white');
         }
 
-        function switchMatchSubTab(subTabId) {
+    function switchMatchSubTab(subTabId) {
+            // Si aucun sous-onglet n'est spécifié, on force 'results' (le calendrier) par défaut
+            if (!subTabId) subTabId = 'results';
+
             const isConvoc = subTabId === 'convocations';
             document.getElementById('subtab-convocations').classList.toggle('hidden', !isConvoc);
             document.getElementById('subtab-results').classList.toggle('hidden', isConvoc);
