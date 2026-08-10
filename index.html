@@ -183,8 +183,13 @@
             <i class="fa-solid fa-clipboard-user"></i><span>Préparation & Convocations</span>
         </button>
     </div>
-
-            <div id="subtab-convocations" class="space-y-4">
+            <div id="subtab-results" class="space-y-4">
+                <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
+                    <div><h2 class="text-base font-bold text-slate-800">Résultats, Buteurs, Passes & Debrief</h2><p class="text-xs text-slate-500">Scores et causeries d'après-match</p></div>
+                    <div class="space-y-3" id="matches-results-list"></div>
+                </div>
+            </div>
+            <div id="subtab-convocations" class="space-y-4 hidden">
                 <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <div><h2 class="text-base font-bold text-slate-800">Feuille de Convocations & WhatsApp</h2><p class="text-xs text-slate-500">Postes, maillots, licences et covoiturages</p></div>
@@ -228,12 +233,7 @@
                 </div>
             </div>
 
-            <div id="subtab-results" class="space-y-4 hidden">
-                <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
-                    <div><h2 class="text-base font-bold text-slate-800">Résultats, Buteurs, Passes & Debrief</h2><p class="text-xs text-slate-500">Scores et causeries d'après-match</p></div>
-                    <div class="space-y-3" id="matches-results-list"></div>
-                </div>
-            </div>
+            
         </section>
 
         <section id="sec-entrainements" class="space-y-4 hidden">
