@@ -175,10 +175,14 @@
         </section>
 
         <section id="sec-matchs" class="space-y-4 hidden">
-            <div class="flex border-b border-slate-200 space-x-4">
-                <button onclick="switchMatchSubTab('convocations')" id="subtab-convocations-btn" class="pb-2 text-xs font-bold border-b-2 border-sky-600 text-sky-600 flex items-center space-x-1.5 transition"><i class="fa-solid fa-clipboard-user"></i><span>Préparation & Convocations</span></button>
-                <button onclick="switchMatchSubTab('results')" id="subtab-results-btn" class="pb-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 transition"><i class="fa-solid fa-medal"></i><span>Calendrier & Bilans</span></button>
-            </div>
+    <div class="flex border-b border-slate-200 space-x-4">
+        <button onclick="switchMatchSubTab('results')" id="subtab-results-btn" class="pb-2 text-xs font-bold border-b-2 border-sky-600 text-sky-600 flex items-center space-x-1.5 transition">
+            <i class="fa-solid fa-medal"></i><span>Calendrier & Bilans</span>
+        </button>
+        <button onclick="switchMatchSubTab('convocations')" id="subtab-convocations-btn" class="pb-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 transition">
+            <i class="fa-solid fa-clipboard-user"></i><span>Préparation & Convocations</span>
+        </button>
+    </div>
 
             <div id="subtab-convocations" class="space-y-4">
                 <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
