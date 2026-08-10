@@ -1,3 +1,41 @@
+ // Définissez votre code PIN secret à 4 chiffres ici
+const CORRECT_PIN = "2901"; // Vous pourrez le modifier par le code de votre choix
+
+document.addEventListener("DOMContentLoaded", () => {
+    const pinScreen = document.getElementById("pin-screen");
+    const pinInput = document.getElementById("pin-input");
+    const pinError = document.getElementById("pin-error");
+
+    // Vérifier si l'utilisateur s'est déjà authentifié durant cette session
+    if (sessionStorage.getItem("isUnlocked") === "true") {
+        if (pinScreen) pinScreen.style.display = "none";
+        return;
+    }
+
+    if (pinInput) {
+        pinInput.focus();
+        pinInput.addEventListener("input", (e) => {
+            if (e.target.value.length === 4) {
+                if (e.target.value === CORRECT_PIN) {
+                    // Code correct : on mémorise la session et on masque l'écran
+                    sessionStorage.setItem("isUnlocked", "true");
+                    if (pinScreen) {
+                        pinScreen.style.opacity = "0";
+                        pinScreen.style.transition = "opacity 0.3s ease";
+                        setTimeout(() => pinScreen.remove(), 300);
+                    }
+                } else {
+                    // Code incorrect : on signale l'erreur et on vide le champ
+                    if (pinError) pinError.style.display = "block";
+                    pinInput.value = "";
+                }
+            } else {
+                if (pinError) pinError.style.display = "none";
+            }
+        });
+    }
+});
+ 
  // --- 1. CONFIGURATION & PWA ---
         if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
             window.addEventListener('load', () => {

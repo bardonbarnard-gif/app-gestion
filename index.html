@@ -23,6 +23,13 @@
 </head>
 <body class="text-slate-800 pb-20 md:pb-10">
 
+<div id="pin-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111827; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-family: sans-serif;">
+    <h2 style="margin-bottom: 20px;">🔒 Accès Restreint</h2>
+    <p style="margin-bottom: 15px; font-size: 14px; color: #9CA3AF;">Entrez le code PIN à 4 chiffres</p>
+    <input type="password" id="pin-input" maxlength="4" pattern="[0-9]*" inputmode="numeric" style="font-size: 24px; padding: 10px; width: 120px; text-align: center; letter-spacing: 5px; border-radius: 8px; border: 1px solid #4B5563; background: #1F2937; color: white; outline: none;" placeholder="••••">
+    <p id="pin-error" style="color: #EF4444; margin-top: 15px; font-size: 14px; display: none;">Code incorrect</p>
+</div>
+
     <header class="blue-gradient text-white sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center space-x-3">
