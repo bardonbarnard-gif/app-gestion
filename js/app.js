@@ -71,56 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-function applyPermissions() {
-    const role = window.currentUserRole || 'public';
-    const userTeam = window.currentUserTeam || 'all'; // Récupère l'équipe ou les équipes de l'utilisateur
 
-    // --- MISE À JOUR DU TEXTE DU RÔLE ---
-    const roleLabel = document.getElementById("user-role-label");
-    if (roleLabel) {
-        let roleName = window.currentUserName || "Public";
-        
-        if (role === "admin") {
-            roleName = window.currentUserName ? `${window.currentUserName} (Admin)` : "Administrateur";
-        } else if (role === "dirigeant") {
-            roleName = window.currentUserName ? `${window.currentUserName} (Dirigeant)` : "Dirigeant";
-        } else if (role === "responsable") {
-            roleName = window.currentUserName ? `${window.currentUserName} (Responsable)` : "Responsable";
-        } else if (role === "coach") {
-            roleName = window.currentUserName ? `${window.currentUserName} (Coach)` : "Coach";
-        }
-
-        roleLabel.textContent = roleName;
-    }
-
-    // --- RESTRICTIONS SELON LES RÔLES ---
-    // 1. Pour le public, les responsables et les dirigeants : pas de modification (lecture seule)
-    if (role === 'public' || role === 'responsable' || role === 'dirigeant') {
-        document.querySelectorAll('.admin-only, .adjoint-only, .coach-only').forEach(el => {
-            el.style.display = 'none';
-        });
-        document.querySelectorAll('select, input, button.status-btn').forEach(el => {
-            if (!el.classList.contains('allow-public')) {
-                el.disabled = true;
-            }
-        });
-    } 
-    // 2. Pour les coachs : ils peuvent modifier, mais on pourra filtrer si besoin selon leur équipe `userTeam`
-    else if (role === 'coach') {
-        document.querySelectorAll('.admin-only').forEach(el => {
-            el.style.display = 'none';
-        });
-        // Ici, le coach garde ses droits d'écriture, mais l'application pourra utiliser `userTeam` 
-        // pour filtrer par exemple l'affichage des matchs ou des joueurs de son équipe.
-    }
-    // 3. Pour l'admin : tout est autorisé (pas de restriction)
-
-    // --- AFFICHAGE DU BOUTON ADMIN ---
-    // Cette fonction vérifie si l'utilisateur est admin pour afficher ou masquer le bouton de la console
-    if (typeof checkAdminAccessUI === "function") {
-        checkAdminAccessUI();
-    }
-}
  // --- 1. CONFIGURATION & PWA ---
         if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
             window.addEventListener('load', () => {
@@ -1775,3 +1726,180 @@ function filterPlayers(query = "") {
         card.style.display = (matchText && matchCat) ? 'block' : 'none';
     });
 }
+// --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
+function applyPermissions() {
+    const role = window.currentUserRole || 'public';
+    const userTeam = window.currentUserTeam || 'all';
+
+    // --- MISE À JOUR DU TEXTE DU RÔLE ---
+    const roleLabel = document.getElementById("user-role-label");
+    if (roleLabel) {
+        let roleName = window.currentUserName || "Public";
+        
+        if (role === "admin") {
+            roleName = window.currentUserName ? `${window.currentUserName} (Admin)` : "Administrateur";
+        } else if (role === "dirigeant") {
+            roleName = window.currentUserName ? `${window.currentUserName} (Dirigeant)` : "Dirigeant";
+        } else if (role === "responsable") {
+            roleName = window.currentUserName ? `${window.currentUserName} (Responsable)` : "Responsable";
+        } else if (role === "coach") {
+            roleName = window.currentUserName ? `${window.currentUserName} (Coach)` : "Coach";
+        }
+
+        roleLabel.textContent = roleName;
+    }
+
+    // --- RESTRICTIONS SELON LES RÔLES ---
+    if (role === 'public' || role === 'responsable' || role === 'dirigeant') {
+        document.querySelectorAll('.admin-only, .adjoint-only, .coach-only').forEach(el => {
+            el.style.display = 'none';
+        });
+        document.querySelectorAll('select, input, button.status-btn').forEach(el => {
+            if (!el.classList.contains('allow-public')) {
+                el.disabled = true;
+            }
+        });
+    } else if (role === 'coach') {
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = 'none';
+        });
+    }
+
+    // --- AFFICHAGE DU BOUTON ADMIN ---
+    if (typeof checkAdminAccessUI === "function") {
+        checkAdminAccessUI();
+    }
+}
+
+
+// --- 5. CONSOLE D'ADMINISTRATION & GESTION DES ACCÈS ---
+
+// Affichage dynamique du bouton d'accès à la console Admin si l'utilisateur est admin
+function checkAdminAccessUI() {
+    const role = window.currentUserRole;
+    let adminBtn = document.getElementById("open-admin-console-btn");
+    
+    if (role === "admin") {
+        if (!adminBtn) {
+            adminBtn = document.createElement("button");
+            adminBtn.id = "open-admin-console-btn";
+            adminBtn.innerHTML = '<i class="fa-solid fa-gear mr-1"></i> Gérer les accès';
+            adminBtn.className = "fixed bottom-4 right-4 bg-slate-900 text-white px-4 py-2 rounded-full shadow-2xl text-xs font-bold z-40 hover:bg-slate-800 transition flex items-center cursor-pointer";
+            adminBtn.onclick = () => toggleAdminModal(true);
+            document.body.appendChild(adminBtn);
+        } else {
+            adminBtn.style.display = "flex";
+        }
+    } else if (adminBtn) {
+        adminBtn.style.display = "none";
+    }
+}
+
+// Ouvrir ou fermer la modale admin
+window.toggleAdminModal = function(show) {
+    const modal = document.getElementById("admin-access-modal");
+    if (modal) {
+        if (show) {
+            modal.classList.remove("hidden");
+            loadCoachesFromFirebase();
+        } else {
+            modal.classList.add("hidden");
+        }
+    }
+}
+
+// Gérer l'affichage du champ équipe selon le rôle sélectionné
+window.toggleTeamInput = function(role) {
+    const group = document.getElementById("team-input-group");
+    if (role === "admin" || role === "dirigeant" || role === "public") {
+        group.style.display = "none";
+    } else {
+        group.style.display = "block";
+    }
+}
+
+// Enregistrement ou mise à jour d'un compte dans Firebase
+document.addEventListener("DOMContentLoaded", () => {
+    const coachForm = document.getElementById("coach-form");
+    if (coachForm) {
+        coachForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const pin = document.getElementById("admin-pin").value.trim();
+            const name = document.getElementById("admin-name").value.trim();
+            const role = document.getElementById("admin-role").value;
+            const team = document.getElementById("admin-team").value.trim();
+
+            if (pin.length !== 4) {
+                alert("Le code PIN doit comporter exactement 4 chiffres.");
+                return;
+            }
+
+            try {
+                await firebase.database().ref("rangueil_data/access/" + pin).set({
+                    name: name,
+                    role: role,
+                    team: (role === "admin" || role === "dirigeant" || role === "public") ? "all" : (team || "all")
+                });
+
+                alert(`Accès pour "${name}" enregistré avec succès !`);
+                coachForm.reset();
+                toggleTeamInput(document.getElementById("admin-role").value);
+                loadCoachesFromFirebase();
+            } catch (error) {
+                console.error("Erreur lors de l'enregistrement :", error);
+                alert("Erreur lors de l'enregistrement en base.");
+            }
+        });
+    }
+});
+
+// Charger la liste des comptes depuis Firebase pour les afficher dans la modale
+async function loadCoachesFromFirebase() {
+    const container = document.getElementById("coaches-list-container");
+    if (!container) return;
+
+    container.innerHTML = "<p class='text-xs text-slate-400'>Chargement des comptes...</p>";
+
+    try {
+        const snapshot = await firebase.database().ref("rangueil_data/access").once("value");
+        if (snapshot.exists()) {
+            container.innerHTML = "";
+            snapshot.forEach((childSnapshot) => {
+                const pin = childSnapshot.key;
+                const data = childSnapshot.val();
+
+                const item = document.createElement("div");
+                item.className = "flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-md text-xs";
+                item.innerHTML = `
+                    <div>
+                        <span class="font-bold text-slate-800">${data.name}</span> 
+                        <span class="bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded ml-1 text-[10px] font-semibold">${data.role}</span>
+                        <span class="text-slate-500 ml-1">(${data.team})</span>
+                        <div class="text-slate-400 font-mono text-[10px] mt-0.5">PIN : ${pin}</div>
+                    </div>
+                    <button onclick="deleteCoachAccount('${pin}')" class="text-red-500 hover:text-red-700 p-1.5 cursor-pointer"><i class="fa-solid fa-trash"></i></button>
+                `;
+                container.appendChild(item);
+            });
+        } else {
+            container.innerHTML = "<p class='text-xs text-slate-400'>Aucun compte trouvé.</p>";
+        }
+    } catch (error) {
+        console.error("Erreur de chargement :", error);
+        container.innerHTML = "<p class='text-xs text-red-500'>Erreur de chargement.</p>";
+    }
+}
+
+// Supprimer un compte de Firebase
+window.deleteCoachAccount = async function(pin) {
+    if (confirm(`Voulez-vous vraiment supprimer l'accès associé au PIN ${pin} ?`)) {
+        try {
+            await firebase.database().ref("rangueil_data/access/" + pin).remove();
+            loadCoachesFromFirebase();
+        } catch (error) {
+            console.error("Erreur lors de la suppression :", error);
+            alert("Impossible de supprimer ce compte.");
+        }
+    }
+};
