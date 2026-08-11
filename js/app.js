@@ -1903,3 +1903,82 @@ window.deleteCoachAccount = async function(pin) {
         }
     }
 };
+
+// 1. Enregistrer ou créer une équipe dans Firebase
+function handleSaveTeam(event) {
+    event.preventDefault();
+    
+    const teamIdInput = document.getElementById('team-id').value.trim().toLowerCase();
+    const teamNameInput = document.getElementById('team-name').value.trim();
+
+    if (!teamIdInput || !teamNameInput) return;
+
+    // Enregistrement dans Firebase sous le nœud "teams/identifiant_equipe"
+    firebase.database().ref('teams/' + teamIdInput).set({
+        name: teamNameInput
+    }, (error) => {
+        if (error) {
+            alert("Erreur lors de l'enregistrement de l'équipe.");
+        } else {
+            // Réinitialiser le formulaire de l'équipe
+            document.getElementById('team-form').reset();
+        }
+    });
+}
+
+// 2. Afficher la liste des équipes dans l'admin et mettre à jour l'application
+function renderAdminTeams(teamsData) {
+    const container = document.getElementById('admin-teams-list');
+    if (!container) return;
+
+    state.teams = teamsData || {};
+    const keys = Object.keys(state.teams);
+
+    if (keys.length === 0) {
+        container.innerHTML = `<div class="p-3 text-center text-slate-400 text-xs bg-slate-50 rounded-lg">Aucune équipe enregistrée.</div>`;
+        return;
+    }
+
+    container.innerHTML = keys.map(tKey => {
+        const team = state.teams[tKey];
+        return `
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                <div>
+                    <span class="font-bold uppercase text-slate-800">${tKey}</span> : <span class="text-slate-600">${team.name}</span>
+                </div>
+                <button type="button" onclick="deleteTeam('${tKey}')" class="text-red-500 hover:text-red-700 p-1"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        `;
+    }).join('');
+
+    // Mettre à jour automatiquement tous les menus déroulants d'équipes du site
+    updateAllTeamDropdowns();
+}
+
+// 3. Supprimer une équipe
+function deleteTeam(teamKey) {
+    if (confirm(`Voulez-vous vraiment supprimer l'équipe ${teamKey} ?`)) {
+        firebase.database().ref('teams/' + teamKey).remove();
+    }
+}
+
+// 4. Mettre à jour dynamiquement tous les sélecteurs <select> d'équipes dans l'app
+function updateAllTeamDropdowns() {
+    // Cherche tous les éléments <select> qui ont la classe 'team-select' ou l'ID 'm-team', etc.
+    const selects = document.querySelectorAll('#m-team, #admin-team-select, .team-select');
+    const keys = Object.keys(state.teams || {});
+
+    selects.forEach(select => {
+        if (!select) return;
+        select.innerHTML = keys.map(tKey => {
+            const team = state.teams[tKey];
+            return `<option value="${tKey}">${team.name || tKey.toUpperCase()}</option>`;
+        }).join('');
+    });
+}
+
+// 5. Écouter les équipes en temps réel depuis Firebase (à placer dans votre initialisation globale)
+firebase.database().ref('teams').on('value', (snapshot) => {
+    const data = snapshot.val() || {};
+    renderAdminTeams(data);
+});
