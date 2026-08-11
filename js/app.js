@@ -654,6 +654,8 @@ Object.values(state.trainings).forEach(session => {
 
             tbody.innerHTML = htmlRows;
 
+            }
+
         // ============================================================
         // MODULE ENTRAÎNEMENTS — REFONTE COMPLÈTE
         // ============================================================
