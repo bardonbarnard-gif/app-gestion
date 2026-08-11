@@ -1,57 +1,67 @@
-// Définition des différents codes PIN pour chaque rôle
-const PINS = {
-    admin: "2901",       // Ton code administrateur actuel
-    adjoint: "5678",     // Code du coach adjoint
-    responsable: "0000", // Code du responsable
-    public: "9999"       // Code joueurs / parents
-};
-
 document.addEventListener("DOMContentLoaded", () => {
     const pinScreen = document.getElementById("pin-screen");
     const pinInput = document.getElementById("pin-input");
     const pinError = document.getElementById("pin-error");
 
     // Vérifier si l'utilisateur s'est déjà authentifié durant cette session
-    const savedRole = sessionStorage.getItem("currentUserRole");
-    if (savedRole && PINS[savedRole]) {
-        // Restaure le rôle en mémoire
-        window.currentUserRole = savedRole; 
-        if (pinScreen) pinScreen.style.display = "none";
-        applyPermissions(); // On applique aussi les permissions si déjà en cache
-        return;
+    const savedUserStr = sessionStorage.getItem("currentUserData");
+    if (savedUserStr) {
+        try {
+            const userData = JSON.parse(savedUserStr);
+            window.currentUserRole = userData.role; // On garde la compatibilité avec vos permissions
+            window.currentUserName = userData.name; // Optionnel : pour stocker le nom du coach
+            
+            if (pinScreen) pinScreen.style.display = "none";
+            applyPermissions(); 
+            return;
+        } catch (e) {
+            sessionStorage.removeItem("currentUserData");
+        }
     }
 
     if (pinInput) {
         pinInput.focus();
-        pinInput.addEventListener("input", (e) => {
-            if (e.target.value.length === 4) {
-                const enteredPin = e.target.value;
-                let matchedRole = null;
+        pinInput.addEventListener("input", async (e) => {
+            const enteredPin = e.target.value;
 
-                // On cherche quel rôle correspond au code tapé
-                if (enteredPin === PINS.admin) matchedRole = "admin";
-                else if (enteredPin === PINS.adjoint) matchedRole = "adjoint";
-                else if (enteredPin === PINS.responsable) matchedRole = "responsable";
-                else if (enteredPin === PINS.public) matchedRole = "public";
+            if (enteredPin.length === 4) {
+                try {
+                    // Interrogation de Firebase Realtime Database
+                    const pinRef = firebase.database().ref("rangueil_data/access/" + enteredPin);
+                    const snapshot = await pinRef.once("value");
 
-                if (matchedRole) {
-                    // Code correct : on mémorise le rôle et on masque l'écran
-                    window.currentUserRole = matchedRole;
-                    sessionStorage.setItem("currentUserRole", matchedRole);
-                    sessionStorage.setItem("isUnlocked", "true");
+                    if (snapshot.exists()) {
+                        const userData = snapshot.val(); 
+                        // userData contient par exemple : { name: "Thomas", role: "admin", team: "U14" }
 
-                    if (pinScreen) {
-                        pinScreen.style.opacity = "0";
-                        pinScreen.style.transition = "opacity 0.3s ease";
-                        setTimeout(() => {
-                            pinScreen.remove();
-                            applyPermissions();
-                        }, 300);
+                        // On mémorise les infos utilisateur
+                        window.currentUserRole = userData.role; 
+                        window.currentUserName = userData.name;
+                        
+                        sessionStorage.setItem("currentUserData", JSON.stringify(userData));
+                        sessionStorage.setItem("currentUserRole", userData.role);
+                        sessionStorage.setItem("isUnlocked", "true");
+
+                        // Animation de disparition de l'écran PIN (identique à votre code)
+                        if (pinScreen) {
+                            pinScreen.style.opacity = "0";
+                            pinScreen.style.transition = "opacity 0.3s ease";
+                            setTimeout(() => {
+                                pinScreen.remove();
+                                applyPermissions();
+                            }, 300);
+                        }
+                    } else {
+                        // Code incorrect trouvé dans Firebase
+                        if (pinError) pinError.style.display = "block";
+                        pinInput.value = "";
                     }
-                } // <--- C'EST CETTE ACCOLADE QUI MANQUAIT ICI !
-                else {
-                    // Code incorrect : on signale l'erreur et on vide le champ
-                    if (pinError) pinError.style.display = "block";
+                } catch (error) {
+                    console.error("Erreur de connexion à Firebase pour le PIN :", error);
+                    if (pinError) {
+                        pinError.textContent = "Erreur de connexion";
+                        pinError.style.display = "block";
+                    }
                     pinInput.value = "";
                 }
             } else {
@@ -60,17 +70,19 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
- 
+
 function applyPermissions() {
     const role = window.currentUserRole || 'public';
 
     // --- MISE À JOUR DU TEXTE DU RÔLE ---
     const roleLabel = document.getElementById("user-role-label");
     if (roleLabel) {
-        let roleName = "Public";
-        if (role === "admin") roleName = "Administrateur";
-        else if (role === "adjoint") roleName = "Coach Adjoint";
-        else if (role === "responsable") roleName = "Responsable";
+        let roleName = window.currentUserName || "Public";
+        // Si vous préférez afficher le nom du coach (ex: "Thomas") au lieu du rôle brut, 
+        // ou garder le libellé du rôle selon votre préférence :
+        if (role === "admin") roleName = window.currentUserName ? `${window.currentUserName} (Admin)` : "Administrateur";
+        else if (role === "adjoint" || role === "coach") roleName = window.currentUserName || "Coach Adjoint";
+        else if (role === "responsable") roleName = window.currentUserName || "Responsable";
 
         roleLabel.textContent = roleName;
     }
@@ -86,13 +98,12 @@ function applyPermissions() {
             }
         });
     } 
-    else if (role === 'adjoint') {
+    else if (role === 'adjoint' || role === 'coach') {
         document.querySelectorAll('.admin-only').forEach(el => {
             el.style.display = 'none';
         });
     }
 }
-
  // --- 1. CONFIGURATION & PWA ---
         if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
             window.addEventListener('load', () => {
