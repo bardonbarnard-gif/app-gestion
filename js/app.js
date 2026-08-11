@@ -1,4 +1,4 @@
- // Définition des différents codes PIN pour chaque rôle
+// Définition des différents codes PIN pour chaque rôle
 const PINS = {
     admin: "2901",       // Ton code administrateur actuel
     adjoint: "5678",     // Code du coach adjoint
@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Restaure le rôle en mémoire
         window.currentUserRole = savedRole; 
         if (pinScreen) pinScreen.style.display = "none";
+        applyPermissions(); // On applique aussi les permissions si déjà en cache
         return;
     }
 
@@ -42,11 +43,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (pinScreen) {
                         pinScreen.style.opacity = "0";
                         pinScreen.style.transition = "opacity 0.3s ease";
-                     setTimeout(() => {
+                        setTimeout(() => {
                             pinScreen.remove();
-                            applyPermissions(); // <--- C'est cette ligne qu'on ajoute ici
+                            applyPermissions();
                         }, 300);
-                } else {
+                    }
+                } // <--- C'EST CETTE ACCOLADE QUI MANQUAIT ICI !
+                else {
                     // Code incorrect : on signale l'erreur et on vide le champ
                     if (pinError) pinError.style.display = "block";
                     pinInput.value = "";
