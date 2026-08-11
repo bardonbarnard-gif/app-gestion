@@ -1,5 +1,10 @@
- // Définissez votre code PIN secret à 4 chiffres ici
-const CORRECT_PIN = "2901"; // Vous pourrez le modifier par le code de votre choix
+ // Définition des différents codes PIN pour chaque rôle
+const PINS = {
+    admin: "2901",       // Ton code administrateur actuel
+    adjoint: "5678",     // Code du coach adjoint
+    responsable: "0000", // Code du responsable
+    public: "9999"       // Code joueurs / parents
+};
 
 document.addEventListener("DOMContentLoaded", () => {
     const pinScreen = document.getElementById("pin-screen");
@@ -7,7 +12,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const pinError = document.getElementById("pin-error");
 
     // Vérifier si l'utilisateur s'est déjà authentifié durant cette session
-    if (sessionStorage.getItem("isUnlocked") === "true") {
+    const savedRole = sessionStorage.getItem("currentUserRole");
+    if (savedRole && PINS[savedRole]) {
+        // Restaure le rôle en mémoire
+        window.currentUserRole = savedRole; 
         if (pinScreen) pinScreen.style.display = "none";
         return;
     }
@@ -16,9 +24,21 @@ document.addEventListener("DOMContentLoaded", () => {
         pinInput.focus();
         pinInput.addEventListener("input", (e) => {
             if (e.target.value.length === 4) {
-                if (e.target.value === CORRECT_PIN) {
-                    // Code correct : on mémorise la session et on masque l'écran
+                const enteredPin = e.target.value;
+                let matchedRole = null;
+
+                // On cherche quel rôle correspond au code tapé
+                if (enteredPin === PINS.admin) matchedRole = "admin";
+                else if (enteredPin === PINS.adjoint) matchedRole = "adjoint";
+                else if (enteredPin === PINS.responsable) matchedRole = "responsable";
+                else if (enteredPin === PINS.public) matchedRole = "public";
+
+                if (matchedRole) {
+                    // Code correct : on mémorise le rôle et on masque l'écran
+                    window.currentUserRole = matchedRole;
+                    sessionStorage.setItem("currentUserRole", matchedRole);
                     sessionStorage.setItem("isUnlocked", "true");
+
                     if (pinScreen) {
                         pinScreen.style.opacity = "0";
                         pinScreen.style.transition = "opacity 0.3s ease";
