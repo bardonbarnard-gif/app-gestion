@@ -567,8 +567,8 @@ Object.values(state.trainings).forEach(session => {
             carpoolBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${totalSeats < 14 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`;
             carpoolBanner.innerHTML = `<div class="font-bold text-xs">Covoiturage : ${totalSeats} / 14 places</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${totalSeats < 14 ? 'bg-amber-200' : 'bg-emerald-200'}">${totalSeats < 14 ? '⚠️ Transport' : '🟢 OK'}</span>`;
 
-// 1. Rendu des Joueurs : Cartes sur mobile, Vrai Tableau sur PC
-            let htmlRows = '';
+// 1. Rendu des Joueurs : Séparation claire Mobile (Cartes) / PC (Tableau)
+            let htmlMobileCards = '';
             let htmlTableRows = '';
 
             state.players.forEach(p => {
@@ -579,9 +579,9 @@ Object.values(state.trainings).forEach(session => {
                 const postes = getPlayerPostesList(p);
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
 
-                // --- VUE MOBILE (Cartes empilées - visible uniquement sur mobile) ---
-                htmlRows += `
-                    <div class="block sm:hidden bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 mb-2.5 shadow-sm space-y-3">
+                // --- HTML POUR MOBILE (Cartes) ---
+                htmlMobileCards += `
+                    <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 shadow-sm space-y-3">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-2.5">
                                 <div class="inline-flex rounded-lg border p-0.5 bg-slate-100 shrink-0">
@@ -628,9 +628,9 @@ Object.values(state.trainings).forEach(session => {
                     </div>
                 `;
 
-                // --- VUE PC (Ligne de tableau classique - visible uniquement sur PC : display none sur mobile, table-row sur PC) ---
+                // --- HTML POUR PC (Lignes de tableau classiques) ---
                 htmlTableRows += `
-                    <tr class="hidden sm:table-row ${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
+                    <tr class="${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
                         <td class="p-3 pl-4">
                             <div class="font-bold text-slate-800">${p.name}</div>
                             <div class="text-[10px] text-slate-400">Poste favori : ${p.poste1 || '-'}</div>
@@ -670,14 +670,11 @@ Object.values(state.trainings).forEach(session => {
                 `;
             });
 
-            // Pour que ça fonctionne proprement dans le DOM : 
-            // On met les cartes mobiles dans un conteneur dédié ou avant le tableau, et les lignes dans le tbody.
-            // Astuce : On injecte les lignes de tableau dans le tbody, et pour les cartes mobiles, on peut les placer juste au-dessus du tableau.
+            // Injection dans les deux conteneurs respectifs
+            const mobileContainer = document.getElementById('mobile-players-container');
+            if (mobileContainer) mobileContainer.innerHTML = htmlMobileCards;
             
             tbody.innerHTML = htmlTableRows;
-            
-            // Gestion de l'affichage des cartes mobiles en dehors ou via un conteneur spécifique. 
-            // Le plus simple : s'assurer qu'un bloc pour les cartes existe, ou injecter les deux.
 
 
             // 2. Rendu du Staff / Coachs optimisé mobile
