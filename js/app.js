@@ -567,7 +567,7 @@ Object.values(state.trainings).forEach(session => {
             carpoolBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${totalSeats < 14 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`;
             carpoolBanner.innerHTML = `<div class="font-bold text-xs">Covoiturage : ${totalSeats} / 14 places</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${totalSeats < 14 ? 'bg-amber-200' : 'bg-emerald-200'}">${totalSeats < 14 ? '⚠️ Transport' : '🟢 OK'}</span>`;
 
-// 1. Rendu des Joueurs : Séparation claire Mobile (Cartes) / PC (Tableau)
+            // 1. Rendu des Joueurs : Séparation claire Mobile (Cartes) / PC (Tableau)
             let htmlMobileCards = '';
             let htmlTableRows = '';
 
@@ -581,7 +581,7 @@ Object.values(state.trainings).forEach(session => {
 
                 // --- HTML POUR MOBILE (Cartes) ---
                 htmlMobileCards += `
-                    <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 shadow-sm space-y-3">
+                    <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 shadow-sm space-y-3 mb-2.5">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-2.5">
                                 <div class="inline-flex rounded-lg border p-0.5 bg-slate-100 shrink-0">
@@ -670,19 +670,33 @@ Object.values(state.trainings).forEach(session => {
                 `;
             });
 
-            // Injection dans les deux conteneurs respectifs
-            const mobileContainer = document.getElementById('mobile-players-container');
-            if (mobileContainer) mobileContainer.innerHTML = htmlMobileCards;
-            
-            tbody.innerHTML = htmlTableRows;
+            // 2. Rendu du Staff / Coachs (pour Mobile et PC séparément)
+            let staffTableRows = '';
+            let staffMobileCards = '';
 
-
-            // 2. Rendu du Staff / Coachs optimisé mobile
             if (state.staff && state.staff.length > 0) {
-                htmlRows += `<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">Encadrement / Staff Officiel</div>`;
-                htmlRows += state.staff.map(member => {
+                staffTableRows += `<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">Encadrement / Staff Officiel</td></tr>`;
+                staffMobileCards += `<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">Encadrement / Staff Officiel</div>`;
+
+                state.staff.forEach(member => {
                     const hasStaffLicence = member.licence && member.licence.trim() !== '';
-                    return `
+                    
+                    staffTableRows += `
+                        <tr class="bg-sky-50/20 border-b border-slate-100">
+                            <td class="p-3 pl-4">
+                                <div class="font-bold text-slate-800">${member.name}</div>
+                                <span class="text-[10px] text-sky-700 font-semibold">${member.role}</span>
+                            </td>
+                            <td class="p-3" colspan="5">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-slate-600">Licence :</span>
+                                    <span class="font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border text-xs">${hasStaffLicence ? member.licence : 'Non renseignée'}</span>
+                                    ${hasStaffLicence ? `<button onclick="navigator.clipboard.writeText('${member.licence}'); showToast('Licence copiée !')" class="p-1 bg-slate-100 hover:bg-sky-100 text-sky-600 rounded text-xs" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>` : ''}
+                                </div>
+                            </td>
+                        </tr>`;
+
+                    staffMobileCards += `
                         <div class="bg-sky-50/30 border border-slate-200 rounded-xl p-3 mb-2 flex items-center justify-between gap-2">
                             <div>
                                 <div class="font-bold text-slate-800 text-xs">${member.name}</div>
@@ -693,12 +707,19 @@ Object.values(state.trainings).forEach(session => {
                                 ${hasStaffLicence ? `<button onclick="navigator.clipboard.writeText('${member.licence}'); showToast('Licence copiée !')" class="p-1 bg-white hover:bg-sky-100 text-sky-600 rounded text-xs border" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>` : ''}
                             </div>
                         </div>`;
-                }).join('');
+                });
             }
 
-            tbody.innerHTML = htmlRows;
-
+            // Injection finale propre dans les deux conteneurs
+            const mobileContainer = document.getElementById('mobile-players-container');
+            if (mobileContainer) {
+                mobileContainer.innerHTML = htmlMobileCards + staffMobileCards;
             }
+            
+            if (tbody) {
+                tbody.innerHTML = htmlTableRows + staffTableRows;
+            }
+}
 
         // ============================================================
         // MODULE ENTRAÎNEMENTS — REFONTE COMPLÈTE
