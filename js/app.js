@@ -567,8 +567,11 @@ Object.values(state.trainings).forEach(session => {
             carpoolBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${totalSeats < 14 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`;
             carpoolBanner.innerHTML = `<div class="font-bold text-xs">Covoiturage : ${totalSeats} / 14 places</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${totalSeats < 14 ? 'bg-amber-200' : 'bg-emerald-200'}">${totalSeats < 14 ? '⚠️ Transport' : '🟢 OK'}</span>`;
 
-           // 1. Rendu des Joueurs en Cartes mobiles complètes
-            let htmlRows = state.players.map(p => {
+         // 1. Rendu des Joueurs : Cartes sur mobile, Tableau sur PC
+            let htmlRows = '';
+            let htmlTableRows = '';
+
+            state.players.forEach(p => {
                 const currentStatus = m.convocations[p.id] || 'none';
                 const selectedPosition = m.positions[p.id] || p.poste1 || '-';
                 const jerseyNumber = m.jerseys[p.id] || '';
@@ -576,8 +579,9 @@ Object.values(state.trainings).forEach(session => {
                 const postes = getPlayerPostesList(p);
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
 
-                return `
-                    <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 mb-2.5 shadow-sm space-y-3">
+                // --- VUE MOBILE : LA CARTE EMPILÉE (Affichée uniquement sur mobile : block sm:hidden) ---
+                htmlRows += `
+                    <div class="block sm:hidden bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 mb-2.5 shadow-sm space-y-3">
                         
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-2.5">
@@ -586,33 +590,33 @@ Object.values(state.trainings).forEach(session => {
                                     <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
                                 </div>
                                 <div>
-                                    <div class="font-bold text-slate-800 text-xs sm:text-sm">${p.name}</div>
-                                    <div class="text-[10px] text-slate-400">Joueur • Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
+                                    <div class="font-bold text-slate-800 text-xs">${p.name}</div>
+                                    <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-xs">
-                            <div class="flex items-center justify-between sm:justify-start space-x-2 bg-slate-50 p-2 rounded-lg">
+                        <div class="grid grid-cols-1 gap-2 pt-2 border-t border-slate-100 text-xs">
+                            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
                                 <span class="text-[10px] text-slate-500 uppercase font-bold">Licence :</span>
                                 <div class="flex items-center space-x-1.5">
                                     <span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border text-xs">${hasLicence ? p.licence : '⚠️ Manquante'}</span>
-                                    ${hasLicence ? `<button onclick="copyLicence('${p.licence}')" class="p-1 bg-white hover:bg-sky-100 text-slate-500 rounded border" title="Copier la licence"><i class="fa-solid fa-copy text-xs"></i></button>` : ''}
+                                    ${hasLicence ? `<button onclick="copyLicence('${p.licence}')" class="p-1 bg-white hover:bg-sky-100 text-slate-500 rounded border"><i class="fa-solid fa-copy text-xs"></i></button>` : ''}
                                 </div>
                             </div>
 
-                            <div class="flex items-center justify-between sm:justify-start space-x-2 bg-slate-50 p-2 rounded-lg">
+                            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
                                 <span class="text-[10px] text-slate-500 uppercase font-bold">Poste :</span>
-                                <select onchange="setMatchPosition('${m.id}', '${p.id}', this.value)" class="bg-white border border-sky-300 font-bold text-xs text-sky-900 py-1 px-2 rounded-lg w-full sm:w-auto">
+                                <select onchange="setMatchPosition('${m.id}', '${p.id}', this.value)" class="bg-white border border-sky-300 font-bold text-xs text-sky-900 py-1 px-2 rounded-lg">
                                     ${postes.map(pos => `<option value="${pos}" ${pos === selectedPosition ? 'selected' : ''}>${pos}</option>`).join('')}
                                     <option value="Gardien" ${selectedPosition === 'Gardien' ? 'selected' : ''}>Gardien</option>
                                     <option value="Remplaçant" ${selectedPosition === 'Remplaçant' ? 'selected' : ''}>Remplaçant</option>
                                 </select>
                             </div>
 
-                            <div class="flex items-center justify-between sm:justify-start space-x-2 bg-slate-50 p-2 rounded-lg">
-                                <span class="text-[10px] text-slate-500 uppercase font-bold">Maillot :</span>
-                                <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-14 p-1 border rounded text-center font-bold text-xs bg-white">
+                            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Maillot N° :</span>
+                                <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-16 p-1 border rounded text-center font-bold text-xs bg-white">
                             </div>
                         </div>
 
@@ -626,12 +630,76 @@ Object.values(state.trainings).forEach(session => {
                                 <option value="5" ${carpoolSeats == 5 ? 'selected' : ''}>🚗 5 places</option>
                             </select>
                         </div>
-
                     </div>
                 `;
-            }).join('');
 
-            
+                // --- VUE PC : LE TABLEAU CLASSIQUE LARGEMENT OPTIMISÉ (Affiché uniquement sur grand écran : hidden sm:table-row) ---
+                htmlTableRows += `
+                    <tr class="hidden sm:table-row ${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
+                        <td class="p-3 pl-4">
+                            <div class="font-bold text-slate-800">${p.name}</div>
+                            <div class="text-[10px] text-slate-400">Poste favori : ${p.poste1 || '-'}</div>
+                        </td>
+                        <td class="p-3">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border text-xs">${hasLicence ? p.licence : '⚠️'}</span>
+                                ${hasLicence ? `<button onclick="copyLicence('${p.licence}')" class="p-1 bg-slate-100 hover:bg-sky-100 text-slate-500 rounded"><i class="fa-solid fa-copy text-xs"></i></button>` : ''}
+                            </div>
+                        </td>
+                        <td class="p-3">
+                            <select onchange="setMatchPosition('${m.id}', '${p.id}', this.value)" class="bg-white border border-sky-300 font-bold text-xs text-sky-900 py-1 px-2 rounded-lg">
+                                ${postes.map(pos => `<option value="${pos}" ${pos === selectedPosition ? 'selected' : ''}>${pos}</option>`).join('')}
+                                <option value="Gardien" ${selectedPosition === 'Gardien' ? 'selected' : ''}>Gardien</option>
+                                <option value="Remplaçant" ${selectedPosition === 'Remplaçant' ? 'selected' : ''}>Remplaçant</option>
+                            </select>
+                        </td>
+                        <td class="p-3 text-center">
+                            <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-14 p-1 border rounded text-center font-bold text-xs bg-white">
+                        </td>
+                        <td class="p-3 text-center">
+                            <select onchange="setMatchCarpool('${m.id}', '${p.id}', this.value)" class="bg-white border font-bold text-xs py-1 px-2 rounded-lg">
+                                <option value="0" ${carpoolSeats == 0 ? 'selected' : ''}>0 place</option>
+                                <option value="2" ${carpoolSeats == 2 ? 'selected' : ''}>🚗 2 places</option>
+                                <option value="3" ${carpoolSeats == 3 ? 'selected' : ''}>🚗 3 places</option>
+                                <option value="4" ${carpoolSeats == 4 ? 'selected' : ''}>🚗 4 places</option>
+                                <option value="5" ${carpoolSeats == 5 ? 'selected' : ''}>🚗 5 places</option>
+                            </select>
+                        </td>
+                        <td class="p-3 text-center">
+                            <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
+                                <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
+                                <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Combiner les deux (les cartes mobiles s'afficheront sur téléphone, le tableau s'affichera sur PC)
+            let finalRows = htmlRows + htmlTableRows;
+
+            // 2. Rendu du Staff / Coachs
+            if (state.staff && state.staff.length > 0) {
+                finalRows += `<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">Encadrement / Staff Officiel</div>`;
+                finalRows += state.staff.map(member => {
+                    const hasStaffLicence = member.licence && member.licence.trim() !== '';
+                    return `
+                        <div class="bg-sky-50/30 border border-slate-200 rounded-xl p-3 mb-2 flex items-center justify-between gap-2">
+                            <div>
+                                <div class="font-bold text-slate-800 text-xs">${member.name}</div>
+                                <span class="text-[10px] text-sky-700 font-semibold">${member.role}</span>
+                            </div>
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border text-xs">${hasStaffLicence ? member.licence : 'Non renseignée'}</span>
+                                ${hasStaffLicence ? `<button onclick="navigator.clipboard.writeText('${member.licence}'); showToast('Licence copiée !')" class="p-1 bg-white hover:bg-sky-100 text-sky-600 rounded text-xs border" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>` : ''}
+                            </div>
+                        </div>`;
+                }).join('');
+            }
+
+            tbody.innerHTML = finalRows;
+
+
             // 2. Rendu du Staff / Coachs optimisé mobile
             if (state.staff && state.staff.length > 0) {
                 htmlRows += `<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">Encadrement / Staff Officiel</div>`;
