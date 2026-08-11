@@ -64,7 +64,18 @@ document.addEventListener("DOMContentLoaded", () => {
 function applyPermissions() {
     const role = window.currentUserRole || 'public';
 
-    // 1. Si c'est un Public ou un Responsable : lecture seule
+    // --- MISE À JOUR DU TEXTE DU RÔLE ---
+    const roleLabel = document.getElementById("user-role-label");
+    if (roleLabel) {
+        let roleName = "Public";
+        if (role === "admin") roleName = "Administrateur";
+        else if (role === "adjoint") roleName = "Coach Adjoint";
+        else if (role === "responsable") roleName = "Responsable";
+
+        roleLabel.textContent = roleName;
+    }
+
+    // --- RESTRICTIONS ---
     if (role === 'public' || role === 'responsable') {
         document.querySelectorAll('.admin-only, .adjoint-only').forEach(el => {
             el.style.display = 'none';
@@ -75,13 +86,11 @@ function applyPermissions() {
             }
         });
     } 
-    // 2. Si c'est le Coach Adjoint : masqué uniquement les éléments admin-only
     else if (role === 'adjoint') {
         document.querySelectorAll('.admin-only').forEach(el => {
             el.style.display = 'none';
         });
     }
-    // 3. Si c'est l'Admin : tout est visible et accessible
 }
 
  // --- 1. CONFIGURATION & PWA ---
