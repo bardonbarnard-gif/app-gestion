@@ -42,8 +42,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (pinScreen) {
                         pinScreen.style.opacity = "0";
                         pinScreen.style.transition = "opacity 0.3s ease";
-                        setTimeout(() => pinScreen.remove(), 300);
-                    }
+                     setTimeout(() => {
+                            pinScreen.remove();
+                            applyPermissions(); // <--- C'est cette ligne qu'on ajoute ici
+                        }, 300);
                 } else {
                     // Code incorrect : on signale l'erreur et on vide le champ
                     if (pinError) pinError.style.display = "block";
@@ -56,6 +58,36 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
  
+function applyPermissions() {
+    const role = window.currentUserRole || 'public';
+
+    // Si c'est un Public ou un Responsable : lecture seule
+    if (role === 'public' || role === 'responsable') {
+        document.querySelectorAll('.admin-only, .adjoint-only').forEach(el => {
+            el.style.display = 'none';
+        });
+        document.querySelectorAll('select, input, button.status-btn').forEach(el => {
+            if (!el.classList.contains('allow-public')) {
+                el.disabled = true;
+            }
+        });
+    } 
+    // Si c'est le Coach Adjoint : pas d'actions super-admin
+    else if (role === 'adjoint') {
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = 'none';
+        });
+    }
+}
+    // 2. Si c'est le Coach Adjoint : il peut gérer les matchs et convocations, mais pas les actions "Super Admin" (comme supprimer un match ou l'effectif du club)
+    else if (role === 'adjoint') {
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = 'none'; // Masqué pour l'adjoint
+        });
+    }
+    // 3. Si c'est l'Admin : tout est visible et accessible (rien à cacher)
+}
+
  // --- 1. CONFIGURATION & PWA ---
         if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
             window.addEventListener('load', () => {
