@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function applyPermissions() {
     const role = window.currentUserRole || 'public';
 
-    // Si c'est un Public ou un Responsable : lecture seule
+    // 1. Si c'est un Public ou un Responsable : lecture seule
     if (role === 'public' || role === 'responsable') {
         document.querySelectorAll('.admin-only, .adjoint-only').forEach(el => {
             el.style.display = 'none';
@@ -75,20 +75,13 @@ function applyPermissions() {
             }
         });
     } 
-    // Si c'est le Coach Adjoint : pas d'actions super-admin
+    // 2. Si c'est le Coach Adjoint : masqué uniquement les éléments admin-only
     else if (role === 'adjoint') {
         document.querySelectorAll('.admin-only').forEach(el => {
             el.style.display = 'none';
         });
     }
-}
-    // 2. Si c'est le Coach Adjoint : il peut gérer les matchs et convocations, mais pas les actions "Super Admin" (comme supprimer un match ou l'effectif du club)
-    else if (role === 'adjoint') {
-        document.querySelectorAll('.admin-only').forEach(el => {
-            el.style.display = 'none'; // Masqué pour l'adjoint
-        });
-    }
-    // 3. Si c'est l'Admin : tout est visible et accessible (rien à cacher)
+    // 3. Si c'est l'Admin : tout est visible et accessible
 }
 
  // --- 1. CONFIGURATION & PWA ---
