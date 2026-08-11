@@ -73,23 +73,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function applyPermissions() {
     const role = window.currentUserRole || 'public';
+    const userTeam = window.currentUserTeam || 'all'; // Récupère l'équipe ou les équipes de l'utilisateur
 
     // --- MISE À JOUR DU TEXTE DU RÔLE ---
     const roleLabel = document.getElementById("user-role-label");
     if (roleLabel) {
         let roleName = window.currentUserName || "Public";
-        // Si vous préférez afficher le nom du coach (ex: "Thomas") au lieu du rôle brut, 
-        // ou garder le libellé du rôle selon votre préférence :
-        if (role === "admin") roleName = window.currentUserName ? `${window.currentUserName} (Admin)` : "Administrateur";
-        else if (role === "adjoint" || role === "coach") roleName = window.currentUserName || "Coach Adjoint";
-        else if (role === "responsable") roleName = window.currentUserName || "Responsable";
+        
+        if (role === "admin") {
+            roleName = window.currentUserName ? `${window.currentUserName} (Admin)` : "Administrateur";
+        } else if (role === "dirigeant") {
+            roleName = window.currentUserName ? `${window.currentUserName} (Dirigeant)` : "Dirigeant";
+        } else if (role === "responsable") {
+            roleName = window.currentUserName ? `${window.currentUserName} (Responsable)` : "Responsable";
+        } else if (role === "coach") {
+            roleName = window.currentUserName ? `${window.currentUserName} (Coach)` : "Coach";
+        }
 
         roleLabel.textContent = roleName;
     }
 
-    // --- RESTRICTIONS ---
-    if (role === 'public' || role === 'responsable') {
-        document.querySelectorAll('.admin-only, .adjoint-only').forEach(el => {
+    // --- RESTRICTIONS SELON LES RÔLES ---
+    // 1. Pour le public, les responsables et les dirigeants : pas de modification (lecture seule)
+    if (role === 'public' || role === 'responsable' || role === 'dirigeant') {
+        document.querySelectorAll('.admin-only, .adjoint-only, .coach-only').forEach(el => {
             el.style.display = 'none';
         });
         document.querySelectorAll('select, input, button.status-btn').forEach(el => {
@@ -98,10 +105,20 @@ function applyPermissions() {
             }
         });
     } 
-    else if (role === 'adjoint' || role === 'coach') {
+    // 2. Pour les coachs : ils peuvent modifier, mais on pourra filtrer si besoin selon leur équipe `userTeam`
+    else if (role === 'coach') {
         document.querySelectorAll('.admin-only').forEach(el => {
             el.style.display = 'none';
         });
+        // Ici, le coach garde ses droits d'écriture, mais l'application pourra utiliser `userTeam` 
+        // pour filtrer par exemple l'affichage des matchs ou des joueurs de son équipe.
+    }
+    // 3. Pour l'admin : tout est autorisé (pas de restriction)
+
+    // --- AFFICHAGE DU BOUTON ADMIN ---
+    // Cette fonction vérifie si l'utilisateur est admin pour afficher ou masquer le bouton de la console
+    if (typeof checkAdminAccessUI === "function") {
+        checkAdminAccessUI();
     }
 }
  // --- 1. CONFIGURATION & PWA ---
