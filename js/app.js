@@ -567,7 +567,7 @@ Object.values(state.trainings).forEach(session => {
             carpoolBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${totalSeats < 14 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`;
             carpoolBanner.innerHTML = `<div class="font-bold text-xs">Covoiturage : ${totalSeats} / 14 places</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${totalSeats < 14 ? 'bg-amber-200' : 'bg-emerald-200'}">${totalSeats < 14 ? '⚠️ Transport' : '🟢 OK'}</span>`;
 
-            // 1. Rendu des Joueurs
+           // 1. Rendu des Joueurs en Cartes mobiles fluides
             let htmlRows = state.players.map(p => {
                 const currentStatus = m.convocations[p.id] || 'none';
                 const selectedPosition = m.positions[p.id] || p.poste1 || '-';
@@ -577,18 +577,49 @@ Object.values(state.trainings).forEach(session => {
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
 
                 return `
-                    <tr class="${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''}">
-                        <td class="p-3 pl-4"><div class="font-bold text-slate-800">${p.name} <span class="text-[10px] text-slate-400 font-normal">(Joueur)</span></div></td>
-                        <td class="p-3">
-                            ${currentStatus === 'convoke' ? `<div class="flex items-center space-x-1.5"><span class="font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border text-xs">${hasLicence ? p.licence : '⚠️'}</span>${hasLicence ? `<button onclick="copyLicence('${p.licence}')" class="p-1 bg-slate-100 hover:bg-sky-100 text-slate-500 rounded"><i class="fa-solid fa-copy text-xs"></i></button>` : ''}</div>` : `<span class="text-slate-400 text-[10px]">-</span>`}
-                        </td>
-                        <td class="p-3">
-                            ${currentStatus === 'convoke' ? `<select onchange="setMatchPosition('${m.id}', '${p.id}', this.value)" class="bg-white border border-sky-300 font-bold text-xs text-sky-900 py-1 px-2 rounded-lg">${postes.map(pos => `<option value="${pos}" ${pos === selectedPosition ? 'selected' : ''}>${pos}</option>`).join('')}<option value="Gardien" ${selectedPosition === 'Gardien' ? 'selected' : ''}>Gardien</option><option value="Remplaçant" ${selectedPosition === 'Remplaçant' ? 'selected' : ''}>Remplaçant</option></select>` : `<span class="text-slate-400 text-[10px]">-</span>`}
-                        </td>
-                        <td class="p-3 text-center">
-                            ${currentStatus === 'convoke' ? `<input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-14 p-1 border rounded text-center font-bold text-xs bg-white">` : `<span class="text-slate-400 text-[10px]">-</span>`}
-                        </td>
-                        <td class="p-3 text-center">
+                    <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 mb-2.5 shadow-sm space-y-3">
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2.5">
+                                <div class="inline-flex rounded-lg border p-0.5 bg-slate-100 shrink-0">
+                                    <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
+                                    <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-slate-800 text-xs sm:text-sm">${p.name}</div>
+                                    <div class="text-[10px] text-slate-400">Joueur</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${currentStatus === 'convoke' ? `
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-xs">
+                                <div class="flex items-center justify-between sm:justify-start space-x-2 bg-slate-50 p-2 rounded-lg">
+                                    <span class="text-[10px] text-slate-500 uppercase font-bold">Licence :</span>
+                                    <div class="flex items-center space-x-1.5">
+                                        <span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border text-xs">${hasLicence ? p.licence : '⚠️'}</span>
+                                        ${hasLicence ? `<button onclick="copyLicence('${p.licence}')" class="p-1 bg-white hover:bg-sky-100 text-slate-500 rounded border"><i class="fa-solid fa-copy text-xs"></i></button>` : ''}
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between sm:justify-start space-x-2 bg-slate-50 p-2 rounded-lg">
+                                    <span class="text-[10px] text-slate-500 uppercase font-bold">Poste :</span>
+                                    <select onchange="setMatchPosition('${m.id}', '${p.id}', this.value)" class="bg-white border border-sky-300 font-bold text-xs text-sky-900 py-1 px-2 rounded-lg w-full sm:w-auto">
+                                        ${postes.map(pos => `<option value="${pos}" ${pos === selectedPosition ? 'selected' : ''}>${pos}</option>`).join('')}
+                                        <option value="Gardien" ${selectedPosition === 'Gardien' ? 'selected' : ''}>Gardien</option>
+                                        <option value="Remplaçant" ${selectedPosition === 'Remplaçant' ? 'selected' : ''}>Remplaçant</option>
+                                    </select>
+                                </div>
+
+                                <div class="flex items-center justify-between sm:justify-start space-x-2 bg-slate-50 p-2 rounded-lg">
+                                    <span class="text-[10px] text-slate-500 uppercase font-bold">Maillot :</span>
+                                    <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-14 p-1 border rounded text-center font-bold text-xs bg-white">
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-xs bg-slate-50/50 p-2 rounded-lg">
+                            <span class="text-[10px] text-slate-500 uppercase font-bold">Covoiturage :</span>
                             <select onchange="setMatchCarpool('${m.id}', '${p.id}', this.value)" class="bg-white border font-bold text-xs py-1 px-2 rounded-lg">
                                 <option value="0" ${carpoolSeats == 0 ? 'selected' : ''}>0 place</option>
                                 <option value="2" ${carpoolSeats == 2 ? 'selected' : ''}>🚗 2 places</option>
@@ -596,37 +627,32 @@ Object.values(state.trainings).forEach(session => {
                                 <option value="4" ${carpoolSeats == 4 ? 'selected' : ''}>🚗 4 places</option>
                                 <option value="5" ${carpoolSeats == 5 ? 'selected' : ''}>🚗 5 places</option>
                             </select>
-                        </td>
-                        <td class="p-3 text-center">
-                            <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
-                                <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke' : 'text-slate-600'}">Conv.</button>
-                                <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke' : 'text-slate-600'}">Non</button>
-                            </div>
-                        </td>
-                    </tr>`;
+                        </div>
+
+                    </div>
+                `;
             }).join('');
 
-            // 2. Rendu du Staff / Coachs à la suite dans le même tableau
+            // 2. Rendu du Staff / Coachs optimisé mobile
             if (state.staff && state.staff.length > 0) {
-                htmlRows += `<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">Encadrement / Staff Officiel</td></tr>`;
+                htmlRows += `<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">Encadrement / Staff Officiel</div>`;
                 htmlRows += state.staff.map(member => {
                     const hasStaffLicence = member.licence && member.licence.trim() !== '';
                     return `
-                        <tr class="bg-sky-50/20">
-                            <td class="p-3 pl-4"><div class="font-bold text-slate-800">${member.name}</div><span class="text-[10px] text-sky-700 font-semibold">${member.role}</span></td>
-                            <td class="p-3" colspan="5">
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-xs text-slate-600">Licence :</span>
-                                    <span class="font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border text-xs">${hasStaffLicence ? member.licence : 'Non renseignée'}</span>
-                                    ${hasStaffLicence ? `<button onclick="navigator.clipboard.writeText('${member.licence}'); showToast('Licence copiée !')" class="p-1 bg-slate-100 hover:bg-sky-100 text-sky-600 rounded text-xs" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>` : ''}
-                                </div>
-                            </td>
-                        </tr>`;
+                        <div class="bg-sky-50/30 border border-slate-200 rounded-xl p-3 mb-2 flex items-center justify-between gap-2">
+                            <div>
+                                <div class="font-bold text-slate-800 text-xs">${member.name}</div>
+                                <span class="text-[10px] text-sky-700 font-semibold">${member.role}</span>
+                            </div>
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border text-xs">${hasStaffLicence ? member.licence : 'Non renseignée'}</span>
+                                ${hasStaffLicence ? `<button onclick="navigator.clipboard.writeText('${member.licence}'); showToast('Licence copiée !')" class="p-1 bg-white hover:bg-sky-100 text-sky-600 rounded text-xs border" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>` : ''}
+                            </div>
+                        </div>`;
                 }).join('');
             }
 
             tbody.innerHTML = htmlRows;
-        }
 
         // ============================================================
         // MODULE ENTRAÎNEMENTS — REFONTE COMPLÈTE
