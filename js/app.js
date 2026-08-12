@@ -8,29 +8,33 @@ document.addEventListener("DOMContentLoaded", () => {
     if (savedUserStr) {
         try {
             const userData = JSON.parse(savedUserStr);
-            window.currentUserRole = userData.role; 
-            window.currentUserName = userData.name; 
+            window.currentUserRole = userData.role; // On garde la compatibilité avec vos permissions
+            window.currentUserName = userData.name; // Optionnel : pour stocker le nom du coach
             
             if (pinScreen) pinScreen.style.display = "none";
             applyPermissions(); 
+            return;
         } catch (e) {
             sessionStorage.removeItem("currentUserData");
         }
-    } else {
-        // Le bloc PIN s'active uniquement si l'utilisateur n'est PAS connecté
-        if (pinInput) {
-            pinInput.focus();
-            pinInput.addEventListener("input", async (e) => {
-                const enteredPin = e.target.value;
+    }
 
-                if (enteredPin.length === 4) {
-                    try {
-                        const pinRef = firebase.database().ref("rangueil_data/access/" + enteredPin);
-                        const snapshot = await pinRef.once("value");
+    if (pinInput) {
+        pinInput.focus();
+        pinInput.addEventListener("input", async (e) => {
+            const enteredPin = e.target.value;
 
-                        if (snapshot.exists()) {
-                            const userData = snapshot.val();
-                       
+            if (enteredPin.length === 4) {
+                try {
+                    // Interrogation de Firebase Realtime Database
+                    const pinRef = firebase.database().ref("rangueil_data/access/" + enteredPin);
+                    const snapshot = await pinRef.once("value");
+
+                    if (snapshot.exists()) {
+                        const userData = snapshot.val(); 
+                        // userData contient par exemple : { name: "Thomas", role: "admin", team: "U14" }
+
+                        // On mémorise les infos utilisateur
                         window.currentUserRole = userData.role; 
                         window.currentUserName = userData.name;
                         
@@ -65,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-};
+});
 
 
  // --- 1. CONFIGURATION & PWA ---
@@ -106,7 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
     cards: {},
     stats: {},
     staff: [],
-    teams: {}
+    Teams: {}
 };
 
 // Variables d'interface uniquement
@@ -163,7 +167,8 @@ function saveStateToFirebase() {
         cards: state.cards,
         stats: state.stats,
         staff: state.staff,
-            };
+        Teams: state.Teams
+    };
 
     db.ref('rangueil_data').update(dataToSave);
 }
@@ -414,86 +419,15 @@ else {
                 <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs"><span class="font-bold text-slate-700">${i+1}. ${p.name}</span><span class="bg-sky-100 text-sky-800 font-extrabold px-2 py-0.5 rounded">${p.assists} 🎯</span></div>`).join('');
         }
 
-// Rendu Effectif
+        // Rendu Effectif
         function renderEffectif() {
             const container = document.getElementById('effectif-full-container');
-            if (!container) return;
-            
             container.innerHTML = state.players.map(p => {
                 const p1 = p.poste1 || '-', p2 = p.poste2 || '-', p3 = p.poste3 || '-';
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
-                
-                // --- RECUPERATION DU NOM LONG DE L'EQUIPE ---
-                const teamKey = p.team || p.cat;
-                const teamObj = state.teams && state.teams[teamKey];
-                const teamLongName = teamObj ? teamObj.name : (teamKey === 'U14' ? 'U14 Territoire' : (teamKey === 'U13' ? 'U13 Territoire' : teamKey)); 
-                
-                const teamBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">${teamLongName}</span>`;
-
-                // Calcul présences entraînements
-                const today = new Date();
-                today.setHours(0,0,0,0);
-
-                let presences = 0;
-                let totalSessions = 0;
-
-                Object.values(state.trainings).forEach(session => {
-                    if (!session.date) return;
-                    const sessionDate = new Date(session.date + 'T12:00:00');
-                    sessionDate.setHours(0,0,0,0);
-                    if (sessionDate >= today) return;
-                    totalSessions++;
-                    const presence = session.presence || {};
-                    if (presence[p.id] === 'present' || presence[p.id] === 'retard') {
-                        presences++;
-                    }
-                });
-
-                const presencePct = totalSessions > 0 ? Math.round((presences / totalSessions) * 100) : null;
-                const attendanceBadge = presencePct !== null && presencePct < 50 ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-700">⚠️ Assiduité faible</span>' : '';
-                const presenceColor = presencePct === null ? 'text-slate-400' : presencePct >= 75 ? 'text-emerald-600' : presencePct >= 50 ? 'text-amber-600' : 'text-red-600';
-
-                return `
-                <div class="p-3 bg-slate-50/70 border border-slate-200/80 rounded-xl flex flex-col justify-between space-y-3">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h3 class="font-bold text-xs text-slate-800">${p.name}</h3>
-                            ${attendanceBadge}
-                            <p class="text-[11px] ${hasLicence ? 'text-slate-600' : 'text-amber-700 font-bold'}">
-                                Licence: ${hasLicence ? p.licence : '⚠️ Manquante'}
-                            </p>
-                        </div>
-                        <div class="flex items-center space-x-1.5">
-                            ${teamBadge}
-                            <button onclick="openModalPlayer('${p.id}')" class="p-1 text-slate-400 hover:text-sky-600" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
-                            <button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button>
-                        </div>
-                    </div>
-                    <div class="text-xs space-y-2 pt-2 border-t border-slate-200/60">
-                        <div class="grid grid-cols-2 gap-2">
-                            <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between"><span class="text-slate-500">Stats:</span><span class="font-bold text-slate-700">${pStats.goals}⚽ ${pStats.assists}🎯</span></div>
-                            <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between"><span class="text-slate-500">Cartons:</span><span class="font-bold"><span class="text-amber-600">${cards.yellows}🟨</span> <span class="text-red-600">${cards.reds}🟥</span></span></div>
-                        </div>
-                        <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between items-center">
-                            <span class="text-slate-500">Entraînements :</span>
-                            <span class="font-bold ${presenceColor}">
-                                ${presencePct !== null ? `${presencePct}% 📅 (${presences}/${totalSessions})` : '<span class="text-slate-400 font-normal italic">Aucune séance passée</span>'}
-                            </span>
-                        </div>
-                        <div class="bg-white p-2 rounded border space-y-1">
-                            <p class="text-[10px] text-slate-500 uppercase font-extrabold">Postes :</p>
-                            <div class="flex items-center space-x-1.5 text-[11px]">
-                                <span class="font-bold px-2 py-0.5 rounded bg-sky-100 text-sky-900">1. ${p1}</span>
-                                ${p2 !== '-' ? `<span class="font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800">2. ${p2}</span>` : ''}
-                                ${p3 !== '-' ? `<span class="font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800">3. ${p3}</span>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
+                const catBadge = p.cat === 'U14' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800">U14</span>' : (p.cat === 'U13' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800">U13</span>' : '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">FF</span>');
 
                 // Calcul présences entraînements (nouveau format)
                 const today = new Date();
@@ -536,7 +470,7 @@ Object.values(state.trainings).forEach(session => {
         Licence: ${hasLicence ? p.licence : '⚠️ Manquante'}
     </p>
 </div>
-                        <div class="flex items-center space-x-1.5">${teamBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 text-slate-400 hover:text-sky-600" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
+                        <div class="flex items-center space-x-1.5">${catBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 text-slate-400 hover:text-sky-600" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
                     </div>
                     <div class="text-xs space-y-2 pt-2 border-t border-slate-200/60">
                         <div class="grid grid-cols-2 gap-2">
@@ -559,8 +493,8 @@ Object.values(state.trainings).forEach(session => {
                         </div>
                     </div>
                 </div>`;
-            join('');
-        
+            }).join('');
+        }
 
         // Rendu Matchs & Convocations
         function populateMatchSelector() {
