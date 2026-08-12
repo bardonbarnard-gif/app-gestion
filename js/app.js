@@ -1483,35 +1483,31 @@ function duplicateTraining() {
             toggleModal('modal-match', true);
         }
 
-        function handleSaveMatch(e) {
-            e.preventDefault();
-            const mId = document.getElementById('m-id').value;
-            const id = mId || 'M_' + Date.now();
-            const existing = state.matches[id] || {};
-            state.matches[id] = {
-                id,
-                opponent: document.getElementById('m-opponent').value,
-                adresse: document.getElementById('m-adresse').value,
-                date: document.getElementById('m-date').value,
-                heure: document.getElementById('m-heure').value,
-                type: document.getElementById('m-type').value,
-                location: document.getElementById('m-location').value,
-                pelouse: document.getElementById('m-pelouse').value,
-                scoreHome: existing.scoreHome || "",
-                scoreAway: existing.scoreAway || "",
-                convocations: existing.convocations || {},
-                positions: existing.positions || {},
-                jerseys: existing.jerseys || {},
-                carpool: existing.carpool || {},
-                matchStats: existing.matchStats || {},
-                debrief: existing.debrief || "",
-                isValidated: existing.isValidated || false
-            };
-            state.selectedMatchId = id;
-            saveStateToFirebase();
+   function handleSaveMatch(event) {
+    event.preventDefault();
+    
+    const matchId = document.getElementById('m-id').value;
+    const matchData = {
+        opponent: document.getElementById('m-opponent').value,
+        adresse: document.getElementById('m-adresse').value,
+        date: document.getElementById('m-date').value,
+        heure: document.getElementById('m-heure').value,
+        type: document.getElementById('m-type').value,
+        location: document.getElementById('m-location').value,
+        pelouse: document.getElementById('m-pelouse').value,
+        team: document.getElementById('m-team').value // <-- INDISPENSABLE pour lier le match à l'équipe
+    };
+
+    // Si c'est une modification ou une création...
+    const ref = matchId ? firebase.database().ref('matches/' + matchId) : firebase.database().ref('matches').push();
+    
+    ref.set(matchData, (error) => {
+        if (!error) {
             toggleModal('modal-match', false);
-            renderAll();
+            // Rechargez ou actualisez votre liste de matchs
         }
+    });
+}
 
         function openModalPlayer(playerId = null) {
             document.getElementById('form-player').reset();

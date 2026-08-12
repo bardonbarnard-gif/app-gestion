@@ -483,9 +483,18 @@
             <h3 class="font-bold text-slate-800 text-sm" id="modal-match-title">Nouveau Match</h3>
             <button onclick="toggleModal('modal-match', false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
         </div>
+
+        <div>
+            <label class="block text-slate-600 font-semibold mb-1">Équipe / Catégorie</label>
+            <select id="m-team" required class="w-full p-2 border border-slate-200 rounded-lg">
+                </select>
+        </div>
         <form id="form-match" onsubmit="handleSaveMatch(event)" class="space-y-3 text-xs">
             <input type="hidden" id="m-id">
             <div><label class="block text-slate-600 font-semibold mb-1">Adversaire</label><input type="text" id="m-opponent" required placeholder="Ex: Toulouse FC" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+            ```
+
+Grâce à la fonction `updateAllTeamDropdowns()` que nous avions mise en place plus tôt, dès que la modale s'ouvrira, ce menu `<select id="m-team">` se remplira tout seul avec les équipes que vous avez créées dans votre console d'administration !
             <div><label class="block text-slate-600 font-semibold mb-1">Stade / Adresse</label><input type="text" id="m-adresse" placeholder="Ex: Stade Municipal" class="w-full p-2 border border-slate-200 rounded-lg"></div>
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="block text-slate-600 font-semibold mb-1">Date</label><input type="date" id="m-date" required class="w-full p-2 border border-slate-200 rounded-lg"></div>
