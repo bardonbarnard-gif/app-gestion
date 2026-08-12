@@ -426,7 +426,11 @@ else {
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
-                const catBadge = p.cat === 'U14' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800">U14</span>' : (p.cat === 'U13' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800">U13</span>' : '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">FF</span>');
+                const teamKey = p.team || p.cat;
+const teamObj = state.teams && state.teams[teamKey];
+const teamLongName = teamObj ? teamObj.name : teamKey; // ex: "U14 Territoire"
+
+const teamBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">${teamLongName}</span>`;
 
                 // Calcul présences entraînements (nouveau format)
                 const today = new Date();
@@ -469,7 +473,7 @@ Object.values(state.trainings).forEach(session => {
         Licence: ${hasLicence ? p.licence : '⚠️ Manquante'}
     </p>
 </div>
-                        <div class="flex items-center space-x-1.5">${catBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 text-slate-400 hover:text-sky-600" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
+                        <div class="flex items-center space-x-1.5">${teamBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 text-slate-400 hover:text-sky-600" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
                     </div>
                     <div class="text-xs space-y-2 pt-2 border-t border-slate-200/60">
                         <div class="grid grid-cols-2 gap-2">
