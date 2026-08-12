@@ -1547,7 +1547,7 @@ function duplicateTraining() {
                     document.getElementById('p-id').value = player.id;
                     document.getElementById('p-name').value = player.name || '';
                     document.getElementById('p-licence').value = player.licence !== '-' ? player.licence : '';
-                    document.getElementById('p-cat').value = player.cat || 'U14';
+                    document.getElementById('p-team').value = player.team || 'U14';
                     document.getElementById('p-poste1').value = (player.poste1 || '').replace('-', '');
                     document.getElementById('p-poste2').value = (player.poste2 || '').replace('-', '');
                     document.getElementById('p-poste3').value = (player.poste3 || '').replace('-', '');
@@ -1569,7 +1569,7 @@ function duplicateTraining() {
                 id: pId || 'J_' + Date.now(),
                 name: document.getElementById('p-name').value,
                 licence: document.getElementById('p-licence').value.trim() || '-',
-                cat: document.getElementById('p-cat').value,
+                cat: document.getElementById('p-team').value,
                 poste1: document.getElementById('p-poste1').value.trim() || '-',
                 poste2: document.getElementById('p-poste2').value.trim() || '-',
                 poste3: document.getElementById('p-poste3').value.trim() || '-',
