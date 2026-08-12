@@ -427,7 +427,13 @@ else {
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
-                const catBadge = p.cat === 'U14' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800">U14</span>' : (p.cat === 'U13' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800">U13</span>' : '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">FF</span>');
+                const teamName = state.teams?.[p.team]?.name || "Sans équipe";
+
+const catBadge =
+    `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">
+        ${teamName}
+    </span>`;
+
 
                 // Calcul présences entraînements (nouveau format)
                 const today = new Date();
