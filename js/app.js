@@ -1514,8 +1514,8 @@ function duplicateTraining() {
         pelouse: document.getElementById('m-pelouse').value,
         team: teamValue,
         // Initialiser les champs optionnels
-        scoreHome: 0,
-        scoreAway: 0,
+        scoreHome: "",
+        scoreAway: "",
         convocations: {},
         positions: {},
         jerseys: {},
