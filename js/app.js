@@ -159,8 +159,18 @@ let selectedMatchId = null;
             }
         });
 
-   function saveStateToFirebase() {
-    db.ref('rangueil_data').update(state);
+function saveStateToFirebase() {
+    const dataToSave = {
+        players: state.players,
+        matches: state.matches,
+        trainings: state.trainings,
+        cards: state.cards,
+        stats: state.stats,
+        staff: state.staff,
+        Teams: state.Teams
+    };
+
+    db.ref('rangueil_data').update(dataToSave);
 }
 ``
 
