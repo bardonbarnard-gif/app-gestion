@@ -104,15 +104,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // --- 2. ÉTAT GLOBAL DE L'APPLICATION ---
         let state = {
-            players: [],
-            matches: {},
-            currentSession: 1,
-            trainings: {},
-            cards: {},
-            stats: {},
-            staff: [],
-            selectedMatchId: null
-        };
+    players: [],
+    matches: {},
+    trainings: {},
+    cards: {},
+    stats: {},
+    staff: [],
+    Teams: {}
+};
+
+// Variables d'interface uniquement
+let currentSession = 1;
+let selectedMatchId = null;
 
         // --- 3. SYNCHRONISATION FIREBASE ---
         db.ref('rangueil_data').on('value', (snapshot) => {
@@ -156,16 +159,10 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-       function saveStateToFirebase() {
-    db.ref('rangueil_data').update({
-        players: state.players,
-        matches: state.matches,
-        trainings: state.trainings,
-        cards: state.cards,
-        stats: state.stats,
-        staff: state.staff
-    });
+   function saveStateToFirebase() {
+    db.ref('rangueil_data').update(state);
 }
+``
 
         // --- 4. NAVIGATION & ONGLETS ---
         function renderAll() {
