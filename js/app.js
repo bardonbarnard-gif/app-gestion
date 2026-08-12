@@ -110,7 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
     cards: {},
     stats: {},
     staff: [],
-    Teams: {}
+    teams: {}
 };
 
 // Variables d'interface uniquement
@@ -167,8 +167,7 @@ function saveStateToFirebase() {
         cards: state.cards,
         stats: state.stats,
         staff: state.staff,
-        Teams: state.Teams
-    };
+            };
 
     db.ref('rangueil_data').update(dataToSave);
 }
