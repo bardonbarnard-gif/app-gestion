@@ -428,7 +428,7 @@ else {
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
                 const teamKey = p.team || p.cat; 
-                const teamName = "TEST U14";
+                const teamName = teamKey;
 
 const catBadge =
     `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">
