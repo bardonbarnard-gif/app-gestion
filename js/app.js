@@ -1475,10 +1475,12 @@ function duplicateTraining() {
                     document.getElementById('m-type').value = m.type || 'Championnat';
                     document.getElementById('m-location').value = m.location || 'Domicile';
                     document.getElementById('m-pelouse').value = m.pelouse || 'Synthétique';
+                    document.getElementById('m-team').value = m.team || '';
                 }
             } else {
                 document.getElementById('modal-match-title').innerText = "Nouveau Match";
                 document.getElementById('m-id').value = '';
+                document.getElementById('m-team').value = '';
             }
             toggleModal('modal-match', true);
         }
@@ -1486,8 +1488,16 @@ function duplicateTraining() {
    function handleSaveMatch(event) {
     event.preventDefault();
     
-    const matchId = document.getElementById('m-id').value;
+    // Validation du champ team
+    const teamValue = document.getElementById('m-team').value;
+    if (!teamValue) {
+        showToast("❌ Veuillez sélectionner une équipe !");
+        return;
+    }
+    
+    const matchId = document.getElementById('m-id').value || 'M' + Date.now();
     const matchData = {
+        id: matchId,
         opponent: document.getElementById('m-opponent').value,
         adresse: document.getElementById('m-adresse').value,
         date: document.getElementById('m-date').value,
@@ -1495,18 +1505,30 @@ function duplicateTraining() {
         type: document.getElementById('m-type').value,
         location: document.getElementById('m-location').value,
         pelouse: document.getElementById('m-pelouse').value,
-        team: document.getElementById('m-team').value // <-- INDISPENSABLE pour lier le match à l'équipe
+        team: teamValue,
+        // Initialiser les champs optionnels
+        scoreHome: 0,
+        scoreAway: 0,
+        convocations: {},
+        positions: {},
+        jerseys: {},
+        carpool: {},
+        matchStats: {},
+        debrief: ""
     };
 
-    // Si c'est une modification ou une création...
-    const ref = matchId ? firebase.database().ref('matches/' + matchId) : firebase.database().ref('matches').push();
+    // Mise à jour de l'état local
+    state.matches[matchId] = matchData;
     
-    ref.set(matchData, (error) => {
-        if (!error) {
-            toggleModal('modal-match', false);
-            // Rechargez ou actualisez votre liste de matchs
-        }
-    });
+    // Sauvegarde unique dans Firebase via le système d'état central
+    saveStateToFirebase();
+    
+    // Affichage de confirmation
+    showToast("✅ Match enregistré avec succès !");
+    
+    // Rafraîchissement de l'interface
+    toggleModal('modal-match', false);
+    renderAll();
 }
 
         function openModalPlayer(playerId = null) {
