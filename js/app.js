@@ -65,7 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-});
+};
 
 
  // --- 1. CONFIGURATION & PWA ---
