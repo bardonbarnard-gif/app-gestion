@@ -391,7 +391,7 @@ else {
             const lastCont = document.getElementById('dashboard-last-match-content');
             if (lastMatch && lastMatch.scoreHome !== undefined && lastMatch.scoreHome !== "") {
                 lastBadge.innerHTML = getMatchResultBadge(lastMatch.scoreHome, lastMatch.scoreAway);
-                lastCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>Rangueil vs ${lastMatch.opponent}</span><span class="bg-slate-100 px-2 py-0.5 rounded text-xs font-extrabold text-slate-700">${lastMatch.scoreHome} - ${lastMatch.scoreAway}</span></div><p class="text-[11px] text-slate-500">Joué le ${lastMatch.date}</p>${lastMatch.debrief ? `<p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded border mt-1">📝 ${lastMatch.debrief}</p>` : ''}</div>`;
+                lastCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>${lastMatch.team || 'Équipe'} vs ${lastMatch.opponent}</span><span class="bg-slate-100 px-2 py-0.5 rounded text-xs font-extrabold text-slate-700">${lastMatch.scoreHome} - ${lastMatch.scoreAway}</span></div><p class="text-[11px] text-slate-500">Joué le ${lastMatch.date}</p>${lastMatch.debrief ? `<p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded border mt-1">📝 ${lastMatch.debrief}</p>` : ''}</div>`;
             } else {
                 lastBadge.innerHTML = ""; lastCont.innerHTML = `<p class="text-slate-400 italic py-2">Aucun match récent.</p>`;
             }
@@ -400,7 +400,7 @@ else {
             const nextCont = document.getElementById('dashboard-next-match-content');
             if (nextMatch) {
                 nextBadge.innerHTML = getMatchTypeBadge(nextMatch.type || 'Championnat');
-                nextCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>Rangueil vs ${nextMatch.opponent}</span><span class="text-sky-600 font-bold">${nextMatch.location || 'Domicile'}</span></div><p class="text-[11px] text-slate-500">📅 ${nextMatch.date} à ${nextMatch.heure || '14:30'}</p></div>`;
+                nextCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>${nextMatch.team || 'Équipe'} vs ${nextMatch.opponent}</span><span class="text-sky-600 font-bold">${nextMatch.location || 'Domicile'}</span></div><p class="text-[11px] text-slate-500">📅 ${nextMatch.date} à ${nextMatch.heure || '14:30'}</p></div>`;
             } else {
                 nextBadge.innerHTML = ""; nextCont.innerHTML = `<p class="text-slate-400 italic py-2">Aucun match programmé.</p>`;
             }
@@ -549,7 +549,7 @@ Object.values(state.trainings).forEach(session => {
                         <div class="flex justify-between items-start">
                             <div class="flex items-center space-x-2">
     <p class="font-bold text-slate-800 text-sm">
-        Rangueil vs ${m.opponent}
+        ${m.team || 'Équipe'} vs ${m.opponent}
     </p>
     ${getMatchTypeBadge(m.type || 'Championnat')}
 </div>
@@ -1232,7 +1232,7 @@ function duplicateTraining() {
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-lg bg-sky-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
                             <div>
-                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">Rangueil vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
+                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${m.team || 'Équipe'} vs ${m.opponent} vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
                                 <div class="text-[11px] text-slate-500 mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${m.date} à ${m.heure || '14:30'}</div>
                             </div>
                         </div>
@@ -1347,7 +1347,7 @@ function duplicateTraining() {
         function openMatchBilanModal(mId) {
             const m = state.matches[mId];
             if (!m) return;
-            document.getElementById('modal-bilan-title').innerText = `Bilan : Rangueil vs ${m.opponent}`;
+            document.getElementById('modal-bilan-title').innerText = `Bilan : ${m.team || 'Équipe'} vs ${m.opponent}`;
             const container = document.getElementById('modal-bilan-content');
             if (!m.convocations) m.convocations = {};
             if (!state.cards[m.id]) state.cards[m.id] = {};
