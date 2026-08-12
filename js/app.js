@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pinInput = document.getElementById("pin-input");
     const pinError = document.getElementById("pin-error");
 
-    // Vérifier si l'utilisateur s'est déjà authentifié durant cette session
+   (() => {
     const savedUserStr = sessionStorage.getItem("currentUserData");
     if (savedUserStr) {
         try {
@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {
             sessionStorage.removeItem("currentUserData");
         }
-    }
+    })();
 
     if (pinInput) {
         pinInput.focus();
