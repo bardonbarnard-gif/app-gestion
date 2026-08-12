@@ -1575,7 +1575,7 @@ function duplicateTraining() {
                 id: pId || 'J_' + Date.now(),
                 name: document.getElementById('p-name').value,
                 licence: document.getElementById('p-licence').value.trim() || '-',
-                cat: document.getElementById('p-team').value,
+                team: document.getElementById('p-team').value,
                 poste1: document.getElementById('p-poste1').value.trim() || '-',
                 poste2: document.getElementById('p-poste2').value.trim() || '-',
                 poste3: document.getElementById('p-poste3').value.trim() || '-',
