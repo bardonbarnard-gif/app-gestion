@@ -563,8 +563,8 @@ Object.values(state.trainings).forEach(session => {
                         </div>
                     </div>
                 </div>`;
-            }).join('');
-        }
+            join('');
+        
 
         // Rendu Matchs & Convocations
         function populateMatchSelector() {
