@@ -156,16 +156,16 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        function saveStateToFirebase() {
-            db.ref('rangueil_data').set({
-                players: state.players,
-                matches: state.matches,
-                trainings: state.trainings,
-                cards: state.cards,
-                stats: state.stats,
-                staff: state.staff
-            });
-        }
+       function saveStateToFirebase() {
+    db.ref('rangueil_data').update({
+        players: state.players,
+        matches: state.matches,
+        trainings: state.trainings,
+        cards: state.cards,
+        stats: state.stats,
+        staff: state.staff
+    });
+}
 
         // --- 4. NAVIGATION & ONGLETS ---
         function renderAll() {
