@@ -540,15 +540,10 @@ Object.values(state.trainings).forEach(session => {
                     <div class="w-10 h-10 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-base shrink-0 mt-0.5"><i class="fa-solid fa-futbol"></i></div>
                     <div class="flex-1">
                         <div class="flex justify-between items-start">
-                            <div class="flex items-center space-x-2 flex-wrap gap-1.5">
+                            <div class="flex items-center space-x-2">
     <p class="font-bold text-slate-800 text-sm">
         Rangueil vs ${m.opponent}
     </p>
-    ${m.team ? `<span class="px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
-        m.team === 'U14' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
-        m.team === 'U13' ? 'bg-purple-100 text-purple-800 border border-purple-300' :
-        'bg-sky-100 text-sky-800 border border-sky-300'
-    }">👥 ${m.team}</span>` : '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-800 border border-red-300">⚠️ Équipe ?</span>'}
     ${getMatchTypeBadge(m.type || 'Championnat')}
 </div>
 
@@ -1224,24 +1219,13 @@ function duplicateTraining() {
                 const m = state.matches[mId];
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
                 const scoreA = m.scoreAway !== undefined && m.scoreAway !== "" ? m.scoreAway : "-";
-                
-                // Badge pour l'équipe
-                const teamBadge = m.team ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
-                    m.team === 'U14' ? 'bg-blue-100 text-blue-800' :
-                    m.team === 'U13' ? 'bg-purple-100 text-purple-800' :
-                    'bg-sky-100 text-sky-800'
-                }">👥 ${m.team}</span>` : '';
 
                 return `
                     <div class="p-3.5 bg-slate-50 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                        <div class="flex items-center space-x-3 w-full">
+                        <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-lg bg-sky-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
-                            <div class="flex-1">
-                                <div class="flex items-center space-x-2 flex-wrap gap-1.5">
-                                    <span class="font-bold text-slate-800 text-sm">Rangueil vs ${m.opponent}</span>
-                                    ${teamBadge}
-                                    ${getMatchTypeBadge(m.type || 'Championnat')}
-                                </div>
+                            <div>
+                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">Rangueil vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
                                 <div class="text-[11px] text-slate-500 mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${m.date} à ${m.heure || '14:30'}</div>
                             </div>
                         </div>
