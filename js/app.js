@@ -8,12 +8,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (savedUserStr) {
         try {
             const userData = JSON.parse(savedUserStr);
-            window.currentUserRole = userData.role; // On garde la compatibilité avec vos permissions
-            window.currentUserName = userData.name; // Optionnel : pour stocker le nom du coach
+            window.currentUserRole = userData.role; 
+            window.currentUserName = userData.name; 
             
             if (pinScreen) pinScreen.style.display = "none";
             applyPermissions(); 
-            return;
+            
         } catch (e) {
             sessionStorage.removeItem("currentUserData");
         }
@@ -421,20 +421,22 @@ else {
 // Rendu Effectif
         function renderEffectif() {
             const container = document.getElementById('effectif-full-container');
+            if (!container) return;
+            
             container.innerHTML = state.players.map(p => {
                 const p1 = p.poste1 || '-', p2 = p.poste2 || '-', p3 = p.poste3 || '-';
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
                 
-                // --- REMPLACEMENT DU BADGE DE CATÉGORIE PAR LE NOM LONG DE L'ÉQUIPE ---
+                // --- RECUPERATION DU NOM LONG DE L'EQUIPE ---
                 const teamKey = p.team || p.cat;
                 const teamObj = state.teams && state.teams[teamKey];
                 const teamLongName = teamObj ? teamObj.name : (teamKey === 'U14' ? 'U14 Territoire' : (teamKey === 'U13' ? 'U13 Territoire' : teamKey)); 
                 
                 const teamBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">${teamLongName}</span>`;
 
-                // Calcul présences entraînements (nouveau format)
+                // Calcul présences entraînements
                 const today = new Date();
                 today.setHours(0,0,0,0);
 
@@ -467,7 +469,11 @@ else {
                                 Licence: ${hasLicence ? p.licence : '⚠️ Manquante'}
                             </p>
                         </div>
-                        <div class="flex items-center space-x-1.5">${teamBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 text-slate-400 hover:text-sky-600" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
+                        <div class="flex items-center space-x-1.5">
+                            ${teamBadge}
+                            <button onclick="openModalPlayer('${p.id}')" class="p-1 text-slate-400 hover:text-sky-600" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
+                            <button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                        </div>
                     </div>
                     <div class="text-xs space-y-2 pt-2 border-t border-slate-200/60">
                         <div class="grid grid-cols-2 gap-2">
