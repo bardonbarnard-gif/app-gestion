@@ -511,6 +511,7 @@ Object.values(state.trainings).forEach(session => {
             if (keys.length === 0) { selector.innerHTML = `<option value="">Aucun match</option>`; return; }
             selector.innerHTML = keys.map(mId => {
                 const m = state.matches[mId];
+                const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
                 return `<option value="${m.id}" ${m.id === state.selectedMatchId ? 'selected' : ''}>${m.opponent} (${m.date})</option>`;
             }).join('');
             if (state.selectedMatchId) selector.value = state.selectedMatchId;
@@ -1232,6 +1233,7 @@ function duplicateTraining() {
 
             container.innerHTML = keys.map(mId => {
                 const m = state.matches[mId];
+                const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
                 const scoreA = m.scoreAway !== undefined && m.scoreAway !== "" ? m.scoreAway : "-";
 
@@ -1240,7 +1242,7 @@ function duplicateTraining() {
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-lg bg-sky-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
                             <div>
-                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${m.team || 'Équipe'} vs ${m.opponent} vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
+                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${teamName} vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
                                 <div class="text-[11px] text-slate-500 mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${m.date} à ${m.heure || '14:30'}</div>
                             </div>
                         </div>
