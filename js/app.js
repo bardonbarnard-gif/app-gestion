@@ -428,9 +428,7 @@ else {
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
                 const teamKey = p.team || p.cat; 
-                console.log("teamKey =", teamKey);
-                console.log("teams =", state.teams);
-                console.log("team trouvée =", state.teams?.[teamKey]);
+               
                 const teamName = state.teams?.[teamKey]?.name || "Sans équipe";
 
 const catBadge =
