@@ -1967,6 +1967,7 @@ function renderAdminTeams(teamsData) {
     if (!container) return;
 
     state.teams = teamsData || {};
+    renderAll();
     const keys = Object.keys(state.teams);
 
     if (keys.length === 0) {
