@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pinInput = document.getElementById("pin-input");
     const pinError = document.getElementById("pin-error");
 
-   (() => {
+    // Vérifier si l'utilisateur s'est déjà authentifié durant cette session
     const savedUserStr = sessionStorage.getItem("currentUserData");
     if (savedUserStr) {
         try {
@@ -13,28 +13,24 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (pinScreen) pinScreen.style.display = "none";
             applyPermissions(); 
-            
         } catch (e) {
             sessionStorage.removeItem("currentUserData");
         }
-    })();
+    } else {
+        // Le bloc PIN s'active uniquement si l'utilisateur n'est PAS connecté
+        if (pinInput) {
+            pinInput.focus();
+            pinInput.addEventListener("input", async (e) => {
+                const enteredPin = e.target.value;
 
-    if (pinInput) {
-        pinInput.focus();
-        pinInput.addEventListener("input", async (e) => {
-            const enteredPin = e.target.value;
+                if (enteredPin.length === 4) {
+                    try {
+                        const pinRef = firebase.database().ref("rangueil_data/access/" + enteredPin);
+                        const snapshot = await pinRef.once("value");
 
-            if (enteredPin.length === 4) {
-                try {
-                    // Interrogation de Firebase Realtime Database
-                    const pinRef = firebase.database().ref("rangueil_data/access/" + enteredPin);
-                    const snapshot = await pinRef.once("value");
-
-                    if (snapshot.exists()) {
-                        const userData = snapshot.val(); 
-                        // userData contient par exemple : { name: "Thomas", role: "admin", team: "U14" }
-
-                        // On mémorise les infos utilisateur
+                        if (snapshot.exists()) {
+                            const userData = snapshot.val();
+                       
                         window.currentUserRole = userData.role; 
                         window.currentUserName = userData.name;
                         
