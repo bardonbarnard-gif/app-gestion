@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rangueil FC - Gestion U14 / U13 / FF</title>
+    <title>Rangueil FC - Administration Terrain</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
@@ -46,7 +46,7 @@
                 </div>
                 <div>
                     <h1 class="font-extrabold text-base md:text-xl leading-tight">RANGUEIL FC</h1>
-                    <p class="text-xs text-sky-100 font-medium">Gestion U14 / U13 / FF • Pro 🔵</p>
+                    <p class="text-xs text-sky-100 font-medium">Administration Terrain 🔵</p>
                 </div>
             </div>
             
@@ -157,10 +157,7 @@
                     <div><h2 class="text-base font-bold text-slate-800">Gestion de l'Effectif & Stats</h2><p class="text-xs text-slate-500">Suivi des matchs, buts, passes et cartons</p></div>
                     <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
                         <div class="flex items-center space-x-1">
-                            <button onclick="setFilterCat('all')" id="filter-all" class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-sky-600 text-white transition">Tous</button>
-                            <button onclick="setFilterCat('U14')" id="filter-U14" class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-100 transition">U14</button>
-                            <button onclick="setFilterCat('U13')" id="filter-U13" class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 hover:bg-purple-100 transition">U13</button>
-                            <button onclick="setFilterCat('FF')" id="filter-FF" class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 hover:bg-sky-100 transition">FF</button>
+                            <div id="team-filters" class="flex items-center space-x-1"></div>
                         </div>
                                                 <div class="relative w-full sm:w-56">
                             <input type="text" id="search-player" placeholder="Rechercher un joueur..." class="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">

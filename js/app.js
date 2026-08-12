@@ -1755,8 +1755,29 @@ function filterPlayers(query = "") {
         if (!player) return;
         const matchText = player.name.toLowerCase().includes(q) || 
                          (player.licence && player.licence.includes(q));
-        const matchCat = currentCatFilter === 'all' || player.cat === currentCatFilter;
+        const matchCat = currentCatFilter === 'all' || player.team === currentCatFilter;
         card.style.display = (matchText && matchCat) ? 'block' : 'none';
+    });
+}
+
+function renderTeamFilters() {
+    const container = document.getElementById('team-filters');
+
+    container.innerHTML =
+        `<button onclick="setFilterCat('all')" id="filter-all"
+            class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-sky-600 text-white">
+            Tous
+        </button>`;
+
+    Object.entries(state.teams).forEach(([key, team]) => {
+        container.innerHTML += `
+            <button
+                onclick="setFilterCat('${key}')"
+                id="filter-${key}"
+                class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-600">
+                ${team.name}
+            </button>
+        `;
     });
 }
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
@@ -1965,6 +1986,7 @@ function renderAdminTeams(teamsData) {
     if (!container) return;
 
     state.teams = teamsData || {};
+    renderTeamFilters();
     renderAll();
     const keys = Object.keys(state.teams);
 
