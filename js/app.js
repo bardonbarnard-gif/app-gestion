@@ -445,10 +445,12 @@ state.players.slice(0, 3).forEach(p => {
     );
 });
     if (role === 'coach') {
-        playersToDisplay = state.players.filter(
-            p => (p.team || p.cat) === userTeam
-        );
-    }
+    playersToDisplay = state.players.filter(
+        p =>
+            (p.team || p.cat || '').toLowerCase() ===
+            userTeam.toLowerCase()
+    );
+}
     console.log("Coach :", userTeam);
 console.log("Joueurs :", state.players);
 
