@@ -375,7 +375,7 @@ const nextTraining = trainingsSource
         return d >= today;
     })
     .sort((a,b) => new Date(a.date) - new Date(b.date))[0];
-    .filter(t => {
+    filter(t => {
         if (!t.date) return false;
 
         const d = new Date(t.date + 'T12:00:00');
