@@ -427,17 +427,14 @@ else {
 
         // Rendu Effectif
         function renderEffectif() {
-            console.log("ROLE =", window.currentUserRole);
-console.log("TEAM =", window.currentUserTeam);
+            
 
                 const role = window.currentUserRole || 'public';
     const userTeam = window.currentUserTeam || 'all';
 
     let playersToDisplay = state.players;
 
-    console.log("Equipe coach :", userTeam);
-
-state.players.slice(0, 3).forEach(p => {
+    state.players.slice(0, 3).forEach(p => {
     console.log(
         p.name,
         "team =", p.team,
@@ -451,8 +448,7 @@ state.players.slice(0, 3).forEach(p => {
             userTeam.toLowerCase()
     );
 }
-    console.log("Coach :", userTeam);
-console.log("Joueurs :", state.players);
+    
 
             const container = document.getElementById('effectif-full-container');
             container.innerHTML = playersToDisplay.map(p => {
