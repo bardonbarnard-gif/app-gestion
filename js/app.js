@@ -1863,6 +1863,8 @@ function duplicateTraining() {
                     document.getElementById('staff-id').value = member.id;
                     document.getElementById('staff-name').value = member.name;
                     document.getElementById('staff-role').value = member.role;
+                    document.getElementById('staff-scope').value =
+    member.scope || '';
                     document.getElementById('staff-licence').value = member.licence || '';
                     document.getElementById('staff-phone').value = member.phone || '';
                     document.getElementById('staff-email').value = member.email || '';
@@ -1879,6 +1881,7 @@ function duplicateTraining() {
                 id: idInput || 'STF_' + Date.now(),
                 name: document.getElementById('staff-name').value.trim(),
                 role: document.getElementById('staff-role').value,
+               scope: document.getElementById('staff-scope').value.trim(), 
                 licence: document.getElementById('staff-licence').value.trim(),
                 phone: document.getElementById('staff-phone').value.trim(),
                 email: document.getElementById('staff-email').value.trim()
