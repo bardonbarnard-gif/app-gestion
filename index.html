@@ -68,20 +68,20 @@
 </div>
 
      <nav class="bg-sky-950/40 backdrop-blur-sm border-t border-sky-500/20 px-2 py-2">
-    <div class="flex flex-wrap sm:flex-nowrap justify-center sm:space-x-1 gap-1.5 mx-auto max-w-7xl">
-        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-btn text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center space-x-2 transition bg-white/20 text-white">
-            <i class="fa-solid fa-chart-pie"></i><span>Tableau de bord</span>
+    <div class="grid grid-cols-2 md:flex md:flex-nowrap gap-2 mx-auto max-w-7xl">
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-btn text-xs font-semibold px-3.5 px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition bg-white/20 text-white">
+            <i class="fa-solid fa-chart-pie"></i><span>Tableau</span>
         </button>
-        <button onclick="switchTab('matchs')" id="tab-matchs" class="nav-btn text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center space-x-2 transition text-sky-100 hover:bg-white/10">
-            <i class="fa-solid fa-trophy"></i><span>Matchs & Résultats</span>
+        <button onclick="switchTab('matchs')" id="tab-matchs" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+            <i class="fa-solid fa-trophy"></i><span>Matchs</span>
         </button>
-        <button onclick="switchTab('entrainements')" id="tab-entrainements" class="nav-btn text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center space-x-2 transition text-sky-100 hover:bg-white/10">
-            <i class="fa-solid fa-stopwatch"></i><span>Entraînements</span>
+        <button onclick="switchTab('entrainements')" id="tab-entrainements" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+            <i class="fa-solid fa-stopwatch"></i><span>Séances</span>
         </button>
-        <button onclick="switchTab('staff')" id="tab-staff" class="nav-btn text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center space-x-2 transition text-sky-100 hover:bg-white/10">
-            <i class="fa-solid fa-user-tie"></i><span>Staff & Dirigeants</span>
+        <button onclick="switchTab('staff')" id="tab-staff" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+            <i class="fa-solid fa-user-tie"></i><span>Staff</span>
         </button>
-        <button onclick="switchTab('effectif')" id="tab-effectif" class="nav-btn text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center space-x-2 transition text-sky-100 hover:bg-white/10">
+        <button onclick="switchTab('effectif')" id="tab-effectif" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
             <i class="fa-solid fa-users"></i><span>Effectif & Stats</span>
         </button>
     </div>
