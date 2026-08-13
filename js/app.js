@@ -331,7 +331,7 @@ dashboardMatches.forEach(m => {
      <span class="text-slate-700">${draws}N</span> -
      <span class="text-red-600">${losses}D</span>`;
 
-            const teamCards = getTotalTeamCards();
+            
             const teamCards =
     role === 'coach'
         ? getTeamCards(dashboardMatches)
