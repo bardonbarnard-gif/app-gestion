@@ -335,7 +335,11 @@ dashboardMatches.forEach(m => {
             document.getElementById('stat-total-cards').innerHTML = `<span class="text-amber-500">${teamCards.yellows}🟨</span> <span class="text-red-600">${teamCards.reds}🟥</span>`;
 
             // Alerte Licences
-            const missingLicences = state.players.filter(p => !p.licence || p.licence.trim() === '' || p.licence.trim() === '-');
+            const missingLicences = dashboardPlayers.filter(
+    p => !p.licence ||
+    p.licence.trim() === '' ||
+    p.licence.trim() === '-'
+);
             const alertBanner = document.getElementById('licences-alert-banner');
             if (missingLicences.length > 0) {
                 alertBanner.innerHTML = `
@@ -355,7 +359,22 @@ dashboardMatches.forEach(m => {
 const today = new Date();
 today.setHours(0,0,0,0);
 
-const nextTraining = Object.values(state.trainings || {})
+const trainingsSource = role === 'coach'
+    ? Object.values(state.trainings || {}).filter(t =>
+        (t.team || '').toLowerCase() === userTeam.toLowerCase()
+      )
+    : Object.values(state.trainings || {});
+
+const nextTraining = trainingsSource
+    .filter(t => {
+        if (!t.date) return false;
+
+        const d = new Date(t.date + 'T12:00:00');
+        d.setHours(0,0,0,0);
+
+        return d >= today;
+    })
+    .sort((a,b) => new Date(a.date) - new Date(b.date))[0];
     .filter(t => {
         if (!t.date) return false;
 
@@ -410,7 +429,7 @@ else {
 }
 
             // Forme (5 derniers matchs)
-            const matchesArr = Object.values(state.matches).sort((a,b) => new Date(a.date) - new Date(b.date));
+            const matchesArr = dashboardMatches.sort((a,b) => new Date(a.date) - new Date(b.date));
             const pastMatches = matchesArr.filter(m => m.scoreHome !== undefined && m.scoreHome !== "").slice(-5);
             const streakContainer = document.getElementById('dashboard-form-streak');
             streakContainer.innerHTML = pastMatches.length > 0 ? pastMatches.map(m => {
@@ -477,7 +496,15 @@ const teamCards =
         ? getTeamCards(dashboardMatches)
         : getTotalTeamCards();
         function renderTopScorersAndPassers() {
-            let playersWithStats = state.players.map(p => {
+            const role = window.currentUserRole || 'public';
+const userTeam = window.currentUserTeam || 'all';
+
+const playersSource = role === 'coach'
+    ? state.players.filter(p =>
+        (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase()
+      )
+    : state.players;
+            let playersWithStats = playersSource.map(p => {
                 let s = state.stats[p.id] || { goals: 0, assists: 0 };
                 return { name: p.name, goals: s.goals || 0, assists: s.assists || 0 };
             });
@@ -903,7 +930,16 @@ const userTeam = window.currentUserTeam || 'all';
             renderTrainingStatsBar();
             const today = new Date(); today.setHours(0,0,0,0);
 
-            const all = Object.values(state.trainings || {});
+            const role = window.currentUserRole || 'public';
+const userTeam = window.currentUserTeam || 'all';
+
+let all = Object.values(state.trainings || {});
+
+if (role === 'coach') {
+    all = all.filter(t =>
+        (t.team || '').toLowerCase() === userTeam.toLowerCase()
+    );
+}
             const future = all.filter(s => s.date && new Date(s.date + 'T12:00:00') >= today)
                               .sort((a, b) => new Date(a.date) - new Date(b.date));
             const past   = all.filter(s => !s.date || new Date(s.date + 'T12:00:00') < today)
@@ -1248,6 +1284,8 @@ function duplicateTraining() {
             document.getElementById('modal-training-title').textContent = tId ? 'Modifier la Séance' : 'Nouvelle Séance';
             if (tId && state.trainings[tId]) {
                 const s = state.trainings[tId];
+                document.getElementById('t-team').value =
+    s.team || '';
                 document.getElementById('t-title').value = s.title || '';
                 document.getElementById('t-date').value = s.date || '';
                 document.getElementById('t-heure').value = s.heure || '18:00';
@@ -1273,6 +1311,7 @@ function duplicateTraining() {
                 title: document.getElementById('t-title').value || `Séance du ${document.getElementById('t-date').value}`,
                 date: document.getElementById('t-date').value,
                 heure: document.getElementById('t-heure').value || '18:00',
+                team: document.getElementById('t-team').value,
                 theme: theme,
                 presence: existing.presence || {},
                 pdfData: existing.pdfData || null,
@@ -2159,7 +2198,9 @@ function deleteTeam(teamKey) {
 // 4. Mettre à jour dynamiquement tous les sélecteurs <select> d'équipes dans l'app
 function updateAllTeamDropdowns() {
     // Cherche tous les éléments <select> qui ont la classe 'team-select' ou l'ID 'm-team', etc.
-    const selects = document.querySelectorAll('#m-team, #admin-team-select, .team-select');
+    const selects = document.querySelectorAll(
+    '#m-team, #t-team, #admin-team-select, .team-select'
+);
     const keys = Object.keys(state.teams || {});
 
     selects.forEach(select => {
