@@ -285,6 +285,9 @@ function saveStateToFirebase() {
 
         // Rendu Tableau de bord
         function renderDashboard() {
+            const dashboardPlayers
+const dashboardMatches
+const dashboardTrainings
             const role = window.currentUserRole || 'public';
 const userTeam = window.currentUserTeam || 'all';
 
