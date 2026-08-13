@@ -1860,6 +1860,8 @@ function applyPermissions() {
     if (typeof checkAdminAccessUI === "function") {
         checkAdminAccessUI();
     }
+    renderAll();
+
 }
 
 
