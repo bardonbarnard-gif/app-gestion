@@ -437,6 +437,9 @@ else {
             p => (p.team || p.cat) === userTeam
         );
     }
+    console.log("Coach :", userTeam);
+console.log("Joueurs :", state.players);
+
             const container = document.getElementById('effectif-full-container');
             container.innerHTML = playersToDisplay.map(p => {
                 const p1 = p.poste1 || '-', p2 = p.poste2 || '-', p3 = p.poste3 || '-';
