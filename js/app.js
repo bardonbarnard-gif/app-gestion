@@ -533,10 +533,20 @@ Object.values(state.trainings).forEach(session => {
         // Rendu Matchs & Convocations
         function populateMatchSelector() {
             const selector = document.getElementById('match-selector');
-            const keys = Object.keys(state.matches);
+            const role = window.currentUserRole || 'public';
+const userTeam = window.currentUserTeam || 'all';
+
+let matches = Object.values(state.matches);
+
+if (role === 'coach') {
+    matches = matches.filter(m =>
+        (m.team || '').toLowerCase() === userTeam.toLowerCase()
+    );
+}
+            const keys = matches.map(m => m.id);
             if (keys.length === 0) { selector.innerHTML = `<option value="">Aucun match</option>`; return; }
-            selector.innerHTML = keys.map(mId => {
-                const m = state.matches[mId];
+            selector.innerHTML = matches.map(m => {
+                
                 const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
                 return `<option value="${m.id}" ${m.id === state.selectedMatchId ? 'selected' : ''}>${m.opponent} (${m.date})</option>`;
             }).join('');
@@ -549,6 +559,8 @@ Object.values(state.trainings).forEach(session => {
         }
 
         function renderMatchDetail() {
+            const role = window.currentUserRole || 'public';
+const userTeam = window.currentUserTeam || 'all';
             const selector = document.getElementById('match-selector');
             const tbody = document.getElementById('match-convocation-tbody');
             const infoCard = document.getElementById('match-info-card');
@@ -571,6 +583,13 @@ Object.values(state.trainings).forEach(session => {
             selector.value = state.selectedMatchId;
             infoCard.style.display = 'flex'; counterBanner.style.display = 'flex'; carpoolBanner.style.display = 'flex';
             const m = state.matches[state.selectedMatchId];
+            if (
+    role === 'coach' &&
+    m &&
+    (m.team || '').toLowerCase() !== userTeam.toLowerCase()
+) {
+    return;
+}
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
 
             if (!m.convocations) m.convocations = {};
@@ -1253,12 +1272,31 @@ function duplicateTraining() {
             }
         }
 
-        function renderMatchesResultsList() {
-            const container = document.getElementById('matches-results-list');
-            const keys = Object.keys(state.matches);
-            if (keys.length === 0) { container.innerHTML = `<div class="p-4 text-center text-slate-400 text-xs">Aucun match enregistré.</div>`; return; }
+      function renderMatchesResultsList() {
 
-            container.innerHTML = keys.map(mId => {
+    const role = window.currentUserRole || 'public';
+    const userTeam = window.currentUserTeam || 'all';
+
+    const container = document.getElementById('matches-results-list');
+
+    let matches = Object.values(state.matches);
+
+    // Coach : seulement les matchs de son équipe
+    if (role === 'coach') {
+        matches = matches.filter(m =>
+            (m.team || '').toLowerCase() === userTeam.toLowerCase()
+        );
+    }
+
+    if (matches.length === 0) {
+        container.innerHTML = `
+            <div class="p-4 text-center text-slate-400 text-xs">
+                Aucun match enregistré.
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = matches.map(m => {
                 const m = state.matches[mId];
                 const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
