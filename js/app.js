@@ -1947,17 +1947,44 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 function filterPlayers(query = "") {
-    const q = query.toLowerCase() || document.getElementById('search-player').value.toLowerCase();
+
+    const q =
+        query.toLowerCase() ||
+        document.getElementById('search-player').value.toLowerCase();
+
+    const role = window.currentUserRole || 'public';
+    const userTeam = window.currentUserTeam || 'all';
+
+    const playersSource =
+        role === 'coach'
+            ? state.players.filter(
+                p =>
+                    (p.team || p.cat || '').toLowerCase() ===
+                    userTeam.toLowerCase()
+            )
+            : state.players;
+
     const container = document.getElementById('effectif-full-container');
     const cards = Array.from(container.children);
-            
+
     cards.forEach((card, i) => {
-        const player = state.players[i];
+
+        const player = playersSource[i];
+
         if (!player) return;
-        const matchText = player.name.toLowerCase().includes(q) || 
-                         (player.licence && player.licence.includes(q));
-        const matchCat = currentCatFilter === 'all' || player.team === currentCatFilter;
-        card.style.display = (matchText && matchCat) ? 'block' : 'none';
+
+        const matchText =
+            player.name.toLowerCase().includes(q) ||
+            (player.licence && player.licence.toLowerCase().includes(q));
+
+        const matchCat =
+            currentCatFilter === 'all' ||
+            player.team === currentCatFilter;
+
+        card.style.display =
+            (matchText && matchCat)
+                ? 'block'
+                : 'none';
     });
 }
 
