@@ -177,6 +177,20 @@ function saveStateToFirebase() {
 ``
 
         // --- 4. NAVIGATION & ONGLETS ---
+
+        function logoutUser() {
+
+    sessionStorage.removeItem("currentUserData");
+    sessionStorage.removeItem("currentUserRole");
+    sessionStorage.removeItem("isUnlocked");
+
+    window.currentUserRole = null;
+    window.currentUserName = null;
+    window.currentUserTeam = null;
+
+    location.reload();
+}
+
         function renderAll() {
             renderDashboard();
             renderEffectif();
