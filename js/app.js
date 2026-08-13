@@ -427,6 +427,9 @@ else {
 
         // Rendu Effectif
         function renderEffectif() {
+            console.log("ROLE =", window.currentUserRole);
+console.log("TEAM =", window.currentUserTeam);
+
                 const role = window.currentUserRole || 'public';
     const userTeam = window.currentUserTeam || 'all';
 
