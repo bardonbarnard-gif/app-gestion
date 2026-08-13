@@ -1297,7 +1297,6 @@ function duplicateTraining() {
     }
 
     container.innerHTML = matches.map(m => {
-                const m = state.matches[mId];
                 const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
                 const scoreA = m.scoreAway !== undefined && m.scoreAway !== "" ? m.scoreAway : "-";
