@@ -285,11 +285,50 @@ function saveStateToFirebase() {
 
         // Rendu Tableau de bord
         function renderDashboard() {
-            document.getElementById('stat-effectif').innerText = state.players.length;
-            document.getElementById('stat-matchs').innerText = Object.keys(state.matches).length;
+            const role = window.currentUserRole || 'public';
+const userTeam = window.currentUserTeam || 'all';
+
+// Joueurs filtrés
+const dashboardPlayers = role === 'coach'
+    ? state.players.filter(p =>
+        (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase()
+      )
+    : state.players;
+
+// Matchs filtrés
+const dashboardMatches = role === 'coach'
+    ? Object.values(state.matches).filter(m =>
+        (m.team || '').toLowerCase() === userTeam.toLowerCase()
+      )
+    : Object.values(state.matches);
+            document.getElementById('stat-effectif').innerText =
+    dashboardPlayers.length;
+            document.getElementById('stat-matchs').innerText =
+    dashboardMatches.length;
             
-            const stats = calculateSeasonStats();
-            document.getElementById('stat-bilan-vdn').innerHTML = `<span class="text-emerald-600">${stats.wins}V</span> - <span class="text-slate-700">${stats.draws}N</span> - <span class="text-red-600">${stats.losses}D</span>`;
+            let wins = 0;
+let draws = 0;
+let losses = 0;
+
+dashboardMatches.forEach(m => {
+    if (
+        m.scoreHome !== undefined &&
+        m.scoreHome !== "" &&
+        m.scoreAway !== undefined &&
+        m.scoreAway !== ""
+    ) {
+        const h = parseInt(m.scoreHome);
+        const a = parseInt(m.scoreAway);
+
+        if (h > a) wins++;
+        else if (h === a) draws++;
+        else losses++;
+    }
+});
+            document.getElementById('stat-bilan-vdn').innerHTML =
+    `<span class="text-emerald-600">${wins}V</span> -
+     <span class="text-slate-700">${draws}N</span> -
+     <span class="text-red-600">${losses}D</span>`;
 
             const teamCards = getTotalTeamCards();
             document.getElementById('stat-total-cards').innerHTML = `<span class="text-amber-500">${teamCards.yellows}🟨</span> <span class="text-red-600">${teamCards.reds}🟥</span>`;
@@ -412,6 +451,30 @@ else {
             }
         }
 
+        function getTeamCards(matches) {
+
+    let yellows = 0;
+    let reds = 0;
+
+    matches.forEach(match => {
+
+        const cards = state.cards[match.id];
+
+        if (!cards) return;
+
+        Object.values(cards).forEach(card => {
+            if (card === 'yellow') yellows++;
+            if (card === 'red') reds++;
+        });
+    });
+
+    return { yellows, reds };
+}
+
+const teamCards =
+    role === 'coach'
+        ? getTeamCards(dashboardMatches)
+        : getTotalTeamCards();
         function renderTopScorersAndPassers() {
             let playersWithStats = state.players.map(p => {
                 let s = state.stats[p.id] || { goals: 0, assists: 0 };
