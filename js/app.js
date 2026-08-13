@@ -427,18 +427,25 @@ else {
 
         // Rendu Effectif
         function renderEffectif() {
+                const role = window.currentUserRole || 'public';
+    const userTeam = window.currentUserTeam || 'all';
+
+    let playersToDisplay = state.players;
+
+    if (role === 'coach') {
+        playersToDisplay = state.players.filter(
+            p => (p.team || p.cat) === userTeam
+        );
+    }
             const container = document.getElementById('effectif-full-container');
-            container.innerHTML = state.players.map(p => {
+            container.innerHTML = playersToDisplay.map(p => {
                 const p1 = p.poste1 || '-', p2 = p.poste2 || '-', p3 = p.poste3 || '-';
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
                 const teamKey = p.team || p.cat; 
-               
                 const teamName = state.teams?.[teamKey]?.name || "Sans équipe";
-
-const catBadge =
-    `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">
+                const catBadge =`<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">
         ${teamName}
     </span>`;
 
