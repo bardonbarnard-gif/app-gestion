@@ -1825,8 +1825,17 @@ function duplicateTraining() {
                 <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 flex flex-col justify-between space-y-3">
                     <div class="flex items-start justify-between">
                         <div>
-                            <h3 class="font-extrabold text-slate-800 text-sm">${member.name}</h3>
-                            <span class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-sky-50 text-sky-700 border border-sky-100">${member.role}</span>
+                        <h3 class="font-extrabold text-slate-800 text-sm">${member.name}</h3>
+
+<span class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-sky-50 text-sky-700 border border-sky-100">
+    ${member.role}
+</span>
+
+${member.scope
+    ? `<p class="text-xs text-slate-500 mt-1 font-medium">
+            📍 ${member.scope}
+       </p>`
+    : ''}    
                         </div>
                         <div class="flex space-x-1">
                             <button onclick="editStaff('${member.id}')" class="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs" title="Modifier"><i class="fa-solid fa-pen"></i></button>
