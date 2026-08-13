@@ -545,6 +545,7 @@ Object.values(state.trainings).forEach(session => {
             selector.value = state.selectedMatchId;
             infoCard.style.display = 'flex'; counterBanner.style.display = 'flex'; carpoolBanner.style.display = 'flex';
             const m = state.matches[state.selectedMatchId];
+            const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
 
             if (!m.convocations) m.convocations = {};
             if (!m.positions) m.positions = {};
