@@ -1794,13 +1794,6 @@ function renderTeamFilters() {
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
 function applyPermissions() {
     const role = window.currentUserRole || 'public';
-console.log(
-    'Role :',
-    role,
-    'Team :',
-    window.currentUserTeam
-);
-
     const userTeam = window.currentUserTeam || 'all';
 
     // --- MISE À JOUR DU TEXTE DU RÔLE ---
