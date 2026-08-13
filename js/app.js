@@ -1840,11 +1840,11 @@ function duplicateTraining() {
     ${member.role}
 </span>
 
-${member.scope
+  ${member.scope
     ? `<p class="text-xs text-slate-500 mt-1 font-medium">
-            📍 ${member.scope}
+            📍 ${state.teams?.[member.scope]?.name || member.scope}
        </p>`
-    : ''}    
+    : ''} 
                         </div>
                         <div class="flex space-x-1">
                             <button onclick="editStaff('${member.id}')" class="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs" title="Modifier"><i class="fa-solid fa-pen"></i></button>
@@ -2235,7 +2235,7 @@ function updateAllTeamDropdowns() {
 
     );
     console.log("Dropdowns trouvés :", selects.length);
-    
+
     const keys = Object.keys(state.teams || {});
 
     selects.forEach(select => {
