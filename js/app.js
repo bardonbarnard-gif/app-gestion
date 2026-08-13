@@ -432,6 +432,15 @@ else {
 
     let playersToDisplay = state.players;
 
+    console.log("Equipe coach :", userTeam);
+
+state.players.slice(0, 3).forEach(p => {
+    console.log(
+        p.name,
+        "team =", p.team,
+        "cat =", p.cat
+    );
+});
     if (role === 'coach') {
         playersToDisplay = state.players.filter(
             p => (p.team || p.cat) === userTeam
@@ -1806,7 +1815,7 @@ function applyPermissions() {
 
     console.log(sessionStorage.getItem("currentUserData"));
 
-    
+
     const role = window.currentUserRole || 'public';
     const userTeam = window.currentUserTeam || 'all';
 
