@@ -1966,9 +1966,11 @@ function applyPermissions() {
             roleName = window.currentUserName ? `${window.currentUserName} (Dirigeant)` : "Dirigeant";
         } else if (role === "responsable") {
             roleName = window.currentUserName ? `${window.currentUserName} (Responsable)` : "Responsable";
-        } else if (role === "coach") {
-            roleName = window.currentUserName ? `${window.currentUserName} (Coach)` : "Coach";
-        }
+        }else if (role === "coach") {
+    roleName = window.currentUserName
+        ? `${window.currentUserName} (${userTeam.toUpperCase()})`
+        : `Coach ${userTeam.toUpperCase()}`;
+}
 
         roleLabel.textContent = roleName;
     }
