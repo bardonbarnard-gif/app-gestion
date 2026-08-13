@@ -2232,7 +2232,10 @@ function updateAllTeamDropdowns() {
     // Cherche tous les éléments <select> qui ont la classe 'team-select' ou l'ID 'm-team', etc.
     const selects = document.querySelectorAll(
     '#m-team, #t-team, #admin-team-select, .team-select'
-);
+
+    );
+    console.log("Dropdowns trouvés :", selects.length);
+    
     const keys = Object.keys(state.teams || {});
 
     selects.forEach(select => {
