@@ -558,7 +558,7 @@ Object.values(state.trainings).forEach(session => {
                         <div class="flex justify-between items-start">
                             <div class="flex items-center space-x-2">
     <p class="font-bold text-slate-800 text-sm">
-        ${m.team || 'Équipe'} vs ${m.opponent}
+        ${teamName} vs ${m.opponent}
     </p>
     ${getMatchTypeBadge(m.type || 'Championnat')}
 </div>
@@ -1357,7 +1357,9 @@ function duplicateTraining() {
         function openMatchBilanModal(mId) {
             const m = state.matches[mId];
             if (!m) return;
-            document.getElementById('modal-bilan-title').innerText = `Bilan : ${m.team || 'Équipe'} vs ${m.opponent}`;
+            const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
+            document.getElementById('modal-bilan-title').innerText =
+            `Bilan : ${teamName} vs ${m.opponent}`;
             const container = document.getElementById('modal-bilan-content');
             if (!m.convocations) m.convocations = {};
             if (!state.cards[m.id]) state.cards[m.id] = {};
