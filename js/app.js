@@ -2,6 +2,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const pinScreen = document.getElementById("pin-screen");
     const pinInput = document.getElementById("pin-input");
     const pinError = document.getElementById("pin-error");
+    const teamSelect = document.getElementById("admin-team-select");
+    const teamInput = document.getElementById("admin-team");
+
+    if (teamSelect && teamInput) {
+        teamSelect.addEventListener("change", () => {
+            teamInput.value = teamSelect.value;
+        });
+    }
+});
 
     // Vérifier si l'utilisateur s'est déjà authentifié durant cette session
     const savedUserStr = sessionStorage.getItem("currentUserData");
