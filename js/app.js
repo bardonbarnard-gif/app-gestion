@@ -397,10 +397,14 @@ else {
             }
 
             const nextBadge = document.getElementById('next-match-badge');
+            const nextTeamName =
+    state.teams?.[nextMatch.team]?.name ||
+    nextMatch.team ||
+    'Équipe';
             const nextCont = document.getElementById('dashboard-next-match-content');
             if (nextMatch) {
                 nextBadge.innerHTML = getMatchTypeBadge(nextMatch.type || 'Championnat');
-                nextCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>${nextMatch.team || 'Équipe'} vs ${nextMatch.opponent}</span><span class="text-sky-600 font-bold">${nextMatch.location || 'Domicile'}</span></div><p class="text-[11px] text-slate-500">📅 ${nextMatch.date} à ${nextMatch.heure || '14:30'}</p></div>`;
+                nextCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>${nextTeamName} vs ${nextMatch.opponent}</span><span class="text-sky-600 font-bold">${nextMatch.location || 'Domicile'}</span></div><p class="text-[11px] text-slate-500">📅 ${nextMatch.date} à ${nextMatch.heure || '14:30'}</p></div>`;
             } else {
                 nextBadge.innerHTML = ""; nextCont.innerHTML = `<p class="text-slate-400 italic py-2">Aucun match programmé.</p>`;
             }
