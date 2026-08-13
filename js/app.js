@@ -10,7 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const userData = JSON.parse(savedUserStr);
             window.currentUserRole = userData.role; // On garde la compatibilité avec vos permissions
             window.currentUserName = userData.name; // Optionnel : pour stocker le nom du coach
-            
+            window.currentUserTeam = userData.team || 'all';
+
             if (pinScreen) pinScreen.style.display = "none";
             applyPermissions(); 
             return;
@@ -37,6 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         // On mémorise les infos utilisateur
                         window.currentUserRole = userData.role; 
                         window.currentUserName = userData.name;
+                        window.currentUserTeam = userData.team || 'all';
                         
                         sessionStorage.setItem("currentUserData", JSON.stringify(userData));
                         sessionStorage.setItem("currentUserRole", userData.role);
@@ -1792,6 +1794,13 @@ function renderTeamFilters() {
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
 function applyPermissions() {
     const role = window.currentUserRole || 'public';
+console.log(
+    'Role :',
+    role,
+    'Team :',
+    window.currentUserTeam
+);
+
     const userTeam = window.currentUserTeam || 'all';
 
     // --- MISE À JOUR DU TEXTE DU RÔLE ---
