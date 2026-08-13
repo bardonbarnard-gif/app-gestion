@@ -332,6 +332,10 @@ dashboardMatches.forEach(m => {
      <span class="text-red-600">${losses}D</span>`;
 
             const teamCards = getTotalTeamCards();
+            const teamCards =
+    role === 'coach'
+        ? getTeamCards(dashboardMatches)
+        : getTotalTeamCards();
             document.getElementById('stat-total-cards').innerHTML = `<span class="text-amber-500">${teamCards.yellows}🟨</span> <span class="text-red-600">${teamCards.reds}🟥</span>`;
 
             // Alerte Licences
@@ -450,10 +454,12 @@ else {
             }
 
             const nextBadge = document.getElementById('next-match-badge');
-            const nextTeamName =
-    state.teams?.[nextMatch.team]?.name ||
-    nextMatch.team ||
-    'Équipe';
+           const nextTeamName =
+    nextMatch
+        ? (state.teams?.[nextMatch.team]?.name ||
+           nextMatch.team ||
+           'Équipe')
+        : 'Équipe';
             const nextCont = document.getElementById('dashboard-next-match-content');
             if (nextMatch) {
                 nextBadge.innerHTML = getMatchTypeBadge(nextMatch.type || 'Championnat');
@@ -483,10 +489,7 @@ else {
     return { yellows, reds };
 }
 
-const teamCards =
-    role === 'coach'
-        ? getTeamCards(dashboardMatches)
-        : getTotalTeamCards();
+
         function renderTopScorersAndPassers() {
             const role = window.currentUserRole || 'public';
 const userTeam = window.currentUserTeam || 'all';
