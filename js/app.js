@@ -1803,6 +1803,10 @@ function renderTeamFilters() {
 }
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
 function applyPermissions() {
+
+    console.log(sessionStorage.getItem("currentUserData"));
+
+    
     const role = window.currentUserRole || 'public';
     const userTeam = window.currentUserTeam || 'all';
 
