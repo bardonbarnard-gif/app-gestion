@@ -791,9 +791,11 @@ const userTeam = window.currentUserTeam || 'all';
 ) {
     return;
 }
-
+console.log("Equipe du coach :", userTeam);
+console.log("Joueurs :", state.players);
             // Filtrer les joueurs selon le rôle
             const playersForMatch = role === 'coach'
+            
                 ? state.players.filter(p => (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase())
                 : state.players;
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
