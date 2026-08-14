@@ -321,6 +321,46 @@ function saveStateToFirebase() {
             if (scoreHome === undefined || scoreAway === undefined || scoreHome === "" || scoreAway === "") {
                 return '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-500">À jouer</span>';
             }
+            function getTeamColor(teamKey) {
+
+    const color =
+        state.teams?.[teamKey]?.color || 'slate';
+
+    const colors = {
+        sky: {
+            bg: 'bg-sky-50',
+            border: 'border-sky-300',
+            text: 'text-sky-800'
+        },
+        emerald: {
+            bg: 'bg-emerald-50',
+            border: 'border-emerald-300',
+            text: 'text-emerald-800'
+        },
+        red: {
+            bg: 'bg-red-50',
+            border: 'border-red-300',
+            text: 'text-red-800'
+        },
+        orange: {
+            bg: 'bg-orange-50',
+            border: 'border-orange-300',
+            text: 'text-orange-800'
+        },
+        purple: {
+            bg: 'bg-purple-50',
+            border: 'border-purple-300',
+            text: 'text-purple-800'
+        },
+        slate: {
+            bg: 'bg-slate-50',
+            border: 'border-slate-300',
+            text: 'text-slate-800'
+        }
+    };
+
+    return colors[color] || colors.slate;
+}
             const h = parseInt(scoreHome), a = parseInt(scoreAway);
             if (h > a) return '<span class="px-2.5 py-1 rounded text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">VICTOIRE 🟢</span>';
             if (h < a) return '<span class="px-2.5 py-1 rounded text-xs font-black bg-red-100 text-red-800 border border-red-300">DÉFAITE 🔴</span>';
