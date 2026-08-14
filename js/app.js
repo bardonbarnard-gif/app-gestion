@@ -1981,8 +1981,15 @@ function duplicateTraining() {
                     document.getElementById('staff-id').value = member.id;
                     document.getElementById('staff-name').value = member.name;
                     document.getElementById('staff-role').value = member.role;
-                    document.getElementById('staff-scope').value =
-    member.scope || '';
+                    const scopes = Array.isArray(member.scope)
+    ? member.scope
+    : [member.scope];
+
+document
+    .querySelectorAll('.staff-scope-checkbox')
+    .forEach(cb => {
+        cb.checked = scopes.includes(cb.value);
+    });
                     document.getElementById('staff-licence').value = member.licence || '';
                     document.getElementById('staff-phone').value = member.phone || '';
                     document.getElementById('staff-email').value = member.email || '';
