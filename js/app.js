@@ -795,12 +795,14 @@ console.log("Equipe du coach :", userTeam);
 console.log("Joueurs :", state.players);
             // Filtrer les joueurs selon le rôle
             const playersForMatch = role === 'coach'
-            console.log("Nombre total joueurs :", state.players.length);
-console.log("Equipe utilisateur :", userTeam);
-console.log("Joueurs filtrés :", playersForMatch.length);
+           
             
                 ? state.players.filter(p => (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase())
                 : state.players;
+
+                 console.log("Nombre total joueurs :", state.players.length);
+console.log("Equipe utilisateur :", userTeam);
+console.log("Joueurs filtrés :", playersForMatch.length);
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
             const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
                 day: '2-digit',
