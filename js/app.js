@@ -795,6 +795,9 @@ console.log("Equipe du coach :", userTeam);
 console.log("Joueurs :", state.players);
             // Filtrer les joueurs selon le rôle
             const playersForMatch = role === 'coach'
+            console.log("Nombre total joueurs :", state.players.length);
+console.log("Equipe utilisateur :", userTeam);
+console.log("Joueurs filtrés :", playersForMatch.length);
             
                 ? state.players.filter(p => (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase())
                 : state.players;
