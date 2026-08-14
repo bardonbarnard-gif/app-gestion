@@ -165,10 +165,14 @@ let selectedMatchId = null;
                     }
                 }
                 
-                const matchKeys = Object.keys(state.matches);
-                if (matchKeys.length > 0 && (!state.selectedMatchId || !state.matches[state.selectedMatchId])) {
-                    state.selectedMatchId = matchKeys[matchKeys.length - 1];
-                }
+               const matchKeys = Object.keys(state.matches);
+
+if (
+    state.selectedMatchId &&
+    !state.matches[state.selectedMatchId]
+) {
+    state.selectedMatchId = null;
+} 
 
                 renderAll();
             } catch(err) {
@@ -672,55 +676,64 @@ Object.values(state.trainings).forEach(session => {
 
         // Rendu Matchs & Convocations
         function populateMatchSelector() {
-            const selector = document.getElementById('match-selector');
-            const role = window.currentUserRole || 'public';
-const userTeam = window.currentUserTeam || 'all';
+    const selector = document.getElementById('match-selector');
 
-let matches = Object.values(state.matches);
+    const role = window.currentUserRole || 'public';
+    const userTeam = window.currentUserTeam || 'all';
 
-if (role === 'coach') {
-    matches = matches.filter(m =>
-        (m.team || '').toLowerCase() === userTeam.toLowerCase()
-    );
+    let matches = Object.values(state.matches);
+
+    if (role === 'coach') {
+        matches = matches.filter(m =>
+            (m.team || '').toLowerCase() === userTeam.toLowerCase()
+        );
+    }
+
+    // Tri par date
+    matches.sort((a, b) => {
+        const dateA = a.date
+            ? new Date(a.date + 'T12:00:00')
+            : new Date('9999-12-31');
+
+        const dateB = b.date
+            ? new Date(b.date + 'T12:00:00')
+            : new Date('9999-12-31');
+
+        return dateA - dateB;
+    });
+
+    if (matches.length === 0) {
+        selector.innerHTML =
+            '<option value="">Aucun match</option>';
+        return;
+    }
+
+    selector.innerHTML =
+        '<option value="">-- Sélectionner un match --</option>' +
+        matches.map(m => {
+
+            const formattedDate = m.date
+                ? new Date(m.date + 'T12:00:00').toLocaleDateString(
+                    'fr-FR',
+                    {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    }
+                )
+                : '--/--/--';
+
+            return `
+                <option value="${m.id}">
+                    ${m.opponent} (${formattedDate})
+                </option>
+            `;
+
+        }).join('');
+
+    // Aucune sélection automatique
+    selector.value = state.selectedMatchId || '';
 }
-
-            // Trier les matchs par date (prochain d'abord)
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            
-            matches.sort((a, b) => {
-                const dateA = a.date ? new Date(a.date + 'T12:00:00') : new Date('9999-12-31');
-                const dateB = b.date ? new Date(b.date + 'T12:00:00') : new Date('9999-12-31');
-                return dateA - dateB;
-            });
-
-            const keys = matches.map(m => m.id);
-            if (keys.length === 0) { selector.innerHTML = `<option value="">Aucun match</option>`; return; }
-            
-            selector.innerHTML = matches.map(m => {
-                const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
-                const teamColors = {
-    u12: 'border-purple-500 bg-purple-50',
-    u13: 'border-indigo-500 bg-indigo-50',
-    u14: 'border-sky-500 bg-sky-50',
-    u15: 'border-emerald-500 bg-emerald-50',
-    u16: 'border-orange-500 bg-orange-50',
-    u17: 'border-red-500 bg-red-50'
-};
-
-const teamStyle =
-    teamColors[(m.team || '').toLowerCase()] ||
-    'border-slate-300 bg-slate-50';
-                const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                }) : '--/--/--';
-                return `<option value="${m.id}" ${m.id === state.selectedMatchId ? 'selected' : ''}>${m.opponent} (${formattedDate})</option>`;
-            }).join('');
-            if (state.selectedMatchId) selector.value = state.selectedMatchId;
-        }
-
         function onMatchSelectorChange(matchId) {
             state.selectedMatchId = matchId;
             renderMatchDetail();
@@ -1829,6 +1842,12 @@ function duplicateTraining() {
 
     // Mise à jour de l'état local
     state.matches[matchId] = matchData;
+    state.matches[matchId] = matchData;
+
+state.selectedMatchId = matchId;
+
+saveStateToFirebase();
+
     
     // Sauvegarde unique dans Firebase via le système d'état central
     saveStateToFirebase();
