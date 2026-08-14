@@ -857,8 +857,7 @@ console.log("Joueurs filtrés :", playersForMatch.length);
             if (!m.jerseys) m.jerseys = {};
             if (!m.carpool) m.carpool = {};
 
-            const teamColor = getTeamColor(m.team);
-
+            
 infoCard.className =
     `p-4 rounded-xl border-2 ${teamColor.bg} ${teamColor.border}`;
             infoCard.innerHTML = `
