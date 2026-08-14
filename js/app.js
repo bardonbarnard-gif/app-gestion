@@ -105,12 +105,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Données initiales par défaut (Effectif de base)
         const defaultPlayers = [
-            { id: "J001", name: "BAILLARIN Theo", licence: "9603227294", phonePere: "06 76 16 72 65", cat: "U14", poste1: "AD", poste2: "BU", poste3: "MC" },
-            { id: "J002", name: "BAZABAS Mael", licence: "9604869553", phonePere: "06 48 62 75 80", cat: "U14", poste1: "BU", poste2: "AG", poste3: "-" },
-            { id: "J003", name: "BEAULIEU Barthelemy", licence: "9602804942", phonePere: "06 61 53 24 85", cat: "U14", poste1: "DC", poste2: "MDC", poste3: "-" },
-            { id: "J018", name: "BONNEFIS Antoine", licence: "9603191094", phonePere: "06 22 34 04 20", cat: "U13", poste1: "AD", poste2: "DD", poste3: "-" },
-            { id: "J004", name: "BOUAJAJ Ibrahim", licence: "9605352704", phonePere: "06 95 84 64 94", cat: "U14", poste1: "DC", poste2: "MDC", poste3: "-" },
-            { id: "J019", name: "FRESQUET Jules", licence: "9603971174", phonePere: "-", cat: "U13", poste1: "MC", poste2: "MO", poste3: "-" }
+            { id: "J001", name: "BAILLARIN Theo", licence: "9603227294", phonePere: "06 76 16 72 65", team: "u14", poste1: "AD", poste2: "BU", poste3: "MC" },
+            { id: "J002", name: "BAZABAS Mael", licence: "9604869553", phonePere: "06 48 62 75 80", team: "u14", poste1: "BU", poste2: "AG", poste3: "-" },
+            { id: "J003", name: "BEAULIEU Barthelemy", licence: "9602804942", phonePere: "06 61 53 24 85", team: "u14", poste1: "DC", poste2: "MDC", poste3: "-" },
+            { id: "J018", name: "BONNEFIS Antoine", licence: "9603191094", phonePere: "06 22 34 04 20", team: "u13", poste1: "AD", poste2: "DD", poste3: "-" },
+            { id: "J004", name: "BOUAJAJ Ibrahim", licence: "9605352704", phonePere: "06 95 84 64 94", team: "u14", poste1: "DC", poste2: "MDC", poste3: "-" },
+            { id: "J019", name: "FRESQUET Jules", licence: "9603971174", phonePere: "-", team: "u13", poste1: "MC", poste2: "MO", poste3: "-" }
         ];
 
         // --- 2. ÉTAT GLOBAL DE L'APPLICATION ---
@@ -141,7 +141,13 @@ let selectedMatchId = null;
                     state.staff = (data && data.staff) || [];
                     saveStateToFirebase();
                 } else {
-                    state.players = data.players || [];
+                    state.players = (data.players || []).map(p => {
+                        // Migration : convertir cat → team si nécessaire
+                        if (!p.team && p.cat) {
+                            p.team = p.cat;
+                        }
+                        return p;
+                    });
                     state.matches = data.matches || {};
                     state.cards = data.cards || {};
                     state.stats = data.stats || {};
@@ -553,13 +559,6 @@ const playersSource = role === 'coach'
 
     let playersToDisplay = state.players;
 
-    state.players.slice(0, 3).forEach(p => {
-    console.log(
-        p.name,
-        "team =", p.team,
-        "cat =", p.cat
-    );
-});
     if (role === 'coach') {
     playersToDisplay = state.players.filter(
         p =>
@@ -1202,7 +1201,7 @@ if (role === 'coach') {
                 return `<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 rounded-xl border border-slate-100 bg-slate-50">
                     <div>
                         <p class="font-bold text-xs text-slate-800">${p.name}</p>
-                        <p class="text-[10px] text-slate-400">${p.cat || ''}</p>
+                        <p class="text-[10px] text-slate-400">${p.team || ''}</p>
                     </div>
                     <div class="flex flex-wrap gap-1.5">${buttons}</div>
                 </div>`;
