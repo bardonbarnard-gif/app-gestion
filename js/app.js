@@ -1943,7 +1943,35 @@ function duplicateTraining() {
                 </div>`).join('');
         }
 
+        function renderStaffScopes() {
+
+    const container = document.getElementById(
+        "staff-scope-container"
+    );
+
+    if (!container) return;
+
+    container.innerHTML = Object.entries(state.teams)
+        .map(([key, team]) => {
+
+            return `
+                <label class="flex items-center gap-2 text-sm">
+                    <input
+                        type="checkbox"
+                        value="${key}"
+                        class="staff-scope-checkbox">
+
+                    <span>
+                        ${team.name}
+                    </span>
+                </label>
+            `;
+        })
+        .join('');
+}
+
         function openModalStaff(staffId = null) {
+            renderStaffScopes();
             document.getElementById('form-staff').reset();
             document.getElementById('staff-id').value = '';
             document.getElementById('modal-staff-title').innerText = "Ajouter un Membre du Staff";
@@ -1971,7 +1999,9 @@ function duplicateTraining() {
                 id: idInput || 'STF_' + Date.now(),
                 name: document.getElementById('staff-name').value.trim(),
                 role: document.getElementById('staff-role').value,
-               scope: document.getElementById('staff-scope').value.trim(), 
+               scope: Array.from(
+    document.querySelectorAll('.staff-scope-checkbox:checked')
+).map(cb => cb.value), 
                 licence: document.getElementById('staff-licence').value.trim(),
                 phone: document.getElementById('staff-phone').value.trim(),
                 email: document.getElementById('staff-email').value.trim()
