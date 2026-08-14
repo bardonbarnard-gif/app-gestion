@@ -1524,7 +1524,7 @@ return `
         ? `${m.opponent} vs ${teamName}`
         : `${teamName} vs ${m.opponent}`
 }
-``</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
+</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
                                 <div class="text-[11px] text-slate-500 mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
                             </div>
                         </div>
