@@ -1499,7 +1499,12 @@ function duplicateTraining() {
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-lg bg-sky-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
                             <div>
-                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${teamName} vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
+                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${
+    (m.location || '').toLowerCase() === 'extérieur'
+        ? `${m.opponent} vs ${teamName}`
+        : `${teamName} vs ${m.opponent}`
+}
+``</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
                                 <div class="text-[11px] text-slate-500 mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
                             </div>
                         </div>
