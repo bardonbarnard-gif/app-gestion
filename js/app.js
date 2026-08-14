@@ -992,8 +992,21 @@ console.log("Joueurs filtrés :", playersForMatch.length);
 
             // Filtrer le staff par équipe pour les coaches
             const staffForMatch = role === 'coach'
-                ? (state.staff || []).filter(s => (s.scope || '').toLowerCase() === userTeam.toLowerCase() || !s.scope)
-                : (state.staff || []);
+    ? (state.staff || []).filter(s => {
+
+        if (!s.scope) return true;
+
+        const scopes = Array.isArray(s.scope)
+            ? s.scope
+            : [s.scope];
+
+        return scopes.some(scope =>
+            String(scope).toLowerCase() ===
+            userTeam.toLowerCase()
+        );
+
+    })
+    : (state.staff || []);
 
             if (staffForMatch && staffForMatch.length > 0) {
                 staffTableRows += `<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">Encadrement / Staff Officiel</td></tr>`;
