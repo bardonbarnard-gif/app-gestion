@@ -1489,17 +1489,37 @@ function duplicateTraining() {
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
                 const scoreA = m.scoreAway !== undefined && m.scoreAway !== "" ? m.scoreAway : "-";
                 const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                }) : '--/--/--';
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+}) : '--/--/--';
 
-                return `
+const matchTitle =
+    (m.location || '').toLowerCase() === 'extérieur'
+        ? `${m.opponent} vs ${teamName}`
+        : `${teamName} vs ${m.opponent}`;
+
+const trophyColors = {
+    u12: 'bg-purple-600',
+    u13: 'bg-indigo-600',
+    u14: 'bg-sky-600',
+    u15: 'bg-emerald-600',
+    u16: 'bg-orange-600',
+    u17: 'bg-red-600'
+};
+
+const trophyColor =
+    trophyColors[(m.team || '').toLowerCase()] ||
+    'bg-slate-600';
+
+return `
+                
                     <div class="p-3.5 bg-slate-50 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                         <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-lg bg-sky-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
-                            <div>
-                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${teamName} vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
+                            <div class="w-10 h-10 rounded-lg ${trophyColor} text-white flex items-center justify-center font-extrabold text-sm shadow-sm">
+    <i class="fa-solid fa-trophy"></i>
+</div>
+                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${matchTitle}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
                                 <div class="text-[11px] text-slate-500 mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
                             </div>
                         </div>
