@@ -2228,6 +2228,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const oldPin =
     document.getElementById("admin-old-pin").value.trim();
+    console.log("OLD =", oldPin);
+console.log("NEW =", pin);
 
 const name = document.getElementById("admin-name").value.trim();
 const role = document.getElementById("admin-role").value;
@@ -2338,6 +2340,8 @@ window.editCoachAccount = async function(pin) {
 
         document.getElementById("admin-pin").value = pin;
         document.getElementById("admin-old-pin").value = pin;
+        console.log("OLD PIN =", pin);
+``
         document.getElementById("admin-name").value = data.name || "";
         document.getElementById("admin-role").value = data.role || "";
         document.getElementById("admin-team").value = data.team || "";
