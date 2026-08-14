@@ -470,8 +470,13 @@ else {
             const lastBadge = document.getElementById('last-match-badge');
             const lastCont = document.getElementById('dashboard-last-match-content');
             if (lastMatch && lastMatch.scoreHome !== undefined && lastMatch.scoreHome !== "") {
+                const lastMatchDate = lastMatch.date ? new Date(lastMatch.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                }) : '--/--/--';
                 lastBadge.innerHTML = getMatchResultBadge(lastMatch.scoreHome, lastMatch.scoreAway);
-                lastCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>${lastMatch.team || 'Équipe'} vs ${lastMatch.opponent}</span><span class="bg-slate-100 px-2 py-0.5 rounded text-xs font-extrabold text-slate-700">${lastMatch.scoreHome} - ${lastMatch.scoreAway}</span></div><p class="text-[11px] text-slate-500">Joué le ${lastMatch.date}</p>${lastMatch.debrief ? `<p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded border mt-1">📝 ${lastMatch.debrief}</p>` : ''}</div>`;
+                lastCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>${lastMatch.team || 'Équipe'} vs ${lastMatch.opponent}</span><span class="bg-slate-100 px-2 py-0.5 rounded text-xs font-extrabold text-slate-700">${lastMatch.scoreHome} - ${lastMatch.scoreAway}</span></div><p class="text-[11px] text-slate-500">Joué le ${lastMatchDate}</p>${lastMatch.debrief ? `<p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded border mt-1">📝 ${lastMatch.debrief}</p>` : ''}</div>`;
             } else {
                 lastBadge.innerHTML = ""; lastCont.innerHTML = `<p class="text-slate-400 italic py-2">Aucun match récent.</p>`;
             }
@@ -485,8 +490,13 @@ else {
         : 'Équipe';
             const nextCont = document.getElementById('dashboard-next-match-content');
             if (nextMatch) {
+                const nextMatchDate = nextMatch.date ? new Date(nextMatch.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                }) : '--/--/--';
                 nextBadge.innerHTML = getMatchTypeBadge(nextMatch.type || 'Championnat');
-                nextCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>${nextTeamName} vs ${nextMatch.opponent}</span><span class="text-sky-600 font-bold">${nextMatch.location || 'Domicile'}</span></div><p class="text-[11px] text-slate-500">📅 ${nextMatch.date} à ${nextMatch.heure || '14:30'}</p></div>`;
+                nextCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>${nextTeamName} vs ${nextMatch.opponent}</span><span class="text-sky-600 font-bold">${nextMatch.location || 'Domicile'}</span></div><p class="text-[11px] text-slate-500">📅 ${nextMatchDate} à ${nextMatch.heure || '14:30'}</p></div>`;
             } else {
                 nextBadge.innerHTML = ""; nextCont.innerHTML = `<p class="text-slate-400 italic py-2">Aucun match programmé.</p>`;
             }
@@ -652,12 +662,28 @@ if (role === 'coach') {
         (m.team || '').toLowerCase() === userTeam.toLowerCase()
     );
 }
+
+            // Trier les matchs par date (prochain d'abord)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            matches.sort((a, b) => {
+                const dateA = a.date ? new Date(a.date + 'T12:00:00') : new Date('9999-12-31');
+                const dateB = b.date ? new Date(b.date + 'T12:00:00') : new Date('9999-12-31');
+                return dateA - dateB;
+            });
+
             const keys = matches.map(m => m.id);
             if (keys.length === 0) { selector.innerHTML = `<option value="">Aucun match</option>`; return; }
+            
             selector.innerHTML = matches.map(m => {
-                
                 const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
-                return `<option value="${m.id}" ${m.id === state.selectedMatchId ? 'selected' : ''}>${m.opponent} (${m.date})</option>`;
+                const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                }) : '--/--/--';
+                return `<option value="${m.id}" ${m.id === state.selectedMatchId ? 'selected' : ''}>${m.opponent} (${formattedDate})</option>`;
             }).join('');
             if (state.selectedMatchId) selector.value = state.selectedMatchId;
         }
@@ -699,7 +725,17 @@ const userTeam = window.currentUserTeam || 'all';
 ) {
     return;
 }
+
+            // Filtrer les joueurs selon le rôle
+            const playersForMatch = role === 'coach'
+                ? state.players.filter(p => (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase())
+                : state.players;
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
+            const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            }) : '--/--/--';
 
             if (!m.convocations) m.convocations = {};
             if (!m.positions) m.positions = {};
@@ -752,7 +788,7 @@ const userTeam = window.currentUserTeam || 'all';
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1.5 text-[11px] text-slate-600">
                             <div>📍 ${m.location || 'Domicile'} (${m.adresse || 'Stade non défini'})</div>
-                            <div>📅 ${m.date} à ${m.heure || '14:30'}</div>
+                            <div>📅 ${formattedDate} à ${m.heure || '14:30'}</div>
                             <div>🌿 ${m.pelouse || 'Synthétique'}</div>
                         </div>
                     </div>
@@ -778,7 +814,7 @@ const userTeam = window.currentUserTeam || 'all';
             let htmlMobileCards = '';
             let htmlTableRows = '';
 
-            state.players.forEach(p => {
+            playersForMatch.forEach(p => {
                 const currentStatus = m.convocations[p.id] || 'none';
                 const selectedPosition = m.positions[p.id] || p.poste1 || '-';
                 const jerseyNumber = m.jerseys[p.id] || '';
@@ -1409,6 +1445,13 @@ function duplicateTraining() {
         );
     }
 
+    // Trier les matchs par date (prochain d'abord)
+    matches.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date + 'T12:00:00') : new Date('9999-12-31');
+        const dateB = b.date ? new Date(b.date + 'T12:00:00') : new Date('9999-12-31');
+        return dateA - dateB;
+    });
+
     if (matches.length === 0) {
         container.innerHTML = `
             <div class="p-4 text-center text-slate-400 text-xs">
@@ -1421,6 +1464,11 @@ function duplicateTraining() {
                 const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
                 const scoreA = m.scoreAway !== undefined && m.scoreAway !== "" ? m.scoreAway : "-";
+                const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                }) : '--/--/--';
 
                 return `
                     <div class="p-3.5 bg-slate-50 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
@@ -1428,7 +1476,7 @@ function duplicateTraining() {
                             <div class="w-10 h-10 rounded-lg bg-sky-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
                             <div>
                                 <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${teamName} vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
-                                <div class="text-[11px] text-slate-500 mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${m.date} à ${m.heure || '14:30'}</div>
+                                <div class="text-[11px] text-slate-500 mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
                             </div>
                         </div>
                         <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto space-x-3">
