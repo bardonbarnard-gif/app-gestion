@@ -862,11 +862,10 @@ console.log("Joueurs filtrés :", playersForMatch.length);
             infoCard.innerHTML = `
     <div class="flex items-start space-x-3 w-full">
 
-        <div class="w-12 h-12 rounded-xl bg-white shadow-sm
-                    flex items-center justify-center
-                    font-black text-lg ${teamColor.text}">
-            ${teamName.substring(0,3).toUpperCase()}
-        </div>
+        <div class="w-10 h-10 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-base shrink-0 mt-0.5">
+    <i class="fa-solid fa-futbol"></i>
+</div>
+``
 
         <div class="flex-1">
 
