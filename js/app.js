@@ -844,7 +844,7 @@ console.log("Joueurs :", state.players);
 console.log("Equipe utilisateur :", userTeam);
 console.log("Joueurs filtrés :", playersForMatch.length);
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
-            const teamColor = getTeamColor(m.team);
+            
 
             const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
                 day: '2-digit',
@@ -858,8 +858,7 @@ console.log("Joueurs filtrés :", playersForMatch.length);
             if (!m.carpool) m.carpool = {};
 
             
-infoCard.className =
-    `p-4 rounded-xl border-2 ${teamColor.bg} ${teamColor.border}`;
+
             infoCard.innerHTML = `
     <div class="flex items-start space-x-3 w-full">
 
