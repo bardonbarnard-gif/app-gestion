@@ -220,6 +220,113 @@ function saveStateToFirebase() {
             renderStaff();
         }
 
+        // === FONCTION GLOBALE : Couleurs d'équipe ===
+        function getTeamColorClasses(teamKey) {
+            // Récupère la couleur stockée en Firebase pour cette équipe
+            const colorName = state.teams?.[teamKey]?.color || 'slate';
+            
+            const colorMap = {
+                sky: {
+                    bg: 'bg-sky-50',
+                    bgDark: 'bg-sky-100',
+                    bgButton: 'bg-sky-500',
+                    border: 'border-sky-300',
+                    borderDark: 'border-sky-400',
+                    text: 'text-sky-800',
+                    textBold: 'text-sky-900',
+                    textLight: 'text-sky-600',
+                    badge: 'bg-sky-200 text-sky-900',
+                    badgeDark: 'bg-sky-600 text-white'
+                },
+                emerald: {
+                    bg: 'bg-emerald-50',
+                    bgDark: 'bg-emerald-100',
+                    bgButton: 'bg-emerald-500',
+                    border: 'border-emerald-300',
+                    borderDark: 'border-emerald-400',
+                    text: 'text-emerald-800',
+                    textBold: 'text-emerald-900',
+                    textLight: 'text-emerald-600',
+                    badge: 'bg-emerald-200 text-emerald-900',
+                    badgeDark: 'bg-emerald-600 text-white'
+                },
+                red: {
+                    bg: 'bg-red-50',
+                    bgDark: 'bg-red-100',
+                    bgButton: 'bg-red-500',
+                    border: 'border-red-300',
+                    borderDark: 'border-red-400',
+                    text: 'text-red-800',
+                    textBold: 'text-red-900',
+                    textLight: 'text-red-600',
+                    badge: 'bg-red-200 text-red-900',
+                    badgeDark: 'bg-red-600 text-white'
+                },
+                orange: {
+                    bg: 'bg-orange-50',
+                    bgDark: 'bg-orange-100',
+                    bgButton: 'bg-orange-500',
+                    border: 'border-orange-300',
+                    borderDark: 'border-orange-400',
+                    text: 'text-orange-800',
+                    textBold: 'text-orange-900',
+                    textLight: 'text-orange-600',
+                    badge: 'bg-orange-200 text-orange-900',
+                    badgeDark: 'bg-orange-600 text-white'
+                },
+                purple: {
+                    bg: 'bg-purple-50',
+                    bgDark: 'bg-purple-100',
+                    bgButton: 'bg-purple-500',
+                    border: 'border-purple-300',
+                    borderDark: 'border-purple-400',
+                    text: 'text-purple-800',
+                    textBold: 'text-purple-900',
+                    textLight: 'text-purple-600',
+                    badge: 'bg-purple-200 text-purple-900',
+                    badgeDark: 'bg-purple-600 text-white'
+                },
+                pink: {
+                    bg: 'bg-pink-50',
+                    bgDark: 'bg-pink-100',
+                    bgButton: 'bg-pink-500',
+                    border: 'border-pink-300',
+                    borderDark: 'border-pink-400',
+                    text: 'text-pink-800',
+                    textBold: 'text-pink-900',
+                    textLight: 'text-pink-600',
+                    badge: 'bg-pink-200 text-pink-900',
+                    badgeDark: 'bg-pink-600 text-white'
+                },
+                amber: {
+                    bg: 'bg-amber-50',
+                    bgDark: 'bg-amber-100',
+                    bgButton: 'bg-amber-500',
+                    border: 'border-amber-300',
+                    borderDark: 'border-amber-400',
+                    text: 'text-amber-800',
+                    textBold: 'text-amber-900',
+                    textLight: 'text-amber-600',
+                    badge: 'bg-amber-200 text-amber-900',
+                    badgeDark: 'bg-amber-600 text-white'
+                },
+                slate: {
+                    bg: 'bg-slate-50',
+                    bgDark: 'bg-slate-100',
+                    bgButton: 'bg-slate-500',
+                    border: 'border-slate-300',
+                    borderDark: 'border-slate-400',
+                    text: 'text-slate-800',
+                    textBold: 'text-slate-900',
+                    textLight: 'text-slate-600',
+                    badge: 'bg-slate-200 text-slate-900',
+                    badgeDark: 'bg-slate-600 text-white'
+                }
+            };
+
+            return colorMap[colorName] || colorMap.slate;
+        }
+
        function switchTab(tabId) {
             ['dashboard', 'effectif', 'matchs', 'entrainements', 'staff'].forEach(t => {
                 const sec = document.getElementById(`sec-${t}`);
@@ -642,7 +749,8 @@ const playersSource = role === 'coach'
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
                 const teamKey = p.team || p.cat; 
                 const teamName = state.teams?.[teamKey]?.name || "Sans équipe";
-                const catBadge =`<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">
+                const teamColors = getTeamColorClasses(teamKey);
+                const catBadge =`<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${teamColors.badge}">
         ${teamName}
     </span>`;
 
@@ -679,18 +787,18 @@ Object.values(state.trainings).forEach(session => {
                 const presenceColor = presencePct === null ? 'text-slate-400' : presencePct >= 75 ? 'text-emerald-600' : presencePct >= 50 ? 'text-amber-600' : 'text-red-600';
 
                                 return `
-                <div class="p-3 bg-slate-50/70 border border-slate-200/80 rounded-xl flex flex-col justify-between space-y-3">
+                <div class="p-3 ${teamColors.bg} border ${teamColors.border} rounded-xl flex flex-col justify-between space-y-3">
                     <div class="flex justify-between items-start">
                         <div>
-    <h3 class="font-bold text-xs text-slate-800">${p.name}</h3>
+    <h3 class="font-bold text-xs ${teamColors.textBold}">${p.name}</h3>
     ${attendanceBadge}
-    <p class="text-[11px] ${hasLicence ? 'text-slate-600' : 'text-amber-700 font-bold'}">
+    <p class="text-[11px] ${hasLicence ? teamColors.textLight : 'text-amber-700 font-bold'}">
         Licence: ${hasLicence ? p.licence : '⚠️ Manquante'}
     </p>
 </div>
-                        <div class="flex items-center space-x-1.5">${catBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 text-slate-400 hover:text-sky-600" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
+                        <div class="flex items-center space-x-1.5">${catBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 ${teamColors.textLight} hover:${teamColors.textBold}" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
                     </div>
-                    <div class="text-xs space-y-2 pt-2 border-t border-slate-200/60">
+                    <div class="text-xs space-y-2 pt-2 border-t ${teamColors.border}">
                         <div class="grid grid-cols-2 gap-2">
                             <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between"><span class="text-slate-500">Stats:</span><span class="font-bold text-slate-700">${pStats.goals}⚽ ${pStats.assists}🎯</span></div>
                             <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between"><span class="text-slate-500">Cartons:</span><span class="font-bold"><span class="text-amber-600">${cards.yellows}🟨</span> <span class="text-red-600">${cards.reds}🟥</span></span></div>
@@ -831,8 +939,7 @@ const userTeam = window.currentUserTeam || 'all';
 ) {
     return;
 }
-console.log("Equipe du coach :", userTeam);
-console.log("Joueurs :", state.players);
+
             // Filtrer les joueurs selon le rôle
             const playersForMatch = role === 'coach'
            
@@ -840,10 +947,8 @@ console.log("Joueurs :", state.players);
                 ? state.players.filter(p => (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase())
                 : state.players;
 
-                 console.log("Nombre total joueurs :", state.players.length);
-console.log("Equipe utilisateur :", userTeam);
-console.log("Joueurs filtrés :", playersForMatch.length);
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
+            const teamColors = getTeamColorClasses(m.team);
             const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
                 day: '2-digit',
                 month: '2-digit',
@@ -857,11 +962,11 @@ console.log("Joueurs filtrés :", playersForMatch.length);
 
             infoCard.innerHTML = `
                 <div class="flex items-start space-x-3 w-full">
-                    <div class="w-10 h-10 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-base shrink-0 mt-0.5"><i class="fa-solid fa-futbol"></i></div>
+                    <div class="w-10 h-10 rounded-lg ${teamColors.bg} ${teamColors.textBold} flex items-center justify-center font-bold text-base shrink-0 mt-0.5"><i class="fa-solid fa-futbol"></i></div>
                     <div class="flex-1">
                         <div class="flex justify-between items-start">
                             <div class="flex items-center space-x-2">
-    <p class="font-bold text-slate-800 text-sm">
+    <p class="font-bold ${teamColors.textBold} text-sm">
         ${teamName} vs ${m.opponent}
     </p>
     ${getMatchTypeBadge(m.type || 'Championnat')}
@@ -871,7 +976,7 @@ console.log("Joueurs filtrés :", playersForMatch.length);
 
     <button
         onclick="openModalMatch('${m.id}')"
-        class="text-sky-600 font-bold text-xs bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
+        class="${teamColors.textLight} font-bold text-xs ${teamColors.bg} px-2.5 py-1 rounded-lg border ${teamColors.border}">
         <i class="fa-solid fa-pen-to-square mr-1"></i>
         Modifier
     </button>
@@ -899,7 +1004,7 @@ console.log("Joueurs filtrés :", playersForMatch.length);
 
 </div>
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1.5 text-[11px] text-slate-600">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1.5 text-[11px] ${teamColors.textLight}">
                             <div>📍 ${m.location || 'Domicile'} (${m.adresse || 'Stade non défini'})</div>
                             <div>📅 ${formattedDate} à ${m.heure || '14:30'}</div>
                             <div>🌿 ${m.pelouse || 'Synthétique'}</div>
@@ -1593,6 +1698,7 @@ function duplicateTraining() {
 
     container.innerHTML = matches.map(m => {
                 const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
+                const teamColors = getTeamColorClasses(m.team);
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
                 const scoreA = m.scoreAway !== undefined && m.scoreAway !== "" ? m.scoreAway : "-";
                 const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
@@ -1602,20 +1708,20 @@ function duplicateTraining() {
                 }) : '--/--/--';
 
                 return `
-                    <div class="p-3.5 bg-slate-50 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                    <div class="p-3.5 ${teamColors.bg} rounded-xl border ${teamColors.border} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                         <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-lg bg-sky-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
+                            <div class="w-10 h-10 rounded-lg ${teamColors.bgButton} text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
                             <div>
-                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${teamName} vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
-                                <div class="text-[11px] text-slate-500 mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
+                                <div class="flex items-center space-x-2"><span class="font-bold ${teamColors.textBold} text-sm">${teamName} vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
+                                <div class="text-[11px] ${teamColors.textLight} mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
                             </div>
                         </div>
                         <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto space-x-3">
                             <div class="flex items-center space-x-2">
                                 ${getMatchResultBadge(m.scoreHome, m.scoreAway)}
-                                <div class="bg-white px-3 py-1.5 rounded-lg border font-bold text-slate-700 text-sm"><span class="text-sky-600">${scoreH}</span> - <span class="text-red-600">${scoreA}</span></div>
+                                <div class="bg-white px-3 py-1.5 rounded-lg border font-bold text-slate-700 text-sm"><span class="${teamColors.textLight}">${scoreH}</span> - <span class="text-red-600">${scoreA}</span></div>
                             </div>
-                            <button onclick="openMatchBilanModal('${m.id}')" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition whitespace-nowrap"><i class="fa-solid fa-pen-to-square"></i><span>Bilan</span></button>
+                            <button onclick="openMatchBilanModal('${m.id}')" class="${teamColors.bgButton} hover:opacity-90 text-white px-3 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition whitespace-nowrap"><i class="fa-solid fa-pen-to-square"></i><span>Bilan</span></button>
                         </div>
                     </div>`;
             }).join('');
