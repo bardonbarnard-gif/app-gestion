@@ -2293,7 +2293,7 @@ async function loadCoachesFromFirebase() {
         <i class="fa-solid fa-trash"></i>
     </button>
 
-</div> class="text-red-500 hover:text-red-700 p-1.5 cursor-pointer"><i class="fa-solid fa-trash"></i></button>
+
                 `;
                 container.appendChild(item);
             });
