@@ -1486,15 +1486,35 @@ function duplicateTraining() {
 
     container.innerHTML = matches.map(m => {
                 const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
-                const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
-                const scoreA = m.scoreAway !== undefined && m.scoreAway !== "" ? m.scoreAway : "-";
-                const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                }) : '--/--/--';
 
-                return `
+const scoreH =
+    m.scoreHome !== undefined && m.scoreHome !== ""
+        ? m.scoreHome
+        : "-";
+
+const scoreA =
+    m.scoreAway !== undefined && m.scoreAway !== ""
+        ? m.scoreAway
+        : "-";
+
+const formattedDate =
+    m.date
+        ? new Date(m.date + 'T12:00:00').toLocaleDateString(
+            'fr-FR',
+            {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            }
+        )
+        : '--/--/--';
+
+const matchTitle =
+    (m.location || '').toLowerCase() === 'extérieur'
+        ? `${m.opponent} vs ${teamName}`
+        : `${teamName} vs ${m.opponent}`;
+
+return `
                     <div class="p-3.5 bg-slate-50 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-lg bg-sky-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
