@@ -285,11 +285,33 @@ function saveStateToFirebase() {
             return { yellows, reds };
         }
 
-        function getMatchTypeBadge(type) {
-            if (type === 'Championnat') return '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200"><i class="fa-solid fa-trophy mr-1"></i>Championnat</span>';
-            if (type === 'Coupe') return '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-solid fa-shield-halved mr-1"></i>Coupe</span>';
-            return '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200"><i class="fa-solid fa-handshake mr-1"></i>Amical</span>';
-        }
+       function getMatchTypeBadge(type) {
+
+    if (type === 'Championnat') {
+        return `
+            <span class="px-3 py-1 rounded-full text-xs font-black bg-blue-100 text-blue-800 border border-blue-300 shadow-sm">
+                <i class="fa-solid fa-trophy mr-1"></i>
+                Championnat
+            </span>
+        `;
+    }
+
+    if (type === 'Coupe') {
+        return `
+            <span class="px-3 py-1 rounded-full text-xs font-black bg-purple-100 text-purple-800 border border-purple-300 shadow-sm">
+                <i class="fa-solid fa-shield-halved mr-1"></i>
+                Coupe
+            </span>
+        `;
+    }
+
+    return `
+        <span class="px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-300 shadow-sm">
+            <i class="fa-solid fa-handshake mr-1"></i>
+            Amical
+        </span>
+    `;
+}
 
         function getMatchResultBadge(scoreHome, scoreAway) {
             if (scoreHome === undefined || scoreAway === undefined || scoreHome === "" || scoreAway === "") {
@@ -677,6 +699,18 @@ if (role === 'coach') {
             
             selector.innerHTML = matches.map(m => {
                 const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
+                const teamColors = {
+    u12: 'border-purple-500 bg-purple-50',
+    u13: 'border-indigo-500 bg-indigo-50',
+    u14: 'border-sky-500 bg-sky-50',
+    u15: 'border-emerald-500 bg-emerald-50',
+    u16: 'border-orange-500 bg-orange-50',
+    u17: 'border-red-500 bg-red-50'
+};
+
+const teamStyle =
+    teamColors[(m.team || '').toLowerCase()] ||
+    'border-slate-300 bg-slate-50';
                 const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
                     day: '2-digit',
                     month: '2-digit',
@@ -1489,37 +1523,17 @@ function duplicateTraining() {
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
                 const scoreA = m.scoreAway !== undefined && m.scoreAway !== "" ? m.scoreAway : "-";
                 const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-}) : '--/--/--';
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                }) : '--/--/--';
 
-const matchTitle =
-    (m.location || '').toLowerCase() === 'extérieur'
-        ? `${m.opponent} vs ${teamName}`
-        : `${teamName} vs ${m.opponent}`;
-
-const trophyColors = {
-    u12: 'bg-purple-600',
-    u13: 'bg-indigo-600',
-    u14: 'bg-sky-600',
-    u15: 'bg-emerald-600',
-    u16: 'bg-orange-600',
-    u17: 'bg-red-600'
-};
-
-const trophyColor =
-    trophyColors[(m.team || '').toLowerCase()] ||
-    'bg-slate-600';
-
-return `
-                
+                return `
                     <div class="p-3.5 bg-slate-50 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                         <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-lg ${trophyColor} text-white flex items-center justify-center font-extrabold text-sm shadow-sm">
-    <i class="fa-solid fa-trophy"></i>
-</div>
-                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${matchTitle}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
+                            <div class="w-10 h-10 rounded-lg bg-sky-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
+                            <div>
+                                <div class="flex items-center space-x-2"><span class="font-bold text-slate-800 text-sm">${teamName} vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
                                 <div class="text-[11px] text-slate-500 mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
                             </div>
                         </div>
