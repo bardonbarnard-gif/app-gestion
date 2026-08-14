@@ -702,10 +702,30 @@ const userTeam = window.currentUserTeam || 'all';
             const carpoolBanner = document.getElementById('carpooling-counter-banner');
             const validationStatus = document.getElementById('match-validation-status');
 
-            if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) {
-                const keys = Object.keys(state.matches);
-                if (keys.length > 0) state.selectedMatchId = keys[keys.length - 1];
-            }
+           if (!state.selectedMatchId) {
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="6" class="p-8 text-center text-slate-400">
+                <div class="flex flex-col items-center space-y-2">
+                    <i class="fa-solid fa-calendar-days text-3xl"></i>
+                    <p class="font-bold">
+                        Aucun match sélectionné
+                    </p>
+                    <p>
+                        Sélectionnez ou créez un match pour gérer les convocations.
+                    </p>
+                </div>
+            </td>
+        </tr>
+    `;
+
+    infoCard.style.display = 'none';
+    counterBanner.style.display = 'none';
+    carpoolBanner.style.display = 'none';
+
+    return;
+}
 
             if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) {
                 tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Aucun match disponible.</td></tr>`;
