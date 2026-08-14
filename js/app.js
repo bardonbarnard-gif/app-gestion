@@ -844,6 +844,8 @@ console.log("Joueurs :", state.players);
 console.log("Equipe utilisateur :", userTeam);
 console.log("Joueurs filtrés :", playersForMatch.length);
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
+            const teamColor = getTeamColor(m.team);
+
             const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
                 day: '2-digit',
                 month: '2-digit',
@@ -855,17 +857,42 @@ console.log("Joueurs filtrés :", playersForMatch.length);
             if (!m.jerseys) m.jerseys = {};
             if (!m.carpool) m.carpool = {};
 
+            const teamColor = getTeamColor(m.team);
+
+infoCard.className =
+    `p-4 rounded-xl border-2 ${teamColor.bg} ${teamColor.border}`;
             infoCard.innerHTML = `
-                <div class="flex items-start space-x-3 w-full">
-                    <div class="w-10 h-10 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-base shrink-0 mt-0.5"><i class="fa-solid fa-futbol"></i></div>
-                    <div class="flex-1">
-                        <div class="flex justify-between items-start">
-                            <div class="flex items-center space-x-2">
-    <p class="font-bold text-slate-800 text-sm">
-        ${teamName} vs ${m.opponent}
-    </p>
-    ${getMatchTypeBadge(m.type || 'Championnat')}
-</div>
+    <div class="flex items-start space-x-3 w-full">
+
+        <div class="w-12 h-12 rounded-xl bg-white shadow-sm
+                    flex items-center justify-center
+                    font-black text-lg ${teamColor.text}">
+            ${teamName.substring(0,3).toUpperCase()}
+        </div>
+
+        <div class="flex-1">
+
+            <div class="flex justify-between items-start">
+
+                <div>
+
+                    <div class="flex items-center gap-2 mb-1">
+
+                        <span class="px-2 py-1 rounded-full text-[10px]
+                                     font-extrabold bg-white border
+                                     ${teamColor.text}">
+                            ${teamName}
+                        </span>
+
+                        ${getMatchTypeBadge(m.type || 'Championnat')}
+
+                    </div>
+
+                    <p class="font-black text-base text-slate-800">
+                        ⚽ ${teamName} vs ${m.opponent}
+                    </p>
+
+                </div>
 
 <div class="flex flex-wrap gap-2 justify-end">
 
