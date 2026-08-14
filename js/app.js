@@ -2120,7 +2120,7 @@ function renderTeamFilters() {
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
 function applyPermissions() {
 
-    console.log(sessionStorage.getItem("currentUserData"));
+    
 
 
     const role = window.currentUserRole || 'public';
@@ -2228,8 +2228,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const oldPin =
     document.getElementById("admin-old-pin").value.trim();
-    console.log("OLD =", oldPin);
-console.log("NEW =", pin);
+   
 
 const name = document.getElementById("admin-name").value.trim();
 const role = document.getElementById("admin-role").value;
@@ -2340,8 +2339,7 @@ window.editCoachAccount = async function(pin) {
 
         document.getElementById("admin-pin").value = pin;
         document.getElementById("admin-old-pin").value = pin;
-        console.log("OLD PIN =", pin);
-``
+  
         document.getElementById("admin-name").value = data.name || "";
         document.getElementById("admin-role").value = data.role || "";
         document.getElementById("admin-team").value = data.team || "";
@@ -2432,7 +2430,7 @@ function updateAllTeamDropdowns() {
     '#m-team, #t-team, #admin-team-select, .team-select'
 
     );
-    console.log("Dropdowns trouvés :", selects.length);
+    
 
     const keys = Object.keys(state.teams || {});
 
