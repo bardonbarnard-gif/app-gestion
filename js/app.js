@@ -799,7 +799,7 @@ const userTeam = window.currentUserTeam || 'all';
             }
 
             let convokedCount = 0, totalSeats = 0;
-            state.players.forEach(p => {
+            playersForMatch.forEach(p => {
                 if (m.convocations[p.id] === 'convoke') convokedCount++;
                 totalSeats += parseInt(m.carpool[p.id]) || 0;
             });
@@ -917,11 +917,16 @@ const userTeam = window.currentUserTeam || 'all';
             let staffTableRows = '';
             let staffMobileCards = '';
 
-            if (state.staff && state.staff.length > 0) {
+            // Filtrer le staff par équipe pour les coaches
+            const staffForMatch = role === 'coach'
+                ? (state.staff || []).filter(s => (s.scope || '').toLowerCase() === userTeam.toLowerCase() || !s.scope)
+                : (state.staff || []);
+
+            if (staffForMatch && staffForMatch.length > 0) {
                 staffTableRows += `<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">Encadrement / Staff Officiel</td></tr>`;
                 staffMobileCards += `<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">Encadrement / Staff Officiel</div>`;
 
-                state.staff.forEach(member => {
+                staffForMatch.forEach(member => {
                     const hasStaffLicence = member.licence && member.licence.trim() !== '';
                     
                     staffTableRows += `
