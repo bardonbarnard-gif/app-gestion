@@ -2277,7 +2277,23 @@ async function loadCoachesFromFirebase() {
                         <span class="text-slate-500 ml-1">(${data.team})</span>
                         <div class="text-slate-400 font-mono text-[10px] mt-0.5">PIN : ${pin}</div>
                     </div>
-                    <button onclick="deleteCoachAccount('${pin}')" class="text-red-500 hover:text-red-700 p-1.5 cursor-pointer"><i class="fa-solid fa-trash"></i></button>
+                    <div class="flex items-center gap-2">
+
+    <button
+        onclick="editCoachAccount('${pin}')"
+        class="text-sky-500 hover:text-sky-700 p-1.5 cursor-pointer">
+
+        <i class="fa-solid fa-pen"></i>
+    </button>
+
+    <button
+        onclick="deleteCoachAccount('${pin}')"
+        class="text-red-500 hover:text-red-700 p-1.5 cursor-pointer">
+
+        <i class="fa-solid fa-trash"></i>
+    </button>
+
+</div> class="text-red-500 hover:text-red-700 p-1.5 cursor-pointer"><i class="fa-solid fa-trash"></i></button>
                 `;
                 container.appendChild(item);
             });
@@ -2291,6 +2307,31 @@ async function loadCoachesFromFirebase() {
 }
 
 // Supprimer un compte de Firebase
+window.editCoachAccount = async function(pin) {
+
+    try {
+
+        const snapshot =
+            await firebase.database()
+                .ref("rangueil_data/access/" + pin)
+                .once("value");
+
+        if (!snapshot.exists()) return;
+
+        const data = snapshot.val();
+
+        document.getElementById("admin-pin").value = pin;
+        document.getElementById("admin-name").value = data.name || "";
+        document.getElementById("admin-role").value = data.role || "";
+        document.getElementById("admin-team").value = data.team || "";
+
+    } catch (error) {
+
+        console.error(error);
+        alert("Impossible de charger ce compte");
+
+    }
+}
 window.deleteCoachAccount = async function(pin) {
     if (confirm(`Voulez-vous vraiment supprimer l'accès associé au PIN ${pin} ?`)) {
         try {
