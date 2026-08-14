@@ -321,51 +321,7 @@ function saveStateToFirebase() {
             if (scoreHome === undefined || scoreAway === undefined || scoreHome === "" || scoreAway === "") {
                 return '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-500">À jouer</span>';
             }
-            function getTeamColor(teamKey) {
 
-    const color =
-        state.teams?.[teamKey]?.color || 'slate';
-
-    const colors = {
-        sky: {
-            bg: 'bg-sky-50',
-            border: 'border-sky-300',
-            text: 'text-sky-800'
-        },
-        emerald: {
-            bg: 'bg-emerald-50',
-            border: 'border-emerald-300',
-            text: 'text-emerald-800'
-        },
-        red: {
-            bg: 'bg-red-50',
-            border: 'border-red-300',
-            text: 'text-red-800'
-        },
-        orange: {
-            bg: 'bg-orange-50',
-            border: 'border-orange-300',
-            text: 'text-orange-800'
-        },
-        purple: {
-            bg: 'bg-purple-50',
-            border: 'border-purple-300',
-            text: 'text-purple-800'
-        },
-        slate: {
-            bg: 'bg-slate-50',
-            border: 'border-slate-300',
-            text: 'text-slate-800'
-        }
-    };
-
-    return colors[color] || colors.slate;
-}
-            const h = parseInt(scoreHome), a = parseInt(scoreAway);
-            if (h > a) return '<span class="px-2.5 py-1 rounded text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">VICTOIRE 🟢</span>';
-            if (h < a) return '<span class="px-2.5 py-1 rounded text-xs font-black bg-red-100 text-red-800 border border-red-300">DÉFAITE 🔴</span>';
-            return '<span class="px-2.5 py-1 rounded text-xs font-black bg-slate-900 text-white border border-slate-700">MATCH NUL ⬛</span>';
-        }
 
         function calculateSeasonStats() {
             let wins = 0, draws = 0, losses = 0;
@@ -876,10 +832,10 @@ console.log("Joueurs filtrés :", playersForMatch.length);
                     <div class="flex items-center gap-2 mb-1">
 
                         <span class="px-2 py-1 rounded-full text-[10px]
-                                     font-extrabold bg-white border
-                                     ${teamColor.text}">
-                            ${teamName}
-                        </span>
+             font-extrabold bg-white border
+             text-sky-700">
+    ${teamName}
+</span>
 
                         ${getMatchTypeBadge(m.type || 'Championnat')}
 
