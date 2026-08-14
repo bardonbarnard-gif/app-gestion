@@ -821,7 +821,7 @@ console.log("Joueurs filtrés :", playersForMatch.length);
         <div class="w-10 h-10 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-base shrink-0 mt-0.5">
     <i class="fa-solid fa-futbol"></i>
 </div>
-``
+
 
         <div class="flex-1">
 
