@@ -2225,21 +2225,37 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             
             const pin = document.getElementById("admin-pin").value.trim();
-            const name = document.getElementById("admin-name").value.trim();
-            const role = document.getElementById("admin-role").value;
-            const team = document.getElementById("admin-team").value.trim();
 
-            if (pin.length !== 4) {
-                alert("Le code PIN doit comporter exactement 4 chiffres.");
-                return;
-            }
+const oldPin =
+    document.getElementById("admin-old-pin").value.trim();
 
-            try {
-                await firebase.database().ref("rangueil_data/access/" + pin).set({
-                    name: name,
-                    role: role,
-                    team: (role === "admin" || role === "dirigeant" || role === "public") ? "all" : (team || "all")
-                });
+const name = document.getElementById("admin-name").value.trim();
+const role = document.getElementById("admin-role").value;
+const team = document.getElementById("admin-team").value.trim();
+
+if (pin.length !== 4) {
+    alert("Le code PIN doit comporter exactement 4 chiffres.");
+    return;
+}
+
+try {
+
+    if (
+        oldPin &&
+        oldPin !== pin
+    ) {
+        await firebase.database()
+            .ref("rangueil_data/access/" + oldPin)
+            .remove();
+    }
+
+    await firebase.database().ref("rangueil_data/access/" + pin).set({
+        name: name,
+        role: role,
+        team: (role === "admin" || role === "dirigeant" || role === "public")
+            ? "all"
+            : (team || "all")
+    });
 
                 alert(`Accès pour "${name}" enregistré avec succès !`);
                 coachForm.reset();
@@ -2321,6 +2337,7 @@ window.editCoachAccount = async function(pin) {
         const data = snapshot.val();
 
         document.getElementById("admin-pin").value = pin;
+        document.getElementById("admin-old-pin").value = pin;
         document.getElementById("admin-name").value = data.name || "";
         document.getElementById("admin-role").value = data.role || "";
         document.getElementById("admin-team").value = data.team || "";
