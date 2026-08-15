@@ -342,13 +342,23 @@ function saveStateToFirebase() {
         }
 
     function switchMatchSubTab(subTabId) {
-            // Si aucun sous-onglet n'est spécifié, on force 'results' (le calendrier) par défaut
+           
             if (!subTabId) subTabId = 'results';
 
             const isConvoc = subTabId === 'convocations';
+                if (isConvoc) {
+        state.selectedMatchId = null;
+
+        const selector = document.getElementById('match-selector');
+        if (selector) {
+            selector.value = '';
+        }
+
+        renderMatchDetail();
+    }
             document.getElementById('subtab-convocations').classList.toggle('hidden', !isConvoc);
             document.getElementById('subtab-results').classList.toggle('hidden', isConvoc);
-
+ // Si aucun sous-onglet n'est spécifié, on force 'results' (le calendrier) par défaut
             const btnC = document.getElementById('subtab-convocations-btn');
             const btnR = document.getElementById('subtab-results-btn');
 
