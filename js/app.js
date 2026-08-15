@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    // Vérifier si l'utilisateur s'est déjà authentifié durant cette session
+    /// Vérifier si l'utilisateur s'est déjà authentifié durant cette session
     const savedUserStr = sessionStorage.getItem("currentUserData");
     if (savedUserStr) {
         try {
