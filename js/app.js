@@ -181,6 +181,9 @@ if (
         });
 
 function saveStateToFirebase() {
+
+    recalculateGlobalStats();
+
     const dataToSave = {
         players: state.players,
         matches: state.matches,
@@ -1784,21 +1787,50 @@ function duplicateTraining() {
         }
 
         function deleteMatch(matchId) {
-            const match = state.matches[matchId];
-            if (!match) return;
-            let warning = `Supprimer le match contre ${match.opponent} ?`;
-            if (match.scoreHome !== undefined && match.scoreHome !== "") {
-                warning = `⚠️ Ce match contient déjà des données :\n\n• score\n• statistiques\n• cartons\n• convocations\n\nConfirmer la suppression définitive ?`;
-            }
-            if (!confirm(warning)) return;
-            delete state.matches[matchId];
-            if (state.cards[matchId]) delete state.cards[matchId];
-            const remaining = Object.keys(state.matches);
-            state.selectedMatchId = remaining.length > 0 ? remaining[remaining.length - 1] : null;
-            saveStateToFirebase();
-            renderAll();
-            showToast("Match supprimé");
-        }
+    const match = state.matches[matchId];
+
+    if (!match) return;
+
+    let warning = `Supprimer le match contre ${match.opponent} ?`;
+
+    if (
+        match.scoreHome !== undefined &&
+        match.scoreHome !== ""
+    ) {
+        warning =
+            `⚠️ Ce match contient déjà des données :\n\n` +
+            `• score\n` +
+            `• buteurs\n` +
+            `• passeurs\n` +
+            `• cartons\n` +
+            `• convocations\n\n` +
+            `Confirmer la suppression définitive ?`;
+    }
+
+    if (!confirm(warning)) return;
+
+    // Supprimer le match
+    delete state.matches[matchId];
+
+    // Supprimer les cartons liés
+    if (state.cards[matchId]) {
+        delete state.cards[matchId];
+    }
+
+    // Recalcul complet des stats
+    recalculateGlobalStats();
+
+    // Réinitialiser la sélection si nécessaire
+    if (state.selectedMatchId === matchId) {
+        state.selectedMatchId = null;
+    }
+
+    saveStateToFirebase();
+
+    renderAll();
+
+    showToast("✅ Match supprimé et statistiques mises à jour");
+}
 
         function duplicateMatch(matchId) {
             const source = state.matches[matchId];
@@ -1830,24 +1862,54 @@ function duplicateTraining() {
         }
 
         function resetMatch(matchId) {
-            const match = state.matches[matchId];
-            if (!match) return;
-            if (!confirm("Réinitialiser le match ? Toutes les convocations, statistiques, cartons et résultats seront supprimés.")) return;
-            match.scoreHome = "";
-            match.scoreAway = "";
-            match.convocations = {};
-            match.positions = {};
-            match.jerseys = {};
-            match.carpool = {};
-            match.matchStats = {};
-            match.debrief = "";
-            match.isValidated = false;
-            if (state.cards[matchId]) delete state.cards[matchId];
-            recalculateGlobalStats();
-            saveStateToFirebase();
-            renderAll();
-            showToast("Match réinitialisé");
-        }
+    const match = state.matches[matchId];
+
+    if (!match) return;
+
+    if (
+        !confirm(
+            "Réinitialiser le match ?\n\n" +
+            "Le score, les buteurs, les passeurs, les cartons et les convocations seront supprimés."
+        )
+    ) {
+        return;
+    }
+
+    // Score
+    match.scoreHome = "";
+    match.scoreAway = "";
+
+    // Convocations
+    match.convocations = {};
+
+    // Feuille de match
+    match.positions = {};
+    match.jerseys = {};
+    match.carpool = {};
+
+    // Stats du match
+    match.matchStats = {};
+
+    // Debrief
+    match.debrief = "";
+
+    // Verrouillage
+    match.isValidated = false;
+
+    // Cartons
+    if (state.cards[matchId]) {
+        delete state.cards[matchId];
+    }
+
+    // Recalcul global buts/passes
+    recalculateGlobalStats();
+
+    saveStateToFirebase();
+
+    renderAll();
+
+    showToast("✅ Match réinitialisé");
+}
 
         function copyLicence(licence) {
             navigator.clipboard.writeText(licence).then(() => showToast(`Licence ${licence} copiée !`));
