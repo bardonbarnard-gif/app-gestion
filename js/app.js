@@ -328,7 +328,17 @@ function saveStateToFirebase() {
         }
 
        function switchTab(tabId) {
-            ['dashboard', 'effectif', 'matchs', 'entrainements', 'staff'].forEach(t => {
+
+    if (tabId === 'matchs') {
+        state.selectedMatchId = null;
+
+        const selector = document.getElementById('match-selector');
+        if (selector) {
+            selector.value = '';
+        }
+    }
+
+    ['dashboard', 'effectif', 'matchs', 'entrainements', 'staff'].forEach(t => {
                 const sec = document.getElementById(`sec-${t}`);
                 if(sec) sec.classList.add('hidden');
                 const btn = document.getElementById(`tab-${t}`);
@@ -337,6 +347,9 @@ function saveStateToFirebase() {
 
             const targetSec = document.getElementById(`sec-${tabId}`);
             if(targetSec) targetSec.classList.remove('hidden');
+            if (tabId === 'matchs') {
+    renderMatchDetail();
+}
             const activeBtn = document.getElementById(`tab-${tabId}`);
             if (activeBtn) activeBtn.classList.add('bg-white/20', 'text-white');
         }
