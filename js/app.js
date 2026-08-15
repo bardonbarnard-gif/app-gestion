@@ -1701,27 +1701,60 @@ function duplicateTraining() {
                 const teamColors = getTeamColorClasses(m.team);
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
                 const scoreA = m.scoreAway !== undefined && m.scoreAway !== "" ? m.scoreAway : "-";
-                const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                }) : '--/--/--';
+                
+                // Format date en DD-MM-YYYY
+                let formattedDate = '--/--/--';
+                if (m.date) {
+                    const dateParts = m.date.split('-');
+                    if (dateParts.length === 3) {
+                        formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+                    }
+                }
+
+                // Vérifier si le match est passé
+                const matchDateTime = m.date && m.heure 
+                    ? new Date(m.date + 'T' + (m.heure || '14:30'))
+                    : new Date('9999-12-31');
+                const now = new Date();
+                const isMatchPassed = matchDateTime < now;
+
+                // Déterminer si l'équipe joue à domicile ou à l'extérieur
+                const isHome = m.location?.toLowerCase().includes('domicile') || m.location?.toLowerCase().includes('home');
+                
+                // Construire l'affichage du match: "Équipe - Opponent" ou "Opponent - Équipe"
+                let matchTitle = '';
+                if (isHome) {
+                    // Domicile: "U14 Territoire - Lyon"
+                    matchTitle = `${teamName} - ${m.opponent}`;
+                } else {
+                    // Extérieur: "Lyon - U14 Territoire"
+                    matchTitle = `${m.opponent} - ${teamName}`;
+                }
+                
+                // Layout toujours normal (équipe toujours à gauche)
+                let matchContentHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-lg ${teamColors.bgButton} text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
+                        <div>
+                            <div class="flex items-center space-x-2"><span class="font-bold ${teamColors.textBold} text-sm">${matchTitle}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
+                            <div class="text-[11px] ${teamColors.textLight} mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
+                        </div>
+                    </div>`;
+
+                // Bouton Bilan - uniquement si le match est passé
+                const bilanButtonHTML = isMatchPassed 
+                    ? `<button onclick="openMatchBilanModal('${m.id}')" class="${teamColors.bgButton} hover:opacity-90 text-white px-3 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition whitespace-nowrap"><i class="fa-solid fa-pen-to-square"></i><span>Bilan</span></button>`
+                    : `<button disabled class="bg-slate-300 text-slate-500 px-3 py-2 rounded-lg font-bold flex items-center space-x-1.5 cursor-not-allowed whitespace-nowrap" title="Accessible après le match"><i class="fa-solid fa-clock"></i><span>Bilan</span></button>`;
 
                 return `
                     <div class="p-3.5 ${teamColors.bg} rounded-xl border ${teamColors.border} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-lg ${teamColors.bgButton} text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
-                            <div>
-                                <div class="flex items-center space-x-2"><span class="font-bold ${teamColors.textBold} text-sm">${teamName} vs ${m.opponent}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
-                                <div class="text-[11px] ${teamColors.textLight} mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
-                            </div>
-                        </div>
+                        ${matchContentHTML}
                         <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto space-x-3">
                             <div class="flex items-center space-x-2">
                                 ${getMatchResultBadge(m.scoreHome, m.scoreAway)}
                                 <div class="bg-white px-3 py-1.5 rounded-lg border font-bold text-slate-700 text-sm"><span class="${teamColors.textLight}">${scoreH}</span> - <span class="text-red-600">${scoreA}</span></div>
                             </div>
-                            <button onclick="openMatchBilanModal('${m.id}')" class="${teamColors.bgButton} hover:opacity-90 text-white px-3 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition whitespace-nowrap"><i class="fa-solid fa-pen-to-square"></i><span>Bilan</span></button>
+                            ${bilanButtonHTML}
                         </div>
                     </div>`;
             }).join('');
