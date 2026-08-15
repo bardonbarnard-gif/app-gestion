@@ -450,6 +450,18 @@ function saveStateToFirebase() {
     `;
 }
 
+        // Fonction pour obtenir l'icône du match selon son type (pour l'icône principale à gauche)
+        function getMatchIcon(type) {
+            if (type === 'Championnat') {
+                return 'fa-solid fa-trophy'; // Coupe pour Championnat
+            }
+            if (type === 'Coupe') {
+                return 'fa-solid fa-shield-halved'; // Bouclier pour Coupe
+            }
+            // Amical par défaut
+            return 'fa-solid fa-handshake'; // Poignée de main pour Amical
+        }
+
         function getMatchResultBadge(scoreHome, scoreAway) {
             if (scoreHome === undefined || scoreAway === undefined || scoreHome === "" || scoreAway === "") {
                 return '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-500">À jouer</span>';
@@ -1760,7 +1772,7 @@ function duplicateTraining() {
                 // Layout toujours normal (équipe toujours à gauche)
                 let matchContentHTML = `
                     <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 rounded-lg ${teamColors.bgButton} text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
+                        <div class="w-10 h-10 rounded-lg ${teamColors.bgButton} text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="${getMatchIcon(m.type || 'Championnat')}"></i></div>
                         <div>
                             <div class="flex items-center space-x-2"><span class="font-bold ${teamColors.textBold} text-sm">${matchTitle}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
                             <div class="text-[11px] ${teamColors.textLight} mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
