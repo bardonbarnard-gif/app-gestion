@@ -1293,8 +1293,15 @@ if (role === 'coach') {
                 }
 
                 const presences = Object.values(s.presence || {});
-                const nbPresent = presences.filter(v => v === 'present').length;
-                const nbTotal = state.players.length;
+                const nbPresent = presences.filter(v =>
+    v === 'present' || v === 'retard'
+).length;
+                const playersForTraining = state.players.filter(p =>
+    (p.team || p.cat || '').toLowerCase() ===
+    (s.team || '').toLowerCase()
+);
+
+const nbTotal = playersForTraining.length;
                 const pct = nbTotal > 0 ? Math.round((nbPresent / nbTotal) * 100) : 0;
                 const pctColor = pct >= 75 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-red-500';
                 const dayName = s.date ? new Date(s.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : '—';
