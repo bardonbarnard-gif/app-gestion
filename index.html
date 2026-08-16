@@ -615,7 +615,7 @@
             
             <div class="grid grid-cols-3 gap-2">
                 <div><label class="block text-slate-600 font-semibold mb-1">Type</label><select id="m-type" class="w-full p-2 border border-slate-200 rounded-lg"><option value="Championnat">Championnat</option><option value="Coupe">Coupe</option><option value="Amical">Amical</option></select></div>
-                <div><label class="block text-slate-600 font-semibold mb-1">Lieu</label><select id="m-location" class="w-full p-2 border border-slate-200 rounded-lg"><option value="Domicile">Domicile</option><option value="Extérieur">Extérieur</option></select></div>
+                <div><label class="block text-slate-600 font-semibold mb-1">Lieu</label><select id="m-location" onchange="updateMeetingPreview()" class="w-full p-2 border border-slate-200 rounded-lg"><option value="Domicile">Domicile</option><option value="Extérieur">Extérieur</option></select></div>
                 <div><label class="block text-slate-600 font-semibold mb-1">Pelouse</label><select id="m-pelouse" class="w-full p-2 border border-slate-200 rounded-lg"><option value="Synthétique">Synthétique</option><option value="Herbe">Herbe</option><option value="Stabilisé">Stabilisé</option></select></div>
             </div>
             

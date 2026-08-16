@@ -2189,6 +2189,9 @@ function updateMeetingPreview() {
             document.getElementById('m-security-margin')?.value
         ) || 0;
 
+    const location =
+        document.getElementById('m-location').value;
+
     const [hours, minutes] =
         matchTime.split(':').map(Number);
 
@@ -2197,12 +2200,25 @@ function updateMeetingPreview() {
         document.getElementById('m-arrival-margin').value
     ) || 60;
 
-let totalMinutes =
-    (hours * 60) +
-    minutes -
-    arrival -
-    travel -
-    security;
+let totalMinutes;
+
+if (location === 'Domicile') {
+
+    totalMinutes =
+        (hours * 60) +
+        minutes -
+        arrival;
+
+} else {
+
+    totalMinutes =
+        (hours * 60) +
+        minutes -
+        arrival -
+        travel -
+        security;
+
+}
 
     if (totalMinutes < 0) totalMinutes = 0;
 
