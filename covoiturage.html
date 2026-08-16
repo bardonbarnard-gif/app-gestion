@@ -49,16 +49,14 @@ db.ref('rangueil_data/matches')
                 .find(
                     m => m.carpoolId === carpoolId
                 );
-
-        console.log(match);
-        if (match) {
+if (match) {
 
     document.getElementById('match-info').innerHTML = `
-        <div class="font-bold text-sky-900">
+        <div class="font-bold text-sky-900 text-lg">
             🏆 ${match.type || ''}
         </div>
 
-        <div class="mt-1">
+        <div class="mt-1 font-semibold">
             🆚 ${match.opponent || ''}
         </div>
 
@@ -75,9 +73,40 @@ db.ref('rangueil_data/matches')
         </div>
     `;
 
+    db.ref('rangueil_data/players')
+        .once('value')
+        .then(playerSnapshot => {
+
+            const players =
+                playerSnapshot.val() || [];
+
+            const playerSelect =
+                document.getElementById(
+                    'player-select'
+                );
+
+            players.forEach(player => {
+
+                if (
+                    match.convocations &&
+                    match.convocations[player.id] === 'convoke'
+                ) {
+
+                    playerSelect.innerHTML += `
+                        <option value="${player.id}">
+                            ${player.name}
+                        </option>
+                    `;
+
+                }
+
+            });
+
+        });
+
 }
 
-    });
+});
 
 </script>
 <script src="https://cdn.tailwindcss.com"></script>
