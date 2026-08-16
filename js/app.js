@@ -2167,12 +2167,30 @@ function formatDeadlineFr(deadlineText) {
         if (m.adresse) {
 
             text +=
-                `📍 *Adresse du match :*\n`;
+               `📍 *Stade :*\n`;
 
             text +=
                 `${m.adresse}\n\n`;
+}
+         text +=
+    `🚗 *ORGANISATION DU DÉPLACEMENT*\n\n`;
 
-        }
+text +=
+    `👉 *Répondre au covoiturage :*\n`;
+
+text +=
+    `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpoolId}\n\n`;
+
+
+text +=
+`Merci d'indiquer votre situation :
+
+🚗 Je conduis
+👤 Je suis passager
+📍 J'y vais directement
+❌ Absent
+
+`;
 
     }
 
@@ -2513,7 +2531,13 @@ function updateMatchLocationUI() {
         location: document.getElementById('m-location').value,
         pelouse: document.getElementById('m-pelouse').value,
         team: teamValue,
-        meetingPlace:document.getElementById('m-meeting-place').value,
+
+carpoolId:
+    (state.matches[matchId]?.carpoolId)
+    || ('CP_' + Date.now()),
+
+meetingPlace:
+    document.getElementById('m-meeting-place').value,
 
 
 travelTime:
