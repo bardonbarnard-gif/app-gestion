@@ -51,6 +51,31 @@ db.ref('rangueil_data/matches')
                 );
 
         console.log(match);
+        if (match) {
+
+    document.getElementById('match-info').innerHTML = `
+        <div class="font-bold text-sky-900">
+            🏆 ${match.type || ''}
+        </div>
+
+        <div class="mt-1">
+            🆚 ${match.opponent || ''}
+        </div>
+
+        <div class="mt-2">
+            📅 ${match.date || ''}
+        </div>
+
+        <div class="mt-2">
+            📍 ${match.meetingPlace || ''}
+        </div>
+
+        <div class="mt-2">
+            ⚽ ${match.heure || ''}
+        </div>
+    `;
+
+}
 
     });
 
