@@ -2625,11 +2625,7 @@ if (staffId) {
 updateMeetingPreview();
 updateDeadlinePreview();
 
-<<<<<<< HEAD
 
-=======
-toggleModal('modal-match', true);
->>>>>>> bc80cca0b985f2e418a244cd1be863f1e51a6053
 
 function updateDeadlinePreview() {
 
