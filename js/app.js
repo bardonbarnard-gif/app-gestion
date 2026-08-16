@@ -2019,25 +2019,202 @@ else if (m.type === 'Amical') {
         function copyLicence(licence) {
             navigator.clipboard.writeText(licence).then(() => showToast(`Licence ${licence} copiée !`));
         }
+function formatDateFr(dateString) {
 
-        function generateWhatsAppMessage() {
-            if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) return;
-            const m = state.matches[state.selectedMatchId];
-            const convoked = state.players.filter(p => m.convocations[p.id] === 'convoke');
-            let text = `🔵 *RANGUEIL FC - CONVOCATION MATCH* 🔵\n\n`;
-            text += `📅 *Adversaire :* ${m.opponent} (${m.type || 'Championnat'})\n`;
-            text += `📍 *Lieu :* ${m.location || 'Domicile'} - ${m.adresse || 'Stade'}\n`;
-            text += `⏰ *Rendez-vous :* ${m.heure ? 'à ' + m.heure : 'à définir'}\n\n`;
-            text += `📋 *Joueurs Convoqués (${convoked.length}) :*\n`;
-            convoked.forEach((p, idx) => {
-                const pos = m.positions[p.id] || p.poste1 || '';
-                const jersey = m.jerseys && m.jerseys[p.id] ? ` (N°${m.jerseys[p.id]})` : '';
-                text += `${idx+1}. ${p.name}${jersey} - ${pos}\n`;
+    if (!dateString) return '';
+
+    const formatted =
+        new Date(dateString + 'T12:00:00')
+            .toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
             });
-            text += `\n🚗 *COVOITURAGE :* Merci d'indiquer en réponse les places disponibles dans votre véhicule.\n\n`;
-            text += `Allez Rangueil ! ⚽`;
-            navigator.clipboard.writeText(text).then(() => showToast("Message WhatsApp copié !"));
+
+    return formatted.charAt(0).toUpperCase() +
+           formatted.slice(1);
+}
+
+function getResponseDeadline(dateString) {
+
+    if (!dateString) return '--';
+
+    const matchDate = new Date(dateString);
+
+    const day = matchDate.getDay();
+
+    let deadline = new Date(matchDate);
+
+    if (day === 6 || day === 0) {
+
+        while (deadline.getDay() !== 5) {
+            deadline.setDate(
+                deadline.getDate() - 1
+            );
         }
+
+    } else {
+
+        deadline.setDate(
+            deadline.getDate() - 1
+        );
+
+    }
+
+    const formatted =
+        deadline.toLocaleDateString(
+            'fr-FR',
+            {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            }
+        );
+
+    return (
+        formatted.charAt(0).toUpperCase() +
+        formatted.slice(1) +
+        ' - 18h00'
+    );
+
+}
+function formatDeadlineFr(deadlineText) {
+
+    if (!deadlineText || deadlineText === '--') {
+        return '--';
+    }
+
+    const [datePart, hourPart] =
+        deadlineText.split(' - ');
+
+    const [day, month, year] =
+        datePart.split('/');
+
+    const date = new Date(
+        year,
+        month - 1,
+        day
+    );
+
+    const formattedDate =
+        date.toLocaleDateString('fr-FR', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+
+    return (
+        formattedDate.charAt(0).toUpperCase() +
+        formattedDate.slice(1) +
+        ' - ' +
+        hourPart.replace(':', 'h')
+    );
+}
+       function generateWhatsAppMessage() {
+
+    if (
+        !state.selectedMatchId ||
+        !state.matches[state.selectedMatchId]
+    ) return;
+
+    const m =
+        state.matches[state.selectedMatchId];
+
+    const convoked =
+        state.players.filter(
+            p => m.convocations[p.id] === 'convoke'
+        );
+
+    let text =
+        `🔵⚪ *RANGUEIL FC - CONVOCATION* ⚪🔵\n\n`;
+
+    text +=
+        `🏆 *${m.type || 'Championnat'}*\n`;
+
+    text +=
+        `🆚 *${m.opponent}*\n\n`;
+
+    text +=
+    `📅 *Date :* ${formatDateFr(m.date)}\n`;
+
+    if (
+        m.location === 'Domicile'
+    ) {
+
+        text +=
+            `🏠 *MATCH À DOMICILE*\n\n`;
+
+        text +=
+            `📍 *Lieu de rendez-vous :*\n`;
+
+        text +=
+            `${m.meetingPlace || 'COMPLEXE SPORTIF RANGUEIL'}\n\n`;
+
+    } else {
+
+        text +=
+            `🚍 *DÉPLACEMENT*\n\n`;
+
+        text +=
+            `📍 *Rendez-vous :*\n`;
+
+        text +=
+            `${m.meetingPlace || 'COSEC Rangueil'}\n\n`;
+
+        if (m.adresse) {
+
+            text +=
+                `📍 *Adresse du match :*\n`;
+
+            text +=
+                `${m.adresse}\n\n`;
+
+        }
+
+    }
+
+    text +=
+        `🕐 *Rendez-vous :* ${document.getElementById('m-rdv-preview')?.innerText || '--'}\n`;
+
+    text +=
+        `⚽ *Coup d'envoi :* ${m.heure || '--'}\n\n`;
+
+    text +=
+    `⏳ *Merci de confirmer votre présence avant :*\n\n`;
+console.log(
+    "Deadline = ",
+    document.getElementById('m-deadline-preview')?.innerText
+);
+text +=
+    `${getResponseDeadline(m.date)}\n\n`;
+
+    text +=
+        `📋 *Joueurs convoqués (${convoked.length})*\n\n`;
+
+    convoked.forEach((p, idx) => {
+
+        text +=
+            `${idx + 1}. ${p.name}\n`;
+
+    });
+
+    text +=
+        `\n💙 Allez Rangueil ! ⚽`;
+
+    navigator.clipboard
+        .writeText(text)
+        .then(() => {
+
+            showToast(
+                "Message WhatsApp copié !"
+            );
+
+        });
+
+}
 
         function validateCurrentMatchSheet() {
             if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) return;
