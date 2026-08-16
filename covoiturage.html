@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Covoiturage Rangueil FC</title>
+
+https://cdn.tailwindcss.comscript>
+
+</head>
+
+<body class="bg-slate-100 min-h-screen p-4">
+
+<div class="max-w-md mx-auto bg-white rounded-xl shadow p-5">
+
+    <h1 class="text-xl font-bold text-sky-700 mb-4">
+        🚗 Organisation du déplacement
+    </h1>
+
+    <div class="mb-4">
+        <label class="font-semibold block mb-1">
+            Je réponds pour :
+        </label>
+
+        <select id="player-select"
+                class="w-full border p-2 rounded">
+            <option>Choisir un joueur</option>
+        </select>
+    </div>
+
+    <div class="space-y-2">
+
+        <label class="block">
+            <input type="radio"
+                   name="transport"
+                   value="driver">
+
+            🚗 Je conduis
+        </label>
+
+        <label class="block">
+            <input type="radio"
+                   name="transport"
+                   value="passenger">
+
+            👤 Je suis passager
+        </label>
+
+        <label class="block">
+            <input type="radio"
+                   name="transport"
+                   value="direct">
+
+            📍 J'y vais directement
+        </label>
+
+        <label class="block">
+            <input type="radio"
+                   name="transport"
+                   value="absent">
+
+            ❌ Absent
+        </label>
+
+    </div>
+
+    <button
+        class="w-full mt-5 bg-sky-600 text-white font-bold py-2 rounded">
+
+        Valider ma réponse
+
+    </button>
+
+</div>
+
+</body>
+</html>
