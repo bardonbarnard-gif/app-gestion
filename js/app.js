@@ -12,13 +12,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    /// Vérifier si l'utilisateur s'est déjà authentifié durant cette session
+    // Vérifier si l'utilisateur s'est déjà authentifié durant cette session
     const savedUserStr = sessionStorage.getItem("currentUserData");
     if (savedUserStr) {
         try {
             const userData = JSON.parse(savedUserStr);
-            window.currentUserPin =
-    userData.pin || null;
             window.currentUserRole = userData.role; // On garde la compatibilité avec vos permissions
             window.currentUserName = userData.name; // Optionnel : pour stocker le nom du coach
             window.currentUserTeam = userData.team || 'all';
@@ -44,9 +42,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     if (snapshot.exists()) {
                         const userData = snapshot.val(); 
-                        userData.pin = enteredPin;
-
-window.currentUserPin = enteredPin;
                         // userData contient par exemple : { name: "Thomas", role: "admin", team: "U14" }
 
                         // On mémorise les infos utilisateur
@@ -132,7 +127,6 @@ window.currentUserPin = enteredPin;
 // Variables d'interface uniquement
 let currentSession = 1;
 let selectedMatchId = null;
-let currentCatFilter = 'all';
 
         // --- 3. SYNCHRONISATION FIREBASE ---
         db.ref('rangueil_data').on('value', (snapshot) => {
@@ -157,9 +151,7 @@ let currentCatFilter = 'all';
                     state.matches = data.matches || {};
                     state.cards = data.cards || {};
                     state.stats = data.stats || {};
-                    state.staff = Object.values(
-    data.staff || {}
-);
+                    state.staff = data.staff || [];
                     // Migration ancien format numérique → nouveau format objet
                     const rawTrainings = data.trainings || {};
                     if (Object.keys(rawTrainings).length > 0 && !isNaN(Object.keys(rawTrainings)[0])) {
@@ -187,17 +179,7 @@ if (
                 console.error("Erreur de synchronisation :", err);
             }
         });
-function canEditStaff(member) {
 
-    if (window.currentUserRole === "admin") {
-        return true;
-    }
-
-    return (
-        member.accountPin ===
-        window.currentUserPin
-    );
-}
 function saveStateToFirebase() {
 
     recalculateGlobalStats();
@@ -233,7 +215,6 @@ function saveStateToFirebase() {
 
         function renderAll() {
             renderDashboard();
-            renderTeamFilters();
             renderEffectif();
             populateMatchSelector();
             renderMatchDetail();
@@ -751,29 +732,11 @@ else {
             const role = window.currentUserRole || 'public';
 const userTeam = window.currentUserTeam || 'all';
 
-let playersSource = state.players;
-
-if (role === 'coach') {
-
-    playersSource = state.players.filter(
-        p =>
-            (p.team || p.cat || '').toLowerCase() ===
-            userTeam.toLowerCase()
-    );
-
-} else if (role === 'responsable') {
-
-    const teams = userTeam
-        .split(',')
-        .map(t => t.trim().toLowerCase());
-
-    playersSource = state.players.filter(
-        p =>
-            teams.includes(
-                (p.team || p.cat || '').toLowerCase()
-            )
-    );
-}
+const playersSource = role === 'coach'
+    ? state.players.filter(p =>
+        (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase()
+      )
+    : state.players;
             let playersWithStats = playersSource.map(p => {
                 let s = state.stats[p.id] || { goals: 0, assists: 0 };
                 return { name: p.name, goals: s.goals || 0, assists: s.assists || 0 };
@@ -1330,15 +1293,8 @@ if (role === 'coach') {
                 }
 
                 const presences = Object.values(s.presence || {});
-                const nbPresent = presences.filter(v =>
-    v === 'present' || v === 'retard'
-).length;
-                const playersForTraining = state.players.filter(p =>
-    (p.team || p.cat || '').toLowerCase() ===
-    (s.team || '').toLowerCase()
-);
-
-const nbTotal = playersForTraining.length;
+                const nbPresent = presences.filter(v => v === 'present').length;
+                const nbTotal = state.players.length;
                 const pct = nbTotal > 0 ? Math.round((nbPresent / nbTotal) * 100) : 0;
                 const pctColor = pct >= 75 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-red-500';
                 const dayName = s.date ? new Date(s.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : '—';
@@ -1855,17 +1811,9 @@ function duplicateTraining() {
                 }
                 
                 // Layout toujours normal (équipe toujours à gauche)
-                let matchIcon = 'fa-trophy';
-
-if (m.type === 'Coupe') {
-    matchIcon = 'fa-shield-halved';
-}
-else if (m.type === 'Amical') {
-    matchIcon = 'fa-handshake';
-}
                 let matchContentHTML = `
                     <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 rounded-lg ${teamColors.bgButton} text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid ${matchIcon}"></i></div>
+                        <div class="w-10 h-10 rounded-lg ${teamColors.bgButton} text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid fa-trophy"></i></div>
                         <div>
                             <div class="flex items-center space-x-2"><span class="font-bold ${teamColors.textBold} text-sm">${matchTitle}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
                             <div class="text-[11px] ${teamColors.textLight} mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
@@ -2172,67 +2120,7 @@ else if (m.type === 'Amical') {
             saveStateToFirebase();
             renderMatchDetail();
         }
-function updateMeetingPreview() {
 
-    const matchTime =
-        document.getElementById('m-heure')?.value;
-
-    if (!matchTime) return;
-
-    const travel =
-        parseInt(
-            document.getElementById('m-travel-time')?.value
-        ) || 0;
-
-    const security =
-        parseInt(
-            document.getElementById('m-security-margin')?.value
-        ) || 0;
-
-    const location =
-        document.getElementById('m-location').value;
-
-    const [hours, minutes] =
-        matchTime.split(':').map(Number);
-
-    const arrival =
-    parseInt(
-        document.getElementById('m-arrival-margin').value
-    ) || 60;
-
-let totalMinutes;
-
-if (location === 'Domicile') {
-
-    totalMinutes =
-        (hours * 60) +
-        minutes -
-        arrival;
-
-} else {
-
-    totalMinutes =
-        (hours * 60) +
-        minutes -
-        arrival -
-        travel -
-        security;
-
-}
-
-    if (totalMinutes < 0) totalMinutes = 0;
-
-    const rdvHours =
-        String(Math.floor(totalMinutes / 60))
-            .padStart(2, '0');
-
-    const rdvMinutes =
-        String(totalMinutes % 60)
-            .padStart(2, '0');
-
-    document.getElementById('m-rdv-preview').innerText =
-        rdvHours + ':' + rdvMinutes;
-}
         function openModalMatch(matchId = null) {
             document.getElementById('form-match').reset();
             if (matchId) {
@@ -2248,22 +2136,12 @@ if (location === 'Domicile') {
                     document.getElementById('m-location').value = m.location || 'Domicile';
                     document.getElementById('m-pelouse').value = m.pelouse || 'Synthétique';
                     document.getElementById('m-team').value = m.team || '';
-                    document.getElementById('m-meeting-place').value = m.meetingPlace || 'COSEC Rangueil';
-                    document.getElementById('m-travel-time').value = m.travelTime || 25;
-                    document.getElementById('m-security-margin').value = m.securityMargin || 10;
-                    document.getElementById('m-arrival-margin').value = m.arrivalMargin || 60;
                 }
             } else {
                 document.getElementById('modal-match-title').innerText = "Nouveau Match";
                 document.getElementById('m-id').value = '';
                 document.getElementById('m-team').value = '';
-                document.getElementById('m-meeting-place').value = 'COSEC Rangueil';
-                document.getElementById('m-travel-time').value = 25;
-                document.getElementById('m-security-margin').value = 10;
-                document.getElementById('m-arrival-margin').value = 60;
             }
-            updateMeetingPreview();
-            updateDeadlinePreview();
             toggleModal('modal-match', true);
         }
 
@@ -2288,23 +2166,6 @@ if (location === 'Domicile') {
         location: document.getElementById('m-location').value,
         pelouse: document.getElementById('m-pelouse').value,
         team: teamValue,
-        meetingPlace:document.getElementById('m-meeting-place').value,
-
-
-travelTime:
-    parseInt(
-        document.getElementById('m-travel-time').value
-    ) || 25,
-
- arrivalMargin:
-    parseInt(
-        document.getElementById('m-arrival-margin').value
-    ) || 60,  
-
-securityMargin:
-    parseInt(
-        document.getElementById('m-security-margin').value
-    ) || 10,
         // Initialiser les champs optionnels
         scoreHome: "",
         scoreAway: "",
@@ -2318,10 +2179,11 @@ securityMargin:
 
     // Mise à jour de l'état local
     state.matches[matchId] = matchData;
-    
+    state.matches[matchId] = matchData;
 
 state.selectedMatchId = matchId;
 
+saveStateToFirebase();
 
     
     // Sauvegarde unique dans Firebase via le système d'état central
@@ -2446,31 +2308,10 @@ state.selectedMatchId = matchId;
        </p>`
     : ''} 
                         </div>
-                     ${canEditStaff(member) ? `
-<div class="flex space-x-1">
-
-    <button
-        onclick="editStaff('${member.id}')"
-        class="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs"
-        title="Modifier">
-        <i class="fa-solid fa-pen"></i>
-    </button>
-
-    ${
-        window.currentUserRole === 'admin'
-        ? `
-        <button
-            onclick="deleteStaff('${member.id}')"
-            class="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs"
-            title="Supprimer">
-            <i class="fa-solid fa-trash"></i>
-        </button>
-        `
-        : ''
-    }
-
-</div>
-` : ''}   
+                        <div class="flex space-x-1">
+                            <button onclick="editStaff('${member.id}')" class="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs" title="Modifier"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteStaff('${member.id}')" class="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs" title="Supprimer"><i class="fa-solid fa-trash"></i></button>
+                        </div>
                     </div>
                     <div class="space-y-1.5 text-xs pt-2 border-t border-slate-100">
                         <div class="flex items-center justify-between text-slate-600">
@@ -2550,41 +2391,6 @@ document
 
         function handleSaveStaff(event) {
             event.preventDefault();
-            const staffId =
-    document.getElementById("staff-id").value;
-
-if (staffId) {
-
-    const member =
-        state.staff.find(
-            s => s.id === staffId
-        );
-
-    if (
-        member &&
-        !canEditStaff(member)
-    ) {
-        showToast(
-            "Modification interdite",
-            "error"
-        );
-        return;
-    }
-
-} else {
-
-    if (
-        window.currentUserRole !==
-        "admin"
-    ) {
-        showToast(
-            "Seul l'administrateur peut créer un membre du staff",
-            "error"
-        );
-        return;
-    }
-
-}
             const idInput = document.getElementById('staff-id').value;
             const staffData = {
                 id: idInput || 'STF_' + Date.now(),
@@ -2620,56 +2426,24 @@ if (staffId) {
             openModalStaff(staffId);
         }
 
-
 // --- INITIALISATION DES ÉVÉNEMENTS ---
-updateMeetingPreview();
-updateDeadlinePreview();
-
-
-
-function updateDeadlinePreview() {
-
-    const dateValue =
-        document.getElementById('m-date')?.value;
-
-    if (!dateValue) {
-        document.getElementById(
-            'm-deadline-preview'
-        ).innerText = '--';
-        return;
+window.addEventListener('DOMContentLoaded', () => {
+    // Filtrage performant des joueurs
+    const searchInput = document.getElementById('search-player');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            filterPlayers(e.target.value);
+        });
     }
 
-    const matchDate = new Date(dateValue);
-
-    const day = matchDate.getDay();
-
-    let deadline = new Date(matchDate);
-
-    // Samedi ou Dimanche
-    if (day === 6 || day === 0) {
-
-        while (deadline.getDay() !== 5) {
-            deadline.setDate(
-                deadline.getDate() - 1
-            );
-        }
-
-    } else {
-
-        deadline.setDate(
-            deadline.getDate() - 1
-        );
-
+    // Thème "Autre" dans la modale entraînement
+    const sel = document.getElementById('t-theme');
+    if (sel) {
+        sel.addEventListener('change', function() {
+            document.getElementById('t-theme-autre-zone').classList.toggle('hidden', this.value !== 'Autre');
+        });
     }
-
-    const formattedDate =
-        deadline.toLocaleDateString('fr-FR');
-
-    document.getElementById(
-        'm-deadline-preview'
-    ).innerText =
-        formattedDate + ' - 18:00';
-}
+});
 
 function filterPlayers(query = "") {
 
@@ -2714,91 +2488,24 @@ function filterPlayers(query = "") {
 }
 
 function renderTeamFilters() {
-
     const container = document.getElementById('team-filters');
-    if (!container) return;
 
-    const role = window.currentUserRole || 'public';
-    const userTeam = window.currentUserTeam || '';
-
-    container.innerHTML = '';
-
-    // ADMIN
-    if (role === 'admin') {
-
-        container.innerHTML =
-            `<button onclick="setFilterCat('all')"
-                id="filter-all"
-                class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-sky-600 text-white">
-                Tous
-            </button>`;
-
-        Object.entries(state.teams).forEach(([key, team]) => {
-
-            container.innerHTML += `
-                <button
-                    onclick="setFilterCat('${key}')"
-                    id="filter-${key}"
-                    class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-600">
-                    ${team.name}
-                </button>
-            `;
-        });
-
-        return;
-    }
-
-    // COACH
-    if (role === 'coach') {
-
-        const team = state.teams[userTeam];
-
-     if (team) {
-
-    currentCatFilter = userTeam;
-
-    container.innerHTML = `
-        <button
-            onclick="setFilterCat('${userTeam}')"
-            id="filter-${userTeam}"
+    container.innerHTML =
+        `<button onclick="setFilterCat('all')" id="filter-all"
             class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-sky-600 text-white">
-            ${team.name}
-        </button>
-    `;
-}   
+            Tous
+        </button>`;
 
-        return;
-    }
-
-    // RESPONSABLE
-    if (role === 'responsable') {
-
-    const teams = userTeam
-        .split(',')
-        .map(t => t.trim())
-        .filter(Boolean);
-
-    currentCatFilter = teams[0];
-
-    teams.forEach((teamKey, index) => {
-
-        const team = state.teams[teamKey];
-
-        if (!team) return;
-
+    Object.entries(state.teams).forEach(([key, team]) => {
         container.innerHTML += `
             <button
-                onclick="setFilterCat('${teamKey}')"
-                id="filter-${teamKey}"
-                class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg
-                ${index === 0
-                    ? 'bg-sky-600 text-white'
-                    : 'bg-slate-100 text-slate-600'}">
+                onclick="setFilterCat('${key}')"
+                id="filter-${key}"
+                class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-600">
                 ${team.name}
             </button>
         `;
     });
-}
 }
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
 function applyPermissions() {
@@ -2830,7 +2537,7 @@ function applyPermissions() {
     }
 
     // --- RESTRICTIONS SELON LES RÔLES ---
-    if (role === 'public' || role === 'dirigeant') {
+    if (role === 'public' || role === 'responsable' || role === 'dirigeant') {
         document.querySelectorAll('.admin-only, .adjoint-only, .coach-only').forEach(el => {
             el.style.display = 'none';
         });
@@ -2840,29 +2547,15 @@ function applyPermissions() {
             }
         });
     } else if (role === 'coach') {
-    document.querySelectorAll('.admin-only').forEach(el => {
-        el.style.display = 'none';
-    });
-}
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = 'none';
+        });
+    }
 
-// --- BOUTON AJOUT STAFF ---
-const addStaffBtn =
-    document.getElementById('add-staff-btn');
-
-if (addStaffBtn) {
-
-    addStaffBtn.style.display =
-        window.currentUserRole === 'admin'
-            ? 'flex'
-            : 'none';
-
-}
-
-// --- AFFICHAGE DU BOUTON ADMIN ---
-if (typeof checkAdminAccessUI === "function") {
-    checkAdminAccessUI();
-}
-    
+    // --- AFFICHAGE DU BOUTON ADMIN ---
+    if (typeof checkAdminAccessUI === "function") {
+        checkAdminAccessUI();
+    }
     renderAll();
 
 }
@@ -2947,60 +2640,13 @@ try {
             .remove();
     }
 
-   // Création du compte d'accès
-await firebase.database()
-    .ref("rangueil_data/access/" + pin)
-    .set({
+    await firebase.database().ref("rangueil_data/access/" + pin).set({
         name: name,
         role: role,
-        team: (
-            role === "admin" ||
-            role === "dirigeant" ||
-            role === "public"
-        )
+        team: (role === "admin" || role === "dirigeant" || role === "public")
             ? "all"
             : (team || "all")
     });
-
-
-// Création automatique de la fiche staff
-if (
-    role === "coach" ||
-    role === "responsable" ||
-    role === "dirigeant"
-) {
-
-    const staffId = "STF_" + pin;
-
-    const staffRef =
-        firebase.database()
-            .ref("rangueil_data/staff/" + staffId);
-
-    const existingStaff =
-        await staffRef.once("value");
-
-    if (!existingStaff.exists()) {
-
-        await staffRef.set({
-            id: staffId,
-            accountPin: pin,
-            name: name,
-            role:
-                role === "coach"
-                    ? "Éducateur / Entraîneur Principal"
-                    : role === "responsable"
-                    ? "Responsable catégorie"
-                    : "Dirigeant / Accompagnateur",
-            scope: team
-                ? team.split(",").map(t => t.trim())
-                : [],
-            licence: "",
-            phone: "",
-            email: ""
-        });
-
-    }
-}
 
                 alert(`Accès pour "${name}" enregistré avec succès !`);
                 coachForm.reset();
@@ -3096,55 +2742,15 @@ window.editCoachAccount = async function(pin) {
     }
 }
 window.deleteCoachAccount = async function(pin) {
-
-    if (
-        confirm(
-            `Voulez-vous vraiment supprimer l'accès associé au PIN ${pin} ?`
-        )
-    ) {
-
+    if (confirm(`Voulez-vous vraiment supprimer l'accès associé au PIN ${pin} ?`)) {
         try {
-
-            // Suppression du compte
-            await firebase.database()
-                .ref("rangueil_data/access/" + pin)
-                .remove();
-
-            // Suppression automatique de la fiche staff liée
-            const staffSnapshot = await firebase.database()
-    .ref("rangueil_data/staff")
-    .once("value");
-
-staffSnapshot.forEach(child => {
-
-    const staff = child.val();
-
-    if (staff.accountPin === pin) {
-        child.ref.remove();
-    }
-
-});
-
+            await firebase.database().ref("rangueil_data/access/" + pin).remove();
             loadCoachesFromFirebase();
-
-            showToast(
-                "Compte et fiche staff supprimés"
-            );
-
         } catch (error) {
-
-            console.error(
-                "Erreur lors de la suppression :",
-                error
-            );
-
-            alert(
-                "Impossible de supprimer ce compte."
-            );
+            console.error("Erreur lors de la suppression :", error);
+            alert("Impossible de supprimer ce compte.");
         }
-
     }
-
 };
 
 // 1. Enregistrer ou créer une équipe dans Firebase

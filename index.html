@@ -390,9 +390,7 @@
                         <h2 class="text-base font-bold text-slate-800">Gestion du Staff & Dirigeants</h2>
                         <p class="text-xs text-slate-500">Éducateurs, dirigeants, accompagnateurs et rôles officiels</p>
                     </div>
-                    <button
-    id="add-staff-btn"
-    onclick="openModalStaff()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center space-x-1 whitespace-nowrap">
+                    <button onclick="openModalStaff()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center space-x-1 whitespace-nowrap">
                         <i class="fa-solid fa-user-plus"></i><span>Ajouter un membre</span>
                     </button>
                 </div>
@@ -514,100 +512,7 @@
 
             <div><label class="block text-slate-600 font-semibold mb-1">Adversaire</label><input type="text" id="m-opponent" required placeholder="Ex: Toulouse FC" class="w-full p-2 border border-slate-200 rounded-lg"></div>
             <div><label class="block text-slate-600 font-semibold mb-1">Stade / Adresse</label><input type="text" id="m-adresse" placeholder="Ex: Stade Municipal" class="w-full p-2 border border-slate-200 rounded-lg"></div>
-            <div class="bg-sky-50 border border-sky-200 p-3 rounded-lg space-y-3">
-
-    <h4 class="font-bold text-sky-800">
-        🚍 Déplacement
-    </h4>
-
-    <div>
-        <label class="block text-slate-600 font-semibold mb-1">
-            Lieu de rendez-vous
-        </label>
-
-        <input
-            type="text"
-            id="m-meeting-place"
-            value="COSEC Rangueil"
-            class="w-full p-2 border border-slate-200 rounded-lg">
-    </div>
-
-    <div class="grid grid-cols-3 gap-2">
-
-        <div>
-            <label class="block text-slate-600 font-semibold mb-1">
-                Temps trajet (min)
-            </label>
-
-            <input
-                type="number"
-                id="m-travel-time"
-                value="25"
-                min="0"
-                class="w-full p-2 border border-slate-200 rounded-lg">
-        </div>
-
-        <div>
-    <label class="block text-slate-600 font-semibold mb-1">
-        Arrivée avant match (min)
-    </label>
-
-    <input
-        type="number"
-        id="m-arrival-margin"
-        value="60"
-        min="0"
-        class="w-full p-2 border border-slate-200 rounded-lg">
-</div>
-
-        <div>
-            <label class="block text-slate-600 font-semibold mb-1">
-                Marge sécurité (min)
-            </label>
-
-            <input
-                type="number"
-                id="m-security-margin"
-                value="10"
-                min="0"
-                class="w-full p-2 border border-slate-200 rounded-lg">
-        </div>
-
-        </div>
-
- <div class="bg-white border border-sky-200 rounded-lg p-3">
-
-    <div class="text-[11px] text-slate-500 font-semibold">
-        Heure de rendez-vous calculée
-    </div>
-
-    <div
-        id="m-rdv-preview"
-        class="text-lg font-extrabold text-sky-700 mt-1">
-
-        --
-
-    </div>
-
-</div>
-
-<div class="bg-white border border-amber-200 rounded-lg p-3 mt-2">
-
-    <div class="text-[11px] text-slate-500 font-semibold">
-        Date limite de réponse
-    </div>
-
-    <div
-        id="m-deadline-preview"
-        class="text-base font-extrabold text-amber-700 mt-1">
-
-        --
-
-    </div>
-
-</div> 
-
-</div>
+            
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="block text-slate-600 font-semibold mb-1">Date</label><input type="date" id="m-date" required class="w-full p-2 border border-slate-200 rounded-lg"></div>
                 <div><label class="block text-slate-600 font-semibold mb-1">Heure</label><input type="time" id="m-heure" value="14:30" class="w-full p-2 border border-slate-200 rounded-lg"></div>
@@ -615,7 +520,7 @@
             
             <div class="grid grid-cols-3 gap-2">
                 <div><label class="block text-slate-600 font-semibold mb-1">Type</label><select id="m-type" class="w-full p-2 border border-slate-200 rounded-lg"><option value="Championnat">Championnat</option><option value="Coupe">Coupe</option><option value="Amical">Amical</option></select></div>
-                <div><label class="block text-slate-600 font-semibold mb-1">Lieu</label><select id="m-location" onchange="updateMeetingPreview()" class="w-full p-2 border border-slate-200 rounded-lg"><option value="Domicile">Domicile</option><option value="Extérieur">Extérieur</option></select></div>
+                <div><label class="block text-slate-600 font-semibold mb-1">Lieu</label><select id="m-location" class="w-full p-2 border border-slate-200 rounded-lg"><option value="Domicile">Domicile</option><option value="Extérieur">Extérieur</option></select></div>
                 <div><label class="block text-slate-600 font-semibold mb-1">Pelouse</label><select id="m-pelouse" class="w-full p-2 border border-slate-200 rounded-lg"><option value="Synthétique">Synthétique</option><option value="Herbe">Herbe</option><option value="Stabilisé">Stabilisé</option></select></div>
             </div>
             
