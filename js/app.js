@@ -126,7 +126,8 @@ window.currentUserPin = enteredPin;
     cards: {},
     stats: {},
     staff: [],
-    teams: {}
+    teams: {},
+    carpoolResponses: {},
 };
 
 // Variables d'interface uniquement
@@ -157,9 +158,12 @@ let currentCatFilter = 'all';
                     state.matches = data.matches || {};
                     state.cards = data.cards || {};
                     state.stats = data.stats || {};
-                    state.staff = Object.values(
+    state.staff = Object.values(
     data.staff || {}
 );
+
+state.carpoolResponses =
+    data.carpoolResponses || {};
                     // Migration ancien format numérique → nouveau format objet
                     const rawTrainings = data.trainings || {};
                     if (Object.keys(rawTrainings).length > 0 && !isNaN(Object.keys(rawTrainings)[0])) {
@@ -202,14 +206,16 @@ function saveStateToFirebase() {
 
     recalculateGlobalStats();
 
-    const dataToSave = {
-        players: state.players,
-        matches: state.matches,
-        trainings: state.trainings,
-        cards: state.cards,
-        stats: state.stats,
-        staff: state.staff,
-        teams: state.teams
+      const dataToSave = {
+    players: state.players,
+    matches: state.matches,
+    trainings: state.trainings,
+    cards: state.cards,
+    stats: state.stats,
+    staff: state.staff,
+    teams: state.teams,
+    carpoolResponses: state.carpoolResponses
+
     };
 
     db.ref('rangueil_data').update(dataToSave);
@@ -1088,8 +1094,207 @@ const userTeam = window.currentUserTeam || 'all';
             counterBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${convokedCount < 14 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`;
             counterBanner.innerHTML = `<div class="font-bold text-xs">Convocations : ${convokedCount} / 14</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${convokedCount < 14 ? 'bg-amber-200' : 'bg-sky-200'}">${convokedCount < 14 ? '⚠️ Incomplet' : '🔵 OK'}</span>`;
 
-            carpoolBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${totalSeats < 14 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`;
-            carpoolBanner.innerHTML = `<div class="font-bold text-xs">Covoiturage : ${totalSeats} / 14 places</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${totalSeats < 14 ? 'bg-amber-200' : 'bg-emerald-200'}">${totalSeats < 14 ? '⚠️ Transport' : '🟢 OK'}</span>`;
+    const carpoolResponses =
+    state.carpoolResponses?.[
+        m.carpoolId
+    ] || {};
+
+const responses =
+    Object.keys(carpoolResponses).length;
+
+const totalConvoked =
+    playersForMatch.filter(
+        p => m.convocations[p.id] === 'convoke'
+    ).length;
+
+let drivers = 0;
+let passengers = 0;
+let directs = 0;
+let absents = 0;
+let seats = 0;
+
+const driverList = [];
+const driverNoSeatList = [];
+const passengerList = [];
+const directList = [];
+const absentList = [];
+
+Object.entries(carpoolResponses)
+    .forEach(([playerId, r]) => {
+
+        const player =
+            state.players.find(
+                p => p.id === playerId
+            );
+
+        const playerName =
+            player?.name || playerId;
+
+        if (r.status === 'driver') {
+
+            if ((r.seats || 0) > 0) {
+
+                drivers++;
+                seats += r.seats || 0;
+
+                driverList.push(
+                    `${playerName} (${r.seats || 0} places)`
+                );
+
+            } else {
+
+                driverNoSeatList.push(
+                    playerName
+                );
+
+            }
+
+        }
+
+        if (r.status === 'passenger') {
+
+            passengers++;
+            passengerList.push(playerName);
+
+        }
+
+        if (r.status === 'direct') {
+
+            directs++;
+            directList.push(playerName);
+
+        }
+
+        if (r.status === 'absent') {
+
+            absents++;
+            absentList.push(playerName);
+
+        }
+
+    });
+
+const pendingList = [];
+
+playersForMatch.forEach(p => {
+
+    if (
+        m.convocations[p.id] === 'convoke' &&
+        !carpoolResponses[p.id]
+    ) {
+
+        pendingList.push(
+            p.name
+        );
+
+    }
+
+});
+
+const pending =
+    totalConvoked - responses;
+
+const missingSeats =
+    passengers - seats;
+
+const transportStatus =
+    missingSeats > 0
+        ? `🔴 Il manque ${missingSeats} place(s)`
+        : `🟢 Transport assuré`;
+
+const transportClass =
+    missingSeats > 0
+        ? 'text-red-700'
+        : 'text-emerald-700';
+
+carpoolBanner.className =
+    "p-3 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-900";
+
+carpoolBanner.innerHTML = `
+<div class="w-full text-xs space-y-1">
+
+<div class="font-bold">
+🚗 Covoiturage
+</div>
+
+<div>
+✅ Réponses : ${responses}/${totalConvoked}
+</div>
+
+<div>
+⏳ En attente : ${pending}
+</div>
+
+<div>
+🚗 Conducteurs : ${drivers}
+</div>
+
+<div>
+👤 Passagers : ${passengers}
+</div>
+
+<div>
+📍 Direct : ${directs}
+</div>
+
+<div>
+❌ Absents : ${absents}
+</div>
+
+<div class="font-bold">
+🚘 Places proposées : ${seats}
+</div>
+
+<div class="font-bold ${transportClass}">
+${transportStatus}
+</div>
+
+${driverList.length ? `
+<div class="mt-2">
+🚗 <strong>Conducteurs</strong><br>
+${driverList.join('<br>')}
+</div>
+` : ''}
+
+${driverNoSeatList.length ? `
+<div class="mt-2">
+🚙 <strong>Conducteurs sans place</strong><br>
+${driverNoSeatList.join('<br>')}
+</div>
+` : ''}
+
+${passengerList.length ? `
+<div class="mt-2">
+👤 <strong>Passagers</strong><br>
+${passengerList.join('<br>')}
+</div>
+` : ''}
+
+${directList.length ? `
+<div class="mt-2">
+📍 <strong>Direct</strong><br>
+${directList.join('<br>')}
+</div>
+` : ''}
+
+${absentList.length ? `
+<div class="mt-2">
+❌ <strong>Absents</strong><br>
+${absentList.join('<br>')}
+</div>
+` : ''}
+
+${pendingList.length ? `
+<div class="mt-2">
+⏳ <strong>En attente</strong><br>
+${pendingList.join('<br>')}
+</div>
+` : ''}
+
+</div>
+`;
+
+
 
             // 1. Rendu des Joueurs : Séparation claire Mobile (Cartes) / PC (Tableau)
             let htmlMobileCards = '';
@@ -2230,6 +2435,56 @@ text +=
                 "Message WhatsApp copié !"
             );
 
+        });
+
+}
+
+function generateCarpoolReminder() {
+
+    const m =
+        state.matches[state.selectedMatchId];
+
+    if (!m) return;
+
+    const carpoolResponses =
+        state.carpoolResponses?.[
+            m.carpoolId
+        ] || {};
+
+    const pendingPlayers =
+        state.players.filter(
+            p =>
+                m.convocations?.[p.id] === 'convoke' &&
+                !carpoolResponses[p.id]
+        );
+
+    let text =
+`🔵⚪ RANGUEIL FC ⚪🔵
+
+⏳ RELANCE COVOITURAGE
+
+Merci aux joueurs ayant déjà répondu ✅
+
+Les joueurs suivants n'ont pas encore renseigné leur mode de déplacement :
+
+`;
+
+    pendingPlayers.forEach(p => {
+        text += `• ${p.name}\n`;
+    });
+
+    text += `
+
+🚗 Répondre ici :
+https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpoolId}
+
+💙 Allez Rangueil !
+`;
+
+    navigator.clipboard
+        .writeText(text)
+        .then(() => {
+            showToast("Relance copiée !");
         });
 
 }
