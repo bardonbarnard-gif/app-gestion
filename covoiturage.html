@@ -280,6 +280,92 @@ document
     });
 
 </script>
+<script>
 
+document
+    .getElementById('save-btn')
+    .addEventListener('click', () => {
+
+        const playerId =
+            document.getElementById(
+                'player-select'
+            ).value;
+
+        const transport =
+            document.querySelector(
+                'input[name="transport"]:checked'
+            )?.value;
+
+        const seats =
+            document.getElementById(
+                'available-seats'
+            )?.value || 0;
+
+        if (!playerId) {
+
+            alert(
+                "Merci de sélectionner un joueur."
+            );
+
+            return;
+        }
+
+        if (!transport) {
+
+            alert(
+                "Merci de choisir un mode de déplacement."
+            );
+
+            return;
+        }
+
+        const responseData = {
+
+            status: transport,
+
+            seats:
+                transport === 'driver'
+                    ? parseInt(seats)
+                    : 0,
+
+            updatedAt: Date.now()
+
+        };
+
+        db.ref(
+            'rangueil_data/carpoolResponses/'
+            + carpoolId + '/'
+            + playerId
+        )
+        .set(responseData)
+        .then(() => {
+
+            document
+                .getElementById(
+                    'confirmation'
+                )
+                .classList.remove(
+                    'hidden'
+                );
+
+            document
+                .getElementById(
+                    'confirmation'
+                )
+                .innerHTML =
+                '✅ Réponse enregistrée. Merci !';
+
+        })
+        .catch(error => {
+
+            alert(
+                'Erreur : ' + error.message
+            );
+
+        });
+
+    });
+
+</script>
 </body>
 </html>
