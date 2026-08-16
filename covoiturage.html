@@ -9,6 +9,22 @@
 
 </head>
 
+<script>
+
+const params =
+    new URLSearchParams(
+        window.location.search
+    );
+
+const carpoolId =
+    params.get('id');
+
+console.log(
+    'Carpool ID :',
+    carpoolId
+);
+
+</script>
 
 <body class="bg-slate-100 min-h-screen p-4">
 
