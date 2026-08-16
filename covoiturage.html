@@ -3,13 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Covoiturage Rangueil FC</title>
-
-<script src="https://cdn.tailwindcss.com"></script>
-
-</head>
+</script src= https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js></script>
+</script src= https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js></script>
 
 <script>
+
+const firebaseConfig = {
+            apiKey: "AIzaSyBVdcpzLr_VxfLTvN8kpkNv69Hc4xdzct0",
+            authDomain: "ai-studio-applet-webapp-1b612.firebaseapp.com",
+            databaseURL: "https://ai-studio-applet-webapp-1b612-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "ai-studio-applet-webapp-1b612",
+            storageBucket: "ai-studio-applet-webapp-1b612.firebasestorage.app",
+            messagingSenderId: "279839540206",
+            appId: "1:279839540206:web:a5d82ea7b4d9a9cf9d84ff"
+        };
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.database();
 
 const params =
     new URLSearchParams(
@@ -20,75 +33,88 @@ const carpoolId =
     params.get('id');
 
 console.log(
-    'Carpool ID :',
+    "Carpool ID :",
     carpoolId
 );
 
 </script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+</head>
 
 <body class="bg-slate-100 min-h-screen p-4">
 
-<div class="max-w-md mx-auto bg-white rounded-xl shadow p-5">
+<div class="max-w-xl mx-auto bg-white rounded-3xl shadow-lg p-6">
 
-    <h1 class="text-xl font-bold text-sky-700 mb-4">
-        🚗 Organisation du déplacement
-    </h1>
+    <div class="flex items-center gap-3 mb-6">
+        <div class="text-4xl">🚗</div>
 
-    <div class="mb-4">
-        <label class="font-semibold block mb-1">
+        <div>
+            <h1 class="text-3xl font-bold text-sky-700">
+                Organisation du déplacement
+            </h1>
+
+            <p class="text-slate-500 text-sm">
+                Réponse rapide au covoiturage
+            </p>
+        </div>
+    </div>
+
+    <!-- Infos match -->
+    <div
+        id="match-info"
+        class="bg-sky-50 border border-sky-200 rounded-xl p-4 mb-6">
+
+        <p class="font-bold text-sky-900">
+            Chargement du match...
+        </p>
+
+    </div>
+
+    <!-- Joueur -->
+    <div class="mb-5">
+
+        <label class="block font-bold text-slate-700 mb-2">
             Je réponds pour :
         </label>
 
-        <select id="player-select"
-                class="w-full border p-2 rounded">
-            <option>Choisir un joueur</option>
+        <select
+            id="player-select"
+            class="w-full p-3 border rounded-xl">
+
+            <option value="">
+                Choisir un joueur
+            </option>
+
         </select>
+
     </div>
 
-    <div class="space-y-2">
+    <!-- Mode de déplacement -->
+    <div class="space-y-3 mb-5">
 
-        <label class="block">
-            <input type="radio"
-                   name="transport"
-                   value="driver">
+        <label class="flex items-center gap-3 text-xl">
+            <input
+                type="radio"
+                name="transport"
+                value="driver">
 
             🚗 Je conduis
         </label>
 
-        <label class="block">
-            <input type="radio"
-                   name="transport"
-                   value="passenger">
+        <label class="flex items-center gap-3 text-xl">
+            <input
+                type="radio"
+                name="transport"
+                value="passenger">
 
             👤 Je suis passager
         </label>
 
-        <label class="block">
-            <input type="radio"
-                   name="transport"
-                   value="direct">
+        <label class="flex items-center gap-3 text-xl">
+            <input
+                type="radio"
+                name="transport"
+                value="direct">
 
-            📍 J'y vais directement
-        </label>
-
-        <label class="block">
-            <input type="radio"
-                   name="transport"
-                   value="absent">
-
-            ❌ Absent
-        </label>
-
-    </div>
-
-    <button
-        class="w-full mt-5 bg-sky-600 text-white font-bold py-2 rounded">
-
-        Valider ma réponse
-
-    </button>
-
-</div>
-
-</body>
-</html>
+   
