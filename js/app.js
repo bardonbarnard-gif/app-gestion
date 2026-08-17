@@ -1009,20 +1009,26 @@ const userTeam = window.currentUserTeam || 'all';
 
     infoCard.style.display = 'none';
     counterBanner.style.display = 'none';
+    if (carpoolBanner) {
     carpoolBanner.style.display = 'none';
+}
 
     return;
 }
 
             if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) {
                 tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Aucun match disponible.</td></tr>`;
-                infoCard.style.display = 'none'; counterBanner.style.display = 'none'; carpoolBanner.style.display = 'none';
+              if (infoCard) infoCard.style.display = 'none';
+if (counterBanner) counterBanner.style.display = 'none';
+if (carpoolBanner) carpoolBanner.style.display = 'none';  
                 if(validationStatus) validationStatus.innerHTML = '';
                 return;
             }
 
             selector.value = state.selectedMatchId;
-            infoCard.style.display = 'flex'; counterBanner.style.display = 'flex'; carpoolBanner.style.display = 'flex';
+            if (infoCard) infoCard.style.display = 'flex';
+if (counterBanner) counterBanner.style.display = 'flex';
+if (carpoolBanner) carpoolBanner.style.display = 'flex';
             const m = state.matches[state.selectedMatchId];
             if (
     role === 'coach' &&
@@ -1230,10 +1236,12 @@ const transportClass =
         ? 'text-red-700'
         : 'text-emerald-700';
 
-carpoolBanner.className =
-    "p-3 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-900";
+if (carpoolBanner) {
 
-carpoolBanner.innerHTML = `
+    carpoolBanner.className =
+        "p-3 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-900";
+
+    carpoolBanner.innerHTML = `
 <div class="w-full text-xs space-y-1">
 
 <div class="font-bold">
@@ -1317,6 +1325,7 @@ ${pendingList.join('<br>')}
 </div>
 `;
 
+}
 renderTransportTab({
     drivers,
     passengers,
@@ -1333,7 +1342,7 @@ renderTransportTab({
     transportStatus
 });
 
-
+renderMatchSummary(m);
 
 
             // 1. Rendu des Joueurs : Séparation claire Mobile (Cartes) / PC (Tableau)
@@ -3912,4 +3921,104 @@ function openMatchWorkspace(matchId) {
 
     renderMatchDetail();
 
+}
+
+function renderMatchSummary(match) {
+
+    const container =
+        document.getElementById(
+            'match-bilan-summary'
+        );
+
+    if (!container || !match) return;
+
+    const score =
+        (
+            match.scoreHome !== undefined &&
+            match.scoreHome !== ""
+        )
+        ? `${match.scoreHome} - ${match.scoreAway}`
+        : "Match non joué";
+
+    let scorers = [];
+    let assists = [];
+
+    Object.entries(
+        match.matchStats || {}
+    ).forEach(([playerId, stat]) => {
+
+        const player =
+            state.players.find(
+                p => p.id === playerId
+            );
+
+        const name =
+            player?.name || playerId;
+
+        if ((stat.goals || 0) > 0) {
+            scorers.push(
+                `${name} (${stat.goals})`
+            );
+        }
+
+        if ((stat.assists || 0) > 0) {
+            assists.push(
+                `${name} (${stat.assists})`
+            );
+        }
+
+    });
+
+    container.innerHTML = `
+        <div class="space-y-4">
+
+            <div>
+                <span class="font-bold">
+                    ⚽ Score :
+                </span>
+                ${score}
+            </div>
+
+            <div>
+                <span class="font-bold">
+                    ⚽ Buteurs :
+                </span>
+
+                ${scorers.length
+                    ? scorers.join(', ')
+                    : 'Aucun'}
+            </div>
+
+            <div>
+                <span class="font-bold">
+                    🎯 Passeurs :
+                </span>
+
+                ${assists.length
+                    ? assists.join(', ')
+                    : 'Aucun'}
+            </div>
+
+            <div>
+                <span class="font-bold">
+                    📝 Débrief :
+                </span>
+
+                <div class="mt-2 text-sm">
+                    ${match.debrief || 'Aucun commentaire'}
+                </div>
+            </div>
+
+            <div class="pt-3 border-t">
+                <button
+                    onclick="openMatchBilanModal('${match.id}')"
+                    class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-xs font-bold">
+
+                    Modifier le bilan
+
+                </button>
+            </div>
+
+        </div>
+    `;
 }
