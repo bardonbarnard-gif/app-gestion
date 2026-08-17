@@ -1420,15 +1420,7 @@ renderTransportTab({
                         <td class="p-3 text-center">
                             <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-14 p-1 border rounded text-center font-bold text-xs bg-white">
                         </td>
-                        <td class="p-3 text-center">
-                            <select onchange="setMatchCarpool('${m.id}', '${p.id}', this.value)" class="bg-white border font-bold text-xs py-1 px-2 rounded-lg">
-                                <option value="0" ${carpoolSeats == 0 ? 'selected' : ''}>0 place</option>
-                                <option value="2" ${carpoolSeats == 2 ? 'selected' : ''}>🚗 2 places</option>
-                                <option value="3" ${carpoolSeats == 3 ? 'selected' : ''}>🚗 3 places</option>
-                                <option value="4" ${carpoolSeats == 4 ? 'selected' : ''}>🚗 4 places</option>
-                                <option value="5" ${carpoolSeats == 5 ? 'selected' : ''}>🚗 5 places</option>
-                            </select>
-                        </td>
+                        
                         <td class="p-3 text-center">
                             <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
