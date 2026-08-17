@@ -2799,6 +2799,8 @@ function updateMatchLocationUI() {
     }
     
     const matchId = document.getElementById('m-id').value || 'M' + Date.now();
+    const existingMatch =
+    state.matches[matchId] || {};
     const matchData = {
         id: matchId,
         opponent: document.getElementById('m-opponent').value,
@@ -2835,12 +2837,14 @@ securityMargin:
         // Initialiser les champs optionnels
         scoreHome: "",
         scoreAway: "",
-        convocations: {},
-        positions: {},
-        jerseys: {},
-        carpool: {},
-        matchStats: {},
-        debrief: ""
+        convocations: existingMatch.convocations || {},
+positions: existingMatch.positions || {},
+jerseys: existingMatch.jerseys || {},
+carpool: existingMatch.carpool || {},
+matchStats: existingMatch.matchStats || {},
+debrief: existingMatch.debrief || "",
+isValidated: existingMatch.isValidated || false
+
     };
 
     // Mise à jour de l'état local

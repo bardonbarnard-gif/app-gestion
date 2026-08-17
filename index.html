@@ -689,7 +689,12 @@
 
 </div>
             <div class="grid grid-cols-2 gap-2">
-                <div><label class="block text-slate-600 font-semibold mb-1">Date</label><input type="date" id="m-date" required class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                <div><label class="block text-slate-600 font-semibold mb-1">Date</label><input
+    type="date"
+    id="m-date"
+    required
+    onchange="updateDeadlinePreview(); updateMeetingPreview();"
+    class="w-full p-2 border border-slate-200 rounded-lg"></div>
                 <div><label class="block text-slate-600 font-semibold mb-1">Heure</label><input type="time" id="m-heure" value="14:30" class="w-full p-2 border border-slate-200 rounded-lg"></div>
             </div>
             
