@@ -383,35 +383,58 @@ function saveStateToFirebase() {
         }
 
     function switchMatchSubTab(subTabId) {
-           
-            if (!subTabId) subTabId = 'results';
 
-            const isConvoc = subTabId === 'convocations';
-                if (isConvoc) {
-        state.selectedMatchId = null;
+    if (!subTabId) {
+        subTabId = 'results';
+    }
 
-        const selector = document.getElementById('match-selector');
-        if (selector) {
-            selector.value = '';
+    const tabs = [
+        'results',
+        'infos',
+        'convocations',
+        'transport'
+    ];
+
+    tabs.forEach(tab => {
+        const section = document.getElementById(`subtab-${tab}`);
+        if (section) {
+            section.classList.add('hidden');
         }
 
+        const button = document.getElementById(`subtab-${tab}-btn`);
+        if (button) {
+            button.className =
+                "pb-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 transition";
+        }
+    });
+
+    const activeSection =
+        document.getElementById(`subtab-${subTabId}`);
+
+    if (activeSection) {
+        activeSection.classList.remove('hidden');
+    }
+
+    const activeButton =
+        document.getElementById(`subtab-${subTabId}-btn`);
+
+    if (activeButton) {
+        activeButton.className =
+            "pb-2 text-xs font-bold border-b-2 border-sky-600 text-sky-600 flex items-center space-x-1.5 transition";
+    }
+
+    if (subTabId === 'results') {
+        renderMatchesResultsList();
+    }
+
+    if (
+        subTabId === 'infos' ||
+        subTabId === 'convocations' ||
+        subTabId === 'transport'
+    ) {
         renderMatchDetail();
     }
-            document.getElementById('subtab-convocations').classList.toggle('hidden', !isConvoc);
-            document.getElementById('subtab-results').classList.toggle('hidden', isConvoc);
- // Si aucun sous-onglet n'est spécifié, on force 'results' (le calendrier) par défaut
-            const btnC = document.getElementById('subtab-convocations-btn');
-            const btnR = document.getElementById('subtab-results-btn');
-
-            if (isConvoc) {
-                btnC.className = "pb-2 text-xs font-bold border-b-2 border-sky-600 text-sky-600 flex items-center space-x-1.5 transition";
-                btnR.className = "pb-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 transition";
-            } else {
-                btnR.className = "pb-2 text-xs font-bold border-b-2 border-sky-600 text-sky-600 flex items-center space-x-1.5 transition";
-                btnC.className = "pb-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 transition";
-                renderMatchesResultsList();
-            }
-        }
+}
 
         // --- 5. MODULES D'AFFICHAGE & RENDU ---
         
