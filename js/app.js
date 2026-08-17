@@ -1317,6 +1317,23 @@ ${pendingList.join('<br>')}
 </div>
 `;
 
+renderTransportTab({
+    drivers,
+    passengers,
+    directs,
+    absents,
+    responses,
+    pending,
+    seats,
+    driverList,
+    passengerList,
+    directList,
+    absentList,
+    pendingList,
+    transportStatus
+});
+
+
 
 
             // 1. Rendu des Joueurs : Séparation claire Mobile (Cartes) / PC (Tableau)
@@ -3763,3 +3780,129 @@ firebase.database().ref('teams').on('value', (snapshot) => {
     const data = snapshot.val() || {};
     renderAdminTeams(data);
 });
+
+function renderTransportTab(data) {
+
+    const container =
+        document.getElementById(
+            'transport-summary-container'
+        );
+
+    if (!container) return;
+
+    container.innerHTML = `
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+
+            <div class="bg-sky-50 p-3 rounded-xl text-center">
+                <div class="text-xl font-bold">
+                    ${data.drivers}
+                </div>
+                <div class="text-xs">
+                    🚗 Conducteurs
+                </div>
+            </div>
+
+            <div class="bg-emerald-50 p-3 rounded-xl text-center">
+                <div class="text-xl font-bold">
+                    ${data.passengers}
+                </div>
+                <div class="text-xs">
+                    👤 Passagers
+                </div>
+            </div>
+
+            <div class="bg-amber-50 p-3 rounded-xl text-center">
+                <div class="text-xl font-bold">
+                    ${data.directs}
+                </div>
+                <div class="text-xs">
+                    📍 Direct
+                </div>
+            </div>
+
+            <div class="bg-red-50 p-3 rounded-xl text-center">
+                <div class="text-xl font-bold">
+                    ${data.absents}
+                </div>
+                <div class="text-xs">
+                    ❌ Absents
+                </div>
+            </div>
+
+        </div>
+
+        <div class="bg-white border rounded-xl p-4 mb-4">
+
+            <div class="font-bold mb-2">
+                🚘 Places disponibles
+            </div>
+
+            <div>
+                ${data.seats}
+            </div>
+
+            <div class="mt-2 font-semibold">
+                ${data.transportStatus}
+            </div>
+
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-4">
+
+            <div class="border rounded-xl p-4">
+
+                <h3 class="font-bold mb-2">
+                    🚗 Conducteurs
+                </h3>
+
+                ${data.driverList.join('<br>') || 'Aucun'}
+
+            </div>
+
+            <div class="border rounded-xl p-4">
+
+                <h3 class="font-bold mb-2">
+                    👤 Passagers
+                </h3>
+
+                ${data.passengerList.join('<br>') || 'Aucun'}
+
+            </div>
+
+            <div class="border rounded-xl p-4">
+
+                <h3 class="font-bold mb-2">
+                    📍 Direct
+                </h3>
+
+                ${data.directList.join('<br>') || 'Aucun'}
+
+            </div>
+
+            <div class="border rounded-xl p-4">
+
+                <h3 class="font-bold mb-2">
+                    ❌ Absents
+                </h3>
+
+                ${data.absentList.join('<br>') || 'Aucun'}
+
+            </div>
+
+        </div>
+
+        <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+
+            <h3 class="font-bold mb-2">
+
+                ⏳ En attente (${data.pendingList.length})
+
+            </h3>
+
+            ${data.pendingList.join('<br>') || 'Tout le monde a répondu ✅'}
+
+        </div>
+
+    `;
+}
