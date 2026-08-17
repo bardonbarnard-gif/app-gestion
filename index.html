@@ -174,14 +174,65 @@
         </section>
 
         <section id="sec-matchs" class="space-y-4 hidden">
-    <div class="flex border-b border-slate-200 space-x-4">
-        <button onclick="switchMatchSubTab('results')" id="subtab-results-btn" class="pb-2 text-xs font-bold border-b-2 border-sky-600 text-sky-600 flex items-center space-x-1.5 transition">
-            <i class="fa-solid fa-medal"></i><span>Calendrier & Bilans</span>
-        </button>
-        <button onclick="switchMatchSubTab('convocations')" id="subtab-convocations-btn" class="pb-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 transition">
-            <i class="fa-solid fa-clipboard-user"></i><span>Préparation & Convocations</span>
-        </button>
+    <div class="flex border-b border-slate-200 space-x-4 overflow-x-auto">
+
+    <button
+        onclick="switchMatchSubTab('results')"
+        id="subtab-results-btn"
+        class="pb-2 text-xs font-bold border-b-2 border-sky-600 text-sky-600 flex items-center space-x-1.5 transition whitespace-nowrap">
+        <i class="fa-solid fa-medal"></i>
+        <span>Calendrier & Bilans</span>
+    </button>
+
+    <button
+        onclick="switchMatchSubTab('infos')"
+        id="subtab-infos-btn"
+        class="pb-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 transition whitespace-nowrap">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>Infos Match</span>
+    </button>
+
+    <button
+        onclick="switchMatchSubTab('convocations')"
+        id="subtab-convocations-btn"
+        class="pb-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 transition whitespace-nowrap">
+        <i class="fa-solid fa-clipboard-user"></i>
+        <span>Convocations</span>
+    </button>
+
+    <button
+        onclick="switchMatchSubTab('transport')"
+        id="subtab-transport-btn"
+        class="pb-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 transition whitespace-nowrap">
+        <i class="fa-solid fa-car"></i>
+        <span>Transport</span>
+    </button>
+
+</div>
+
+<div id="subtab-infos" class="space-y-4 hidden"></div>
+
+<div id="subtab-transport" class="space-y-4 hidden">
+
+    <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
+
+        <div class="mb-4">
+            <h2 class="text-base font-bold text-slate-800">
+                🚗 Transport & Covoiturage
+            </h2>
+
+            <p class="text-xs text-slate-500">
+                Suivi des réponses et organisation du déplacement
+            </p>
+        </div>
+
+        <div id="transport-summary-container">
+        </div>
+
     </div>
+
+</div>
+
             <div id="subtab-results" class="space-y-4">
                 <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
                     <div><h2 class="text-base font-bold text-slate-800">Résultats, Buteurs, Passes & Debrief</h2><p class="text-xs text-slate-500">Scores et causeries d'après-match</p></div>
@@ -198,27 +249,46 @@
                         </div>
                     </div>
 
-                    <div id="match-info-card" class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs"></div>
-                    
-                    <div class="flex justify-end">
-                        <button onclick="generateWhatsAppMessage()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition"><i class="fa-brands fa-whatsapp text-sm"></i><span>Générer le message WhatsApp</span></button>
-                    </div>
+                    <!-- CONTENU ONGLET INFOS MATCH -->
 
- <div class="flex justify-end">
-    <button
-        onclick="generateCarpoolReminder()"
-        class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition">
+<div id="subtab-infos-content">
 
-        <span>📲 Relance covoiturage</span>
+    <div id="match-info-card"
+         class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs">
+    </div>
 
-    </button>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+        <div id="convocation-counter-banner"
+             class="p-3 rounded-xl border flex items-center justify-between gap-2 transition-all">
+        </div>
+
+        <div id="carpooling-counter-banner"
+             class="p-3 rounded-xl border flex items-center justify-between gap-2 transition-all">
+        </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mt-3">
+
+        <button onclick="generateWhatsAppMessage()"
+            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition">
+
+            <i class="fa-brands fa-whatsapp"></i>
+            <span>WhatsApp</span>
+
+        </button>
+
+        <button onclick="generateCarpoolReminder()"
+            class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition">
+
+            <span>📲 Relance covoiturage</span>
+
+        </button>
+
+    </div>
+
 </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div id="convocation-counter-banner" class="p-3 rounded-xl border flex items-center justify-between gap-2 transition-all"></div>
-                        <div id="carpooling-counter-banner" class="p-3 rounded-xl border flex items-center justify-between gap-2 transition-all"></div>
-                    </div>
-
+                  
+                   
                   <div id="mobile-players-container" class="block sm:hidden space-y-3"></div>
 
 <div class="hidden sm:block overflow-x-auto touch-scroll -mx-4 sm:mx-0">
