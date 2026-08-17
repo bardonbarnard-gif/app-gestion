@@ -2123,8 +2123,13 @@ else if (m.type === 'Amical') {
                     : `<button disabled class="bg-slate-300 text-slate-500 px-3 py-2 rounded-lg font-bold flex items-center space-x-1.5 cursor-not-allowed whitespace-nowrap" title="Accessible après le match"><i class="fa-solid fa-clock"></i><span>Bilan</span></button>`;
 
                 return `
-                    <div class="p-3.5 ${teamColors.bg} rounded-xl border ${teamColors.border} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                        ${matchContentHTML}
+    <div
+        onclick="openMatchWorkspace('${m.id}')"
+        class="p-3.5 ${teamColors.bg} rounded-xl border ${teamColors.border}
+        flex flex-col sm:flex-row items-start sm:items-center
+        justify-between gap-3 text-xs cursor-pointer hover:shadow-lg transition">
+
+        ${matchContentHTML}
                         <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto space-x-3">
                             <div class="flex items-center space-x-2">
                                 ${getMatchResultBadge(m.scoreHome, m.scoreAway)}
@@ -3905,4 +3910,14 @@ function renderTransportTab(data) {
         </div>
 
     `;
+}
+
+function openMatchWorkspace(matchId) {
+
+    state.selectedMatchId = matchId;
+
+    switchMatchSubTab('infos');
+
+    renderMatchDetail();
+
 }
