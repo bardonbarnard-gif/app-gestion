@@ -70,6 +70,12 @@
         <button onclick="switchTab('entrainements')" id="tab-entrainements" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
             <i class="fa-solid fa-stopwatch"></i><span>Séances</span>
         </button>
+        <button onclick="switchTab('calendrier')"
+        id="tab-calendrier"
+        class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+    <i class="fa-solid fa-calendar-days"></i>
+    <span>Calendrier</span>
+</button>
         <button onclick="switchTab('staff')" id="tab-staff" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
             <i class="fa-solid fa-user-tie"></i><span>Staff</span>
         </button>
@@ -351,6 +357,7 @@
         </section>
 
         <section id="sec-entrainements" class="space-y-4 hidden">
+          
 
             <!-- STATS GLOBALES -->
             <div id="training-stats-bar" class="grid grid-cols-3 gap-3"></div>
@@ -495,6 +502,71 @@
                 </div>
             </div>
         </section>
+
+        </section>
+
+<section id="sec-calendrier" class="space-y-4 hidden">
+
+    <div class="flex justify-between items-center mb-4">
+
+    <h2 class="text-base font-bold">
+        📅 Calendrier
+    </h2>
+
+    <div class="flex items-center gap-2">
+
+        <button
+    onclick="generateWeeklyPlanning()"
+    class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
+
+    📋 Planning WhatsApp
+
+</button>
+
+            <button
+            onclick="openEventModal()"
+            class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
+
+            ➕ Evènement
+
+        </button>
+
+        <button onclick="previousMonth()"
+                class="px-3 py-2 bg-slate-100 rounded-lg">
+            ◀
+        </button>
+
+        <span id="calendar-month-title"
+              class="font-bold text-slate-700">
+        </span>
+
+        <button onclick="nextMonth()"
+                class="px-3 py-2 bg-slate-100 rounded-lg">
+            ▶
+        </button>
+
+    </div>
+
+</div>
+        </div>
+
+        <div id="calendar-grid"></div>
+
+    </div>
+
+    <div class="bg-white p-4 rounded-xl card-shadow">
+
+        <h3 class="font-bold mb-3">
+            📋 Agenda du jour sélectionné
+        </h3>
+
+        <div id="calendar-events-list"></div>
+
+    </div>
+
+</section>
+
+<section id="sec-staff" class="space-y-4 hidden">
 
         <section id="sec-staff" class="space-y-4 hidden">
             <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
@@ -923,10 +995,89 @@
             </div>
         </div>
     </div>
+    <div id="modal-event"
+     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+
+    <div class="bg-white w-full max-w-md rounded-xl p-5 shadow-xl space-y-3">
+
+        <div class="flex justify-between items-center">
+
+            <h3 class="font-bold text-sm">
+                Nouvel évènement
+            </h3>
+
+            <button onclick="closeEventModal()">
+                ✖
+            </button>
+
+        </div>
+
+        <select id="e-type"
+                class="w-full border p-2 rounded">
+
+            <option value="meeting">
+                👥 Réunion
+            </option>
+
+            <option value="tournament">
+                🏆 Tournoi
+            </option>
+
+            <option value="club">
+                🎉 Évènement club
+            </option>
+
+        </select>
+
+        <input
+            id="e-title"
+            type="text"
+            placeholder="Titre"
+            class="w-full border p-2 rounded">
+
+        <input
+            id="e-date"
+            type="date"
+            class="w-full border p-2 rounded">
+
+        <input
+            id="e-heure"
+            type="time"
+            class="w-full border p-2 rounded">
+
+        <input
+            id="e-lieu"
+            type="text"
+            placeholder="Lieu"
+            class="w-full border p-2 rounded">
+
+        <div class="flex justify-end gap-2">
+
+            <button
+                onclick="closeEventModal()"
+                class="bg-slate-100 px-3 py-2 rounded">
+
+                Annuler
+
+            </button>
+
+            <button
+                onclick="saveEvent()"
+                class="bg-purple-600 text-white px-3 py-2 rounded">
+
+                Enregistrer
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
 <!-- Navigation mobile -->
 <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50">
 
-    <div class="grid grid-cols-5">
+    <div class="grid grid-cols-6">
 
         <button onclick="switchTab('dashboard')" class="py-2 flex flex-col items-center text-slate-600">
             <i class="fa-solid fa-chart-pie text-lg"></i>
@@ -942,7 +1093,11 @@
             <i class="fa-solid fa-stopwatch text-lg"></i>
             <span class="text-[10px] mt-1">Séances</span>
         </button>
-
+<button onclick="switchTab('calendrier')"
+        class="py-2 flex flex-col items-center text-slate-600">
+    <i class="fa-solid fa-calendar-days text-lg"></i>
+    <span class="text-[10px] mt-1">Calendrier</span>
+</button>
         <button onclick="switchTab('effectif')" class="py-2 flex flex-col items-center text-slate-600">
             <i class="fa-solid fa-users text-lg"></i>
             <span class="text-[10px] mt-1">Effectif</span>

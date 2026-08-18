@@ -119,7 +119,7 @@ window.currentUserPin = enteredPin;
         ];
 
         // --- 2. ÉTAT GLOBAL DE L'APPLICATION ---
-        let state = {
+   let state = {
     players: [],
     matches: {},
     trainings: {},
@@ -127,6 +127,7 @@ window.currentUserPin = enteredPin;
     stats: {},
     staff: [],
     teams: {},
+    events: {},
     carpoolResponses: {},
 };
 
@@ -158,6 +159,7 @@ let currentCatFilter = 'all';
                     state.matches = data.matches || {};
                     state.cards = data.cards || {};
                     state.stats = data.stats || {};
+                    state.events = data.events || {};
     state.staff = Object.values(
     data.staff || {}
 );
@@ -206,7 +208,7 @@ function saveStateToFirebase() {
 
     recalculateGlobalStats();
 
-      const dataToSave = {
+ const dataToSave = {
     players: state.players,
     matches: state.matches,
     trainings: state.trainings,
@@ -214,9 +216,9 @@ function saveStateToFirebase() {
     stats: state.stats,
     staff: state.staff,
     teams: state.teams,
+    events: state.events,
     carpoolResponses: state.carpoolResponses
-
-    };
+};
 
     db.ref('rangueil_data').update(dataToSave);
 }
@@ -246,6 +248,8 @@ function saveStateToFirebase() {
             renderMatchesResultsList();
             renderEntrainements();
             renderStaff();
+            renderCalendar();
+            
         }
 
         // === FONCTION GLOBALE : Couleurs d'équipe ===
@@ -366,7 +370,7 @@ function saveStateToFirebase() {
         }
     }
 
-    ['dashboard', 'effectif', 'matchs', 'entrainements', 'staff'].forEach(t => {
+    ['dashboard', 'effectif', 'matchs', 'entrainements', 'calendrier','staff'].forEach(t => {
                 const sec = document.getElementById(`sec-${t}`);
                 if(sec) sec.classList.add('hidden');
                 const btn = document.getElementById(`tab-${t}`);
@@ -4021,4 +4025,488 @@ function renderMatchSummary(match) {
 
         </div>
     `;
+}
+let calendarDate = new Date();
+
+function renderCalendar() {
+
+    const title =
+        document.getElementById(
+            'calendar-month-title'
+        );
+
+    if (!title) return;
+
+    title.innerText =
+        calendarDate.toLocaleDateString(
+            'fr-FR',
+            {
+                month: 'long',
+                year: 'numeric'
+            }
+        );
+
+    const grid =
+        document.getElementById(
+            'calendar-grid'
+        );
+
+    if (!grid) return;
+
+    const year =
+        calendarDate.getFullYear();
+
+    const month =
+        calendarDate.getMonth();
+
+    const firstDay =
+        new Date(year, month, 1);
+
+    const lastDay =
+        new Date(year, month + 1, 0);
+
+    let html = `
+
+    <div class="grid grid-cols-7 gap-1 mb-2 text-center font-bold text-xs">
+
+        <div>Lun</div>
+        <div>Mar</div>
+        <div>Mer</div>
+        <div>Jeu</div>
+        <div>Ven</div>
+        <div>Sam</div>
+        <div>Dim</div>
+
+    </div>
+
+    <div class="grid grid-cols-7 gap-1">
+
+    `;
+
+    let startDay =
+        (firstDay.getDay() + 6) % 7;
+
+    for(let i = 0; i < startDay; i++) {
+
+        html += `
+            <div class="h-24"></div>
+        `;
+
+    }
+
+    for(let d = 1; d <= lastDay.getDate(); d++) {
+
+    const currentDate =
+        `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+    const matches =
+        Object.values(state.matches || {})
+        .filter(m => m.date === currentDate);
+
+        const events =
+    Object.values(state.events || {})
+    .filter(e => e.date === currentDate);
+
+    const trainings =
+        Object.values(state.trainings || {})
+        .filter(t => t.date === currentDate);
+
+    html += `
+
+    <div
+    onclick="showEventsForDate('${currentDate}')"
+    class="h-24 border rounded-lg p-1 bg-white hover:bg-sky-50 cursor-pointer overflow-hidden">
+
+        <div class="font-bold text-xs mb-1">
+            ${d}
+        </div>
+
+        ${matches.map(match => `
+            <div class="bg-blue-500 text-white text-[10px] rounded px-1 mb-1 truncate">
+                ⚽ ${match.opponent}
+            </div>
+        `).join('')}
+
+        
+        ${trainings.map(training => `
+            <div class="bg-emerald-500 text-white text-[10px] rounded px-1 mb-1 truncate">
+                🏃 ${training.heure || ''}
+            </div>
+        `).join('')}
+
+        ${events.map(event => {
+
+    let color = "bg-purple-500";
+    let icon = "👥";
+
+    if(event.type === "tournament") {
+
+        color = "bg-orange-500";
+        icon = "🏆";
+
+    }
+
+    if(event.type === "club") {
+
+        color = "bg-pink-500";
+        icon = "🎉";
+
+    }
+
+    return `
+        <div class="${color} text-white text-[10px] rounded px-1 mb-1 truncate">
+            ${icon} ${event.title}
+        </div>
+    `;
+
+}).join('')}
+
+    </div>
+
+    `;
+}
+
+    html += `
+    </div>
+    `;
+
+    grid.innerHTML = html;
+}
+
+function previousMonth() {
+
+    calendarDate.setMonth(
+        calendarDate.getMonth() - 1
+    );
+
+    renderCalendar();
+}
+
+function nextMonth() {
+
+    calendarDate.setMonth(
+        calendarDate.getMonth() + 1
+    );
+
+    renderCalendar();
+}
+function showEventsForDate(date) {
+
+    const container =
+        document.getElementById(
+            'calendar-events-list'
+        );
+
+    const matches =
+        Object.values(state.matches || {})
+        .filter(m => m.date === date);
+
+    const trainings =
+        Object.values(state.trainings || {})
+        .filter(t => t.date === date);
+
+        const events =
+    Object.values(state.events || {})
+    .filter(e => e.date === date);
+
+    let html = `
+        <div class="font-bold text-sm mb-3">
+            📅 ${date}
+        </div>
+    `;
+
+    matches.forEach(match => {
+
+        html += `
+            <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-2">
+
+                <div class="font-bold text-blue-800">
+                    ⚽ ${match.opponent}
+                </div>
+
+                <div class="text-xs text-slate-600">
+                    ${match.heure || '--'}
+                </div>
+
+            </div>
+        `;
+
+    });
+
+    trainings.forEach(training => {
+
+        html += `
+            <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-2">
+
+                <div class="font-bold text-emerald-800">
+                    🏃 ${training.title || 'Entraînement'}
+                </div>
+
+                <div class="text-xs text-slate-600">
+                    ${training.heure || '--'}
+                </div>
+
+                <div class="text-xs text-slate-500">
+                    ${training.theme || ''}
+                </div>
+
+            </div>
+        `;
+
+    });
+
+  
+events.forEach(event => {
+
+    let icon = "👥";
+    let bgClass = "bg-purple-50 border-purple-200";
+    let textClass = "text-purple-800";
+
+    if(event.type === "tournament") {
+
+        icon = "🏆";
+        bgClass = "bg-orange-50 border-orange-200";
+        textClass = "text-orange-800";
+
+    }
+
+    if(event.type === "club") {
+
+        icon = "🎉";
+        bgClass = "bg-pink-50 border-pink-200";
+        textClass = "text-pink-800";
+
+    }
+
+    html += `
+        <div class="${bgClass} border p-3 rounded-lg mb-2">
+
+            <div class="font-bold ${textClass}">
+                ${icon} ${event.title}
+            </div>
+
+            <div class="text-xs text-slate-600">
+                ${event.heure || ''}
+            </div>
+
+            <div class="text-xs text-slate-500">
+                ${event.lieu || ''}
+            </div>
+
+        </div>
+    `;
+
+});
+
+  if (
+    matches.length === 0 &&
+    trainings.length === 0 &&
+    events.length === 0
+) {
+
+        html += `
+            <div class="text-slate-400 italic">
+                Aucun événement
+            </div>
+        `;
+
+    }
+    container.innerHTML = html;
+}
+function openEventModal() {
+
+    document
+        .getElementById('modal-event')
+        .classList
+        .remove('hidden');
+
+}
+
+function closeEventModal() {
+
+    document
+        .getElementById('modal-event')
+        .classList
+        .add('hidden');
+
+}
+
+function saveEvent() {
+
+    const id =
+        'EVT_' + Date.now();
+
+    state.events[id] = {
+
+        id: id,
+
+        type:
+            document.getElementById('e-type').value,
+
+        title:
+            document.getElementById('e-title').value,
+
+        date:
+            document.getElementById('e-date').value,
+
+        heure:
+            document.getElementById('e-heure').value,
+
+        lieu:
+            document.getElementById('e-lieu').value
+
+    };
+
+    saveStateToFirebase();
+
+    renderCalendar();
+
+    closeEventModal();
+
+    showToast('Évènement créé');
+
+}
+
+function generateWeeklyPlanning() {
+
+    const today = new Date();
+
+    const start = new Date(today);
+
+    start.setDate(
+        today.getDate() - today.getDay() + 1
+    );
+
+    const end = new Date(start);
+
+    end.setDate(
+        start.getDate() + 6
+    );
+
+    let text =
+`🔵⚪ RANGUEIL FC ⚪🔵
+
+📅 Planning de la semaine
+
+`;
+
+    const items = [];
+
+    Object.values(state.matches || {})
+        .forEach(match => {
+
+            if (!match.date) return;
+
+            const d =
+                new Date(
+                    match.date + "T12:00:00"
+                );
+
+            if (
+                d >= start &&
+                d <= end
+            ) {
+
+                items.push({
+                    date: match.date,
+                    message:
+`⚽ ${match.opponent}
+${match.heure || ""}
+`
+                });
+
+            }
+
+        });
+
+    Object.values(state.trainings || {})
+        .forEach(training => {
+
+            if (!training.date) return;
+
+            const d =
+                new Date(
+                    training.date + "T12:00:00"
+                );
+
+            if (
+                d >= start &&
+                d <= end
+            ) {
+
+                items.push({
+                    date: training.date,
+                    message:
+`🏃 ${training.title || "Entraînement"}
+${training.heure || ""}
+`
+                });
+
+            }
+
+        });
+
+    Object.values(state.events || {})
+        .forEach(event => {
+
+            if (!event.date) return;
+
+            const d =
+                new Date(
+                    event.date + "T12:00:00"
+                );
+
+            if (
+                d >= start &&
+                d <= end
+            ) {
+
+                items.push({
+                    date: event.date,
+                    message:
+`👥 ${event.title}
+${event.heure || ""}
+`
+                });
+
+            }
+
+        });
+
+    items.sort((a,b) =>
+        a.date.localeCompare(b.date)
+    );
+
+   items.forEach(item => {
+
+    const dateFr =
+        new Date(item.date + "T12:00:00")
+        .toLocaleDateString(
+            "fr-FR",
+            {
+                weekday: "long",
+                day: "numeric",
+                month: "long"
+            }
+        );
+
+    text +=
+`${dateFr}
+
+${item.message}
+
+`;
+
+});
+
+    navigator.clipboard
+        .writeText(text)
+        .then(() => {
+
+            showToast(
+                "Planning copié dans le presse-papiers"
+            );
+
+        });
+
 }
