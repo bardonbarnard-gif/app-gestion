@@ -4030,12 +4030,20 @@ let calendarDate = new Date();
 
 function renderCalendar() {
 
+    populateCalendarTeamFilter();
+
+    const selectedTeam =
+        document.getElementById(
+            'calendar-team-filter'
+        )?.value || "all";
+
     const title =
         document.getElementById(
             'calendar-month-title'
         );
 
     if (!title) return;
+
 
     title.innerText =
         calendarDate.toLocaleDateString(
@@ -4100,16 +4108,57 @@ function renderCalendar() {
         `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 
     const matches =
-        Object.values(state.matches || {})
-        .filter(m => m.date === currentDate);
+    Object.values(state.matches || {})
+    .filter(m => {
+
+        if (m.date !== currentDate)
+            return false;
+
+        if (
+            selectedTeam !== "all" &&
+            m.team !== selectedTeam
+        )
+            return false;
+
+        return true;
+
+    });
 
         const events =
     Object.values(state.events || {})
-    .filter(e => e.date === currentDate);
+    .filter(e => {
+
+        if (e.date !== currentDate)
+            return false;
+
+        if (
+            selectedTeam !== "all" &&
+            e.team !== "all" &&
+            e.team !== selectedTeam
+        )
+            return false;
+
+        return true;
+
+    });
+``
 
     const trainings =
-        Object.values(state.trainings || {})
-        .filter(t => t.date === currentDate);
+    Object.values(state.trainings || {})
+    .filter(t => {
+
+        if (t.date !== currentDate)
+            return false;
+
+        if (
+            selectedTeam !== "all" &&
+            t.team !== selectedTeam
+        )
+            return false;
+
+        return true;
+
+    });
 
     html += `
 
@@ -4315,6 +4364,8 @@ events.forEach(event => {
 }
 function openEventModal() {
 
+    populateEventTeams();
+
     document
         .getElementById('modal-event')
         .classList
@@ -4342,6 +4393,9 @@ function saveEvent() {
 
         type:
             document.getElementById('e-type').value,
+
+            team:
+    document.getElementById('e-team').value || "all",
 
         title:
             document.getElementById('e-title').value,
@@ -4506,6 +4560,64 @@ ${item.message}
             showToast(
                 "Planning copié dans le presse-papiers"
             );
+
+        });
+
+}
+
+function populateCalendarTeamFilter() {
+
+    const select =
+        document.getElementById(
+            'calendar-team-filter'
+        );
+
+    if (!select) return;
+
+    const current =
+        select.value || "all";
+
+    select.innerHTML = `
+        <option value="all">
+            🌍 Toutes les équipes
+        </option>
+    `;
+
+    Object.entries(state.teams || {})
+        .forEach(([key, team]) => {
+
+            select.innerHTML += `
+                <option value="${key}">
+                    ${team.name}
+                </option>
+            `;
+
+        });
+
+    select.value = current;
+
+}
+function populateEventTeams() {
+
+    const select =
+        document.getElementById('e-team');
+
+    if (!select) return;
+
+    select.innerHTML = `
+        <option value="all">
+            🌍 Toutes les équipes
+        </option>
+    `;
+
+    Object.entries(state.teams || {})
+        .forEach(([key, team]) => {
+
+            select.innerHTML += `
+                <option value="${key}">
+                    ${team.name}
+                </option>
+            `;
 
         });
 

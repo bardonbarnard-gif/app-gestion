@@ -550,6 +550,20 @@
 </div>
         </div>
 
+        <div class="mb-3">
+
+    <select id="calendar-team-filter"
+            onchange="renderCalendar()"
+            class="border border-slate-200 rounded-lg px-3 py-2 text-xs">
+
+        <option value="all">
+            🌍 Toutes les équipes
+        </option>
+
+    </select>
+
+</div>
+
         <div id="calendar-grid"></div>
 
     </div>
@@ -1028,6 +1042,15 @@
             </option>
 
         </select>
+
+        <select id="e-team"
+        class="w-full border p-2 rounded">
+
+    <option value="all">
+        🌍 Toutes les équipes
+    </option>
+
+</select>
 
         <input
             id="e-title"
