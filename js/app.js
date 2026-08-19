@@ -3013,21 +3013,79 @@ state.selectedMatchId = matchId;
                 container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs">Aucun membre du staff enregistré pour le moment. Clique sur "Ajouter un membre" pour commencer.</div>';
                 return;
             }
-            container.innerHTML = state.staff.map(member => `
+            const mergedStaff = {};
+
+state.staff.forEach(member => {
+
+    const key =
+        member.name.trim().toUpperCase();
+
+    if (!mergedStaff[key]) {
+
+        mergedStaff[key] = {
+
+            name: member.name,
+
+            licence: member.licence,
+            phone: member.phone,
+            email: member.email,
+
+            entries: []
+
+        };
+
+    }
+
+    const memberScopes =
+        Array.isArray(member.scope)
+            ? member.scope
+            : [member.scope];
+
+    mergedStaff[key].entries.push({
+
+        role:
+            member.staffRole || member.role,
+
+        scopes:
+            memberScopes
+
+    });
+
+});
+
+const staffList =
+    Object.values(mergedStaff);
+
+
+            container.innerHTML = staffList.map(member => `
                 <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 flex flex-col justify-between space-y-3">
                     <div class="flex items-start justify-between">
                         <div>
                         <h3 class="font-extrabold text-slate-800 text-sm">${member.name}</h3>
 
-<span class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-sky-50 text-sky-700 border border-sky-100">
-    ${member.role}
-</span>
+<div class="mt-2 space-y-2">
 
-  ${member.scope
-    ? `<p class="text-xs text-slate-500 mt-1 font-medium">
-            📍 ${state.teams?.[member.scope]?.name || member.scope}
-       </p>`
-    : ''} 
+    ${member.entries.map(entry => `
+
+        <div class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-2">
+
+            <div class="text-[11px] font-bold text-sky-700">
+                👔 ${entry.role}
+            </div>
+
+            <div class="text-[11px] text-slate-500 mt-1">
+
+                📍 ${entry.scopes.map(scope =>
+                    state.teams?.[scope]?.name || scope
+                ).join(' • ')}
+
+            </div>
+
+        </div>
+
+    `).join('')}
+
+</div>
                         </div>
                      ${canEditStaff(member) ? `
 <div class="flex space-x-1">
@@ -3686,7 +3744,22 @@ window.editCoachAccount = async function(pin) {
   
         document.getElementById("admin-name").value = data.name || "";
         document.getElementById("admin-role").value = data.role || "";
+        toggleTeamInput(data.role);
         document.getElementById("admin-team").value = data.team || "";
+        const teamSelect =
+    document.getElementById("admin-team-select");
+
+if (teamSelect) {
+    teamSelect.value = data.team || "";
+
+ console.log(
+    "TEAM DATA :", data.team
+);
+
+console.log(
+    "TEAM SELECT VALUE :", teamSelect.value
+);   
+}
         document.getElementById("admin-staff-role").value =
     data.staffRole || "Dirigeant / Accompagnateur";
 
@@ -3699,6 +3772,7 @@ document.getElementById("admin-phone").value =
 document.getElementById("admin-email").value =
     data.email || "";
 
+toggleAdminModal(true);
 
     } catch (error) {
 
@@ -5110,7 +5184,6 @@ async function regenerateStaffFromAccess() {
 }
 
 
-
 function openAdminModule(module) {
 
     const container =
@@ -5124,46 +5197,219 @@ function openAdminModule(module) {
 
     if (module === "access") {
 
-        container.innerHTML = `
+  renderAdminAccounts();  
+  } 
+  
+  if (module === "teams") {
 
-            <div class="flex items-center justify-between mb-4">
+    renderAdminTeamsModule();
 
-                <h2 class="text-lg font-bold text-slate-800">
-                    🪪 Comptes d'accès
-                </h2>
-
-                <button
-                    onclick="closeAdminModule()"
-                    class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold">
-
-                    ← Retour
-
-                </button>
-
-            </div>
-
-            <div class="bg-sky-50 border border-sky-200 rounded-xl p-4">
-
-                <p class="font-bold text-sky-800">
-                    Gestion des comptes
-                </p>
-
-                <p class="text-xs text-slate-600 mt-2">
-                    Cette zone accueillera bientôt :
-                </p>
-
-                <ul class="text-xs text-slate-600 mt-2 list-disc pl-5">
-                    <li>Création des comptes</li>
-                    <li>Liste des PIN</li>
-                    <li>Modification des accès</li>
-                    <li>Suppression des accès</li>
-                </ul>
-
-            </div>
-
-        `;
-    }
 }
+}
+
+function renderAdminTeamsModule() {
+
+    const container =
+        document.getElementById(
+            "admin-module-container"
+        );
+
+    if (!container) return;
+
+    container.classList.remove("hidden");
+
+    let html = `
+
+    <div class="flex justify-between items-center mb-4">
+
+        <h2 class="text-lg font-bold text-slate-800">
+            ⚽ Équipes
+        </h2>
+
+        <div class="flex gap-2">
+
+            <button
+                onclick="openModalTeam()"
+                class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
+
+                ➕ Nouvelle équipe
+
+            </button>
+
+            <button
+                onclick="closeAdminModule()"
+                class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold">
+
+                ← Retour
+
+            </button>
+
+        </div>
+
+    </div>
+
+`;
+
+    Object.entries(state.teams || {})
+        .forEach(([key, team]) => {
+
+            html += `
+
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-2">
+
+                    <div class="flex justify-between items-center">
+
+                        <div>
+
+                            <div class="font-bold">
+                                ${key}
+                            </div>
+
+                            <div class="text-xs text-slate-500">
+                                ${team.name}
+                            </div>
+
+                        </div>
+
+                        <div class="flex gap-2">
+
+    <button
+        onclick="editTeam('${key}')"
+        class="bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-1 rounded-lg text-xs">
+
+        ✏️
+
+    </button>
+
+    <button
+        onclick="deleteTeam('${key}')"
+        class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded-lg text-xs">
+
+        🗑️
+
+    </button>
+
+</div>
+
+                    </div>
+
+                </div>
+
+            `;
+        });
+
+    container.innerHTML = html;
+}
+
+async function renderAdminAccounts() {
+
+    const container =
+        document.getElementById(
+            "admin-module-container"
+        );
+
+    if (!container) return;
+
+    const snapshot =
+        await firebase.database()
+            .ref("rangueil_data/access")
+            .once("value");
+
+    const accounts =
+        snapshot.val() || {};
+
+    let html = `
+
+        <div class="flex justify-between items-center mb-4">
+
+            <h2 class="text-lg font-bold text-slate-800">
+                🪪 Comptes d'accès
+            </h2>
+
+            <button
+    onclick="toggleAdminModal(true)"
+    class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
+
+    ➕ Nouveau compte
+
+</button>
+
+
+
+            <button
+                onclick="closeAdminModule()"
+                class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold">
+
+                ← Retour
+
+            </button>
+
+        </div>
+
+    `;
+
+    Object.entries(accounts).forEach(
+        ([pin, user]) => {
+
+      html += `
+
+<div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3">
+
+    <div class="flex justify-between items-start">
+
+        <div>
+
+            <div class="font-bold text-slate-800 text-lg">
+                ${user.name || ""}
+            </div>
+
+            <div class="text-xs text-slate-500">
+    👔 ${user.staffRole || user.role || ""}
+</div>
+
+            
+
+            <div class="text-xs text-slate-500">
+                👔 ${user.staffRole || ""}
+            </div>
+
+            <div class="text-xs text-slate-500">
+                📍 ${user.team || ""}
+            </div>
+
+        </div>
+
+        <div class="flex gap-2 mt-3">
+
+    <button
+        onclick="editCoachAccount('${pin}')"
+        class="bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-1 rounded-lg text-xs font-bold">
+
+        ✏️ Modifier
+
+    </button>
+
+    <button
+        onclick="deleteCoachAccount('${pin}')"
+        class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded-lg text-xs font-bold">
+
+        🗑️ Supprimer
+
+    </button>
+
+</div>
+
+    </div>
+
+</div>
+
+`;      
+        }
+    );
+
+    container.innerHTML = html;
+}
+
 function closeAdminModule() {
 
     const container =
@@ -5176,4 +5422,54 @@ function closeAdminModule() {
     container.classList.add("hidden");
 
     container.innerHTML = "";
+}
+
+
+function openModalTeam(teamId = null) {
+
+    const id = prompt(
+        "Identifiant équipe (ex: u18)"
+    );
+
+    if (!id) return;
+
+    const name = prompt(
+        "Nom complet de l'équipe"
+    );
+
+    if (!name) return;
+
+    firebase.database()
+        .ref("teams/" + id.toLowerCase())
+        .set({
+            name: name
+        });
+
+    showToast(
+        "✅ Équipe créée"
+    );
+}
+function editTeam(teamId) {
+
+    const team =
+        state.teams?.[teamId];
+
+    if (!team) return;
+
+    const newName = prompt(
+        "Nom de l'équipe",
+        team.name || ""
+    );
+
+    if (!newName) return;
+
+    firebase.database()
+        .ref("teams/" + teamId)
+        .update({
+            name: newName
+        });
+
+    showToast(
+        "✅ Équipe modifiée"
+    );
 }
