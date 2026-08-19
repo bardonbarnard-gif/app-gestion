@@ -864,13 +864,20 @@ let presences = 0;
 let totalSessions = 0;
 
 Object.values(state.trainings).forEach(session => {
-
     if (!session.date) return;
 
     const sessionDate = new Date(session.date + 'T12:00:00');
     sessionDate.setHours(0,0,0,0);
 
     if (sessionDate >= today) return;
+
+    // Ne compter que les séances de l'équipe du joueur
+    if (
+        (session.team || '').toLowerCase() !==
+        (p.team || p.cat || '').toLowerCase()
+    ) {
+        return;
+    }
 
     totalSessions++;
 
@@ -1813,7 +1820,16 @@ const nbTotal = playersForTraining.length;
             
             const rows = playersToShow.map(p => {
                 let present = 0, total = pastSessions.length;
-                pastSessions.forEach(s => { if ((s.presence || {})[p.id] === 'present') present++; });
+                pastSessions.forEach(s => {
+    const status = (s.presence || {})[p.id];
+
+    if (
+        status === 'present' ||
+        status === 'retard'
+    ) {
+        present++;
+    }
+});
                 const pct = total > 0 ? Math.round((present / total) * 100) : 0;
                 const barColor = pct >= 75 ? 'bg-emerald-400' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400';
                 const textColor = pct >= 75 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-red-500';
