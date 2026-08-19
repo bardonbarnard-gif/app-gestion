@@ -374,7 +374,7 @@ function saveStateToFirebase() {
         }
     }
 
-    ['dashboard', 'effectif', 'matchs', 'entrainements', 'calendrier','staff'].forEach(t => {
+    ['dashboard', 'effectif', 'matchs', 'entrainements', 'calendrier','staff','admin'].forEach(t => {
                 const sec = document.getElementById(`sec-${t}`);
                 if(sec) sec.classList.add('hidden');
                 const btn = document.getElementById(`tab-${t}`);
@@ -3513,6 +3513,17 @@ const oldPin =
 const name = document.getElementById("admin-name").value.trim();
 const role = document.getElementById("admin-role").value;
 const team = document.getElementById("admin-team").value.trim();
+const staffRole =
+    document.getElementById("admin-staff-role").value;
+
+const licence =
+    document.getElementById("admin-licence").value.trim();
+
+const phone =
+    document.getElementById("admin-phone").value.trim();
+
+const email =
+    document.getElementById("admin-email").value.trim();
 
 if (pin.length !== 4) {
     alert("Le code PIN doit comporter exactement 4 chiffres.");
@@ -3536,13 +3547,19 @@ await firebase.database()
     .set({
         name: name,
         role: role,
+
         team: (
             role === "admin" ||
             role === "dirigeant" ||
             role === "public"
         )
             ? "all"
-            : (team || "all")
+            : (team || "all"),
+
+        staffRole: staffRole,
+        licence: licence,
+        phone: phone,
+        email: email
     });
 
 
@@ -3670,6 +3687,18 @@ window.editCoachAccount = async function(pin) {
         document.getElementById("admin-name").value = data.name || "";
         document.getElementById("admin-role").value = data.role || "";
         document.getElementById("admin-team").value = data.team || "";
+        document.getElementById("admin-staff-role").value =
+    data.staffRole || "Dirigeant / Accompagnateur";
+
+document.getElementById("admin-licence").value =
+    data.licence || "";
+
+document.getElementById("admin-phone").value =
+    data.phone || "";
+
+document.getElementById("admin-email").value =
+    data.email || "";
+
 
     } catch (error) {
 
@@ -4992,4 +5021,159 @@ function getTeamBadge(event) {
         })
         .join(' ');
 
+}
+async function regenerateStaffFromAccess() {
+
+    if (
+        !confirm(
+            "Le staff actuel sera supprimé puis recréé depuis les comptes d'accès.\n\nContinuer ?"
+        )
+    ) {
+        return;
+    }
+
+    try {
+
+        const accessSnapshot =
+            await firebase.database()
+                .ref("rangueil_data/access")
+                .once("value");
+
+        const accessData =
+            accessSnapshot.val() || {};
+
+        const regeneratedStaff = {};
+
+        Object.entries(accessData)
+            .forEach(([pin, user]) => {
+
+                if (
+                    user.role === "admin" ||
+                    user.role === "public"
+                ) {
+                    return;
+                }
+
+                const staffId =
+                    "STF_" + pin;
+
+                regeneratedStaff[staffId] = {
+
+                    id: staffId,
+
+                    accountPin: pin,
+
+                    name: user.name || "",
+
+                    role:
+                        user.staffRole ||
+                        "Dirigeant / Accompagnateur",
+
+                    scope:
+                        user.team
+                            ? user.team
+                                .split(",")
+                                .map(t => t.trim())
+                            : [],
+
+                    licence:
+                        user.licence || "",
+
+                    phone:
+                        user.phone || "",
+
+                    email:
+                        user.email || ""
+
+                };
+            });
+
+        await firebase.database()
+            .ref("rangueil_data/staff")
+            .set(regeneratedStaff);
+
+        showToast(
+            "✅ Staff régénéré"
+        );
+
+        renderStaff();
+
+    } catch(error) {
+
+        console.error(error);
+
+        showToast(
+            "❌ Erreur de régénération",
+            "error"
+        );
+    }
+}
+
+
+
+function openAdminModule(module) {
+
+    const container =
+        document.getElementById(
+            "admin-module-container"
+        );
+
+    if (!container) return;
+
+    container.classList.remove("hidden");
+
+    if (module === "access") {
+
+        container.innerHTML = `
+
+            <div class="flex items-center justify-between mb-4">
+
+                <h2 class="text-lg font-bold text-slate-800">
+                    🪪 Comptes d'accès
+                </h2>
+
+                <button
+                    onclick="closeAdminModule()"
+                    class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold">
+
+                    ← Retour
+
+                </button>
+
+            </div>
+
+            <div class="bg-sky-50 border border-sky-200 rounded-xl p-4">
+
+                <p class="font-bold text-sky-800">
+                    Gestion des comptes
+                </p>
+
+                <p class="text-xs text-slate-600 mt-2">
+                    Cette zone accueillera bientôt :
+                </p>
+
+                <ul class="text-xs text-slate-600 mt-2 list-disc pl-5">
+                    <li>Création des comptes</li>
+                    <li>Liste des PIN</li>
+                    <li>Modification des accès</li>
+                    <li>Suppression des accès</li>
+                </ul>
+
+            </div>
+
+        `;
+    }
+}
+function closeAdminModule() {
+
+    const container =
+        document.getElementById(
+            "admin-module-container"
+        );
+
+    if (!container) return;
+
+    container.classList.add("hidden");
+
+    container.innerHTML = "";
 }
