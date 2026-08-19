@@ -163,6 +163,10 @@ let currentCatFilter = 'all';
     state.staff = Object.values(
     data.staff || {}
 );
+console.log(
+    "STAFF CHARGE :",
+    state.staff
+);
 
 state.carpoolResponses =
     data.carpoolResponses || {};
