@@ -643,6 +643,11 @@ dashboardMatches.forEach(m => {
 const today = new Date();
 today.setHours(0,0,0,0);
 
+const selectedTeam =
+    document.getElementById(
+        'calendar-team-filter'
+    )?.value || "all";
+
 const trainingsSource = role === 'coach'
     ? Object.values(state.trainings || {}).filter(t =>
         (t.team || '').toLowerCase() === userTeam.toLowerCase()
@@ -4603,6 +4608,11 @@ function generateWeeklyPlanning() {
 
     const today = new Date();
 
+    const selectedTeam =
+    document.getElementById(
+        'calendar-team-filter'
+    )?.value || "all";
+
     const start = new Date(today);
 
     start.setDate(
@@ -4615,10 +4625,18 @@ function generateWeeklyPlanning() {
         start.getDate() + 6
     );
 
-    let text =
-`🔵⚪ RANGUEIL FC ⚪🔵
+const teamLabel =
+    selectedTeam === "all"
+        ? "TOUTES ÉQUIPES"
+        : (
+            state.teams?.[selectedTeam]?.name ||
+            selectedTeam.toUpperCase()
+        );
 
-📅 Planning de la semaine
+let text =
+`🔵⚪ RANGUEIL FC ${teamLabel} ⚪🔵
+
+📅 PLANNING DE LA SEMAINE
 
 `;
 
@@ -4628,6 +4646,13 @@ function generateWeeklyPlanning() {
         .forEach(match => {
 
             if (!match.date) return;
+
+            if (
+    selectedTeam !== "all" &&
+    match.team !== selectedTeam
+) {
+    return;
+}
 
             const d =
                 new Date(
@@ -4656,6 +4681,13 @@ ${match.heure || ""}
 
             if (!training.date) return;
 
+            if (
+    selectedTeam !== "all" &&
+    training.team !== selectedTeam
+) {
+    return;
+}
+
             const d =
                 new Date(
                     training.date + "T12:00:00"
@@ -4682,6 +4714,20 @@ ${training.heure || ""}
         .forEach(event => {
 
             if (!event.date) return;
+
+            if (selectedTeam !== "all") {
+
+    if (
+        !event.teams ||
+        (
+            !event.teams.includes("all") &&
+            !event.teams.includes(selectedTeam)
+        )
+    ) {
+        return;
+    }
+
+}
 
             const d =
                 new Date(
