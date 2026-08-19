@@ -4253,17 +4253,69 @@ function showEventsForDate(date) {
             'calendar-events-list'
         );
 
-    const matches =
-        Object.values(state.matches || {})
-        .filter(m => m.date === date);
+    const selectedTeam =
+    document.getElementById(
+        'calendar-team-filter'
+    )?.value || "all";
+
+const matches =
+    Object.values(state.matches || {})
+    .filter(m => {
+
+        if (m.date !== date)
+            return false;
+
+        if (
+            selectedTeam !== "all" &&
+            m.team !== selectedTeam
+        )
+            return false;
+
+        return true;
+
+    });
 
     const trainings =
-        Object.values(state.trainings || {})
-        .filter(t => t.date === date);
+    Object.values(state.trainings || {})
+    .filter(t => {
+
+        if (t.date !== date)
+            return false;
+
+        if (
+            selectedTeam !== "all" &&
+            t.team !== selectedTeam
+        )
+            return false;
+
+        return true;
+
+    });
 
         const events =
     Object.values(state.events || {})
-    .filter(e => e.date === date);
+    .filter(e => {
+
+        if (e.date !== date)
+            return false;
+
+        if (selectedTeam !== "all") {
+
+            if (
+                !e.teams ||
+                (
+                    !e.teams.includes("all") &&
+                    !e.teams.includes(selectedTeam)
+                )
+            ) {
+                return false;
+            }
+
+        }
+
+        return true;
+
+    });
 
     let html = `
         <div class="font-bold text-sm mb-3">
@@ -4372,6 +4424,10 @@ events.forEach(event => {
             <div class="text-xs text-slate-500">
                 ${event.lieu || ''}
             </div>
+
+            <div class="text-xs font-bold text-slate-600 mt-1">
+    ${getEventTeamsLabel(event)}
+</div>
 
         </div>
     `;
@@ -4775,5 +4831,28 @@ function deleteEvent(eventId) {
     showToast(
         "Évènement supprimé"
     );
+
+}
+function getEventTeamsLabel(event) {
+
+    if (
+        event.teams &&
+        event.teams.includes("all")
+    ) {
+        return "🌍 Toutes les équipes";
+    }
+
+    return (event.teams || [])
+        .map(teamKey => {
+
+            const team =
+                state.teams?.[teamKey];
+
+            return team
+                ? team.name
+                : teamKey;
+
+        })
+        .join(" • ");
 
 }
