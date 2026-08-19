@@ -4253,6 +4253,8 @@ function nextMonth() {
 }
 function showEventsForDate(date) {
 
+    console.log("DATE CLIQUEE :", date);
+
     const container =
         document.getElementById(
             'calendar-events-list'
@@ -4341,6 +4343,16 @@ const matches =
                     ${match.heure || '--'}
                 </div>
 
+              <div class="mt-2">
+    ${
+        getTeamColorClasses(match.team).badge
+            ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${getTeamColorClasses(match.team).badge}">
+                ${state.teams?.[match.team]?.name || match.team}
+              </span>`
+            : ''
+    }
+</div>  
+
             </div>
         `;
 
@@ -4362,6 +4374,17 @@ const matches =
                 <div class="text-xs text-slate-500">
                     ${training.theme || ''}
                 </div>
+
+             <div class="mt-2">
+
+    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold
+        ${getTeamColorClasses(training.team).badge}">
+
+        ${state.teams?.[training.team]?.name || training.team}
+
+    </span>
+
+</div>   
 
             </div>
         `;
@@ -4430,8 +4453,9 @@ events.forEach(event => {
                 ${event.lieu || ''}
             </div>
 
-            <div class="text-xs font-bold text-slate-600 mt-1">
-    ${getEventTeamsLabel(event)}
+            <div class="mt-2">
+    ${event.teams?.join(" • ") || ""}
+
 </div>
 
         </div>
@@ -4914,5 +4938,38 @@ function getEventTeamsLabel(event) {
 
         })
         .join(" • ");
+
+}
+
+function getTeamBadge(event) {
+
+    if (
+        event.teams &&
+        event.teams.includes("all")
+    ) {
+
+        return `
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                🌍 Club
+            </span>
+        `;
+
+    }
+
+    return (event.teams || [])
+        .map(teamKey => {
+
+            const teamName =
+                state.teams?.[teamKey]?.name ||
+                teamKey;
+
+            return `
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800">
+                    ${teamName}
+                </span>
+            `;
+
+        })
+        .join(' ');
 
 }
