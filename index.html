@@ -1026,6 +1026,10 @@
 
         </div>
 
+        <input
+    type="hidden"
+    id="e-id">
+
         <select id="e-type"
                 class="w-full border p-2 rounded">
 
@@ -1043,14 +1047,23 @@
 
         </select>
 
-        <select id="e-team"
-        class="w-full border p-2 rounded">
+      <div class="border rounded p-2">
 
-    <option value="all">
+    <label class="flex items-center gap-2 mb-2">
+
+        <input
+            type="checkbox"
+            id="e-team-all">
+
         🌍 Toutes les équipes
-    </option>
 
-</select>
+    </label>
+
+    <div id="event-teams-container"
+         class="space-y-1">
+    </div>
+
+</div>
 
         <input
             id="e-title"

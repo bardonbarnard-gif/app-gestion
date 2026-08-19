@@ -4131,12 +4131,19 @@ function renderCalendar() {
         if (e.date !== currentDate)
             return false;
 
-        if (
-            selectedTeam !== "all" &&
-            e.team !== "all" &&
-            e.team !== selectedTeam
-        )
-            return false;
+        if (selectedTeam !== "all") {
+
+            if (
+                !e.teams ||
+                (
+                    !e.teams.includes("all") &&
+                    !e.teams.includes(selectedTeam)
+                )
+            ) {
+                return false;
+            }
+
+        }
 
         return true;
 
@@ -4330,9 +4337,33 @@ events.forEach(event => {
     html += `
         <div class="${bgClass} border p-3 rounded-lg mb-2">
 
-            <div class="font-bold ${textClass}">
-                ${icon} ${event.title}
-            </div>
+            <div class="flex justify-between items-start">
+
+    <div class="font-bold ${textClass}">
+        ${icon} ${event.title}
+    </div>
+
+    <div class="flex gap-2">
+
+    <button
+        onclick="openEventModal('${event.id}')"
+        class="text-sky-600 hover:text-sky-800">
+
+        ✏️
+
+    </button>
+
+    <button
+        onclick="deleteEvent('${event.id}')"
+        class="text-red-600 hover:text-red-800">
+
+        🗑️
+
+    </button>
+
+</div>
+
+</div>
 
             <div class="text-xs text-slate-600">
                 ${event.heure || ''}
@@ -4362,7 +4393,7 @@ events.forEach(event => {
     }
     container.innerHTML = html;
 }
-function openEventModal() {
+function openEventModal(eventId = null) {
 
     populateEventTeams();
 
@@ -4370,6 +4401,71 @@ function openEventModal() {
         .getElementById('modal-event')
         .classList
         .remove('hidden');
+
+    if (!eventId) {
+
+        document.getElementById('e-id').value = '';
+
+        return;
+
+    }
+
+    const event =
+        state.events[eventId];
+
+    if (!event) return;
+
+    document.getElementById('e-id').value =
+        event.id;
+
+    document.getElementById('e-type').value =
+        event.type || "meeting";
+
+    document.getElementById('e-title').value =
+        event.title || '';
+
+    document.getElementById('e-date').value =
+        event.date || '';
+
+    document.getElementById('e-heure').value =
+        event.heure || '';
+
+    document.getElementById('e-lieu').value =
+        event.lieu || '';
+
+        // Remise à zéro
+document.getElementById('e-team-all').checked = false;
+
+document
+    .querySelectorAll('.event-team-checkbox')
+    .forEach(cb => cb.checked = false);
+
+// Rechargement des équipes enregistrées
+if (event.teams) {
+
+    if (event.teams.includes("all")) {
+
+        document.getElementById(
+            'e-team-all'
+        ).checked = true;
+
+    }
+
+    document
+        .querySelectorAll('.event-team-checkbox')
+        .forEach(cb => {
+
+            if (
+                event.teams.includes(cb.value)
+            ) {
+
+                cb.checked = true;
+
+            }
+
+        });
+
+}
 
 }
 
@@ -4384,8 +4480,35 @@ function closeEventModal() {
 
 function saveEvent() {
 
-    const id =
-        'EVT_' + Date.now();
+    const existingId =
+    document.getElementById('e-id').value;
+
+const id =
+    existingId || ('EVT_' + Date.now());
+
+        const allTeams =
+    document.getElementById(
+        'e-team-all'
+    ).checked;
+
+let selectedTeams = [];
+
+if (allTeams) {
+
+    selectedTeams = ["all"];
+
+}
+else {
+
+    selectedTeams =
+        Array.from(
+            document.querySelectorAll(
+                '.event-team-checkbox:checked'
+            )
+        )
+        .map(cb => cb.value);
+
+}
 
     state.events[id] = {
 
@@ -4394,8 +4517,7 @@ function saveEvent() {
         type:
             document.getElementById('e-type').value,
 
-            team:
-    document.getElementById('e-team').value || "all",
+            teams: selectedTeams,
 
         title:
             document.getElementById('e-title').value,
@@ -4599,26 +4721,59 @@ function populateCalendarTeamFilter() {
 }
 function populateEventTeams() {
 
-    const select =
-        document.getElementById('e-team');
+    const container =
+        document.getElementById(
+            'event-teams-container'
+        );
 
-    if (!select) return;
+    if (!container) return;
 
-    select.innerHTML = `
-        <option value="all">
-            🌍 Toutes les équipes
-        </option>
-    `;
+    container.innerHTML = '';
 
     Object.entries(state.teams || {})
         .forEach(([key, team]) => {
 
-            select.innerHTML += `
-                <option value="${key}">
+            container.innerHTML += `
+
+                <label class="flex items-center gap-2">
+
+                    <input
+                        type="checkbox"
+                        class="event-team-checkbox"
+                        value="${key}">
+
                     ${team.name}
-                </option>
+
+                </label>
+
             `;
 
         });
+
+}
+function deleteEvent(eventId) {
+
+    if (
+        !confirm(
+            "Supprimer cet évènement ?"
+        )
+    ) {
+        return;
+    }
+
+    delete state.events[eventId];
+
+    saveStateToFirebase();
+
+    renderCalendar();
+
+    const selectedDate =
+        document.getElementById(
+            'calendar-events-list'
+        );
+
+    showToast(
+        "Évènement supprimé"
+    );
 
 }
