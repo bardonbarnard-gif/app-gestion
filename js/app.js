@@ -4755,7 +4755,9 @@ ${event.heure || ""}
         a.date.localeCompare(b.date)
     );
 
-   items.forEach(item => {
+let currentDate = "";
+
+items.forEach(item => {
 
     const dateFr =
         new Date(item.date + "T12:00:00")
@@ -4768,15 +4770,27 @@ ${event.heure || ""}
             }
         );
 
-    text +=
-`${dateFr}
+    if (currentDate !== dateFr) {
 
-${item.message}
+        text += `📍 ${dateFr}\n\n`;
 
-`;
+        currentDate = dateFr;
+
+    }
+
+    const formattedMessage =
+        item.message.replace(
+            /(\d{2}:\d{2})/,
+            '🕒 $1'
+        );
+
+    text += `${formattedMessage}\n`;
 
 });
 
+text += `
+💙 Bonne semaine à tous !
+`;
     navigator.clipboard
         .writeText(text)
         .then(() => {
