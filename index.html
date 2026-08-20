@@ -253,6 +253,17 @@
         <span>Transport</span>
     </button>
 
+
+
+ <button
+    onclick="switchMatchSubTab('composition')"
+    id="subtab-composition-btn"
+    class="pb-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 transition whitespace-nowrap">
+
+    <i class="fa-solid fa-chess-board"></i>
+    <span>Composition</span>
+</button>
+
 </div>
 
 <div id="subtab-infos" class="space-y-4 hidden">
@@ -328,22 +339,89 @@
 
 </div>
 
-            <div id="subtab-results" class="space-y-4">
-                <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
-                    <div><h2 class="text-base font-bold text-slate-800">Résultats, Buteurs, Passes & Debrief</h2><p class="text-xs text-slate-500">Scores et causeries d'après-match</p></div>
-                    <div class="space-y-3" id="matches-results-list"></div>
-                </div>
-            </div>
-            <div id="subtab-convocations" class="space-y-4 hidden">
-                <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <div><h2 class="text-base font-bold text-slate-800">Feuille de Convocations & WhatsApp</h2><p class="text-xs text-slate-500">Postes, maillots, licences et covoiturages</p></div>
-                        <div class="flex items-center space-x-2 w-full sm:w-auto">
-                            <select id="match-selector" onchange="onMatchSelectorChange(this.value)" class="w-full sm:w-auto bg-slate-50 border border-slate-200 font-bold text-xs text-slate-700 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"></select>
-                            <button onclick="openModalMatch()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center space-x-1 whitespace-nowrap"><i class="fa-solid fa-plus"></i><span>Nouveau Match</span></button>
-                        </div>
-                    </div>
+<!-- COMPOSITION -->
 
+<div id="subtab-composition" class="space-y-4 hidden">
+
+    <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
+
+        <div class="mb-4">
+            <h2 class="text-base font-bold text-slate-800">
+                ⚽ Composition d'équipe
+            </h2>
+
+            <p class="text-xs text-slate-500">
+                Organisation des titulaires et remplaçants
+            </p>
+        </div>
+
+        <div id="match-composition-container">
+        </div>
+
+    </div>
+
+</div>
+
+<!-- RESULTATS -->
+
+<div id="subtab-results" class="space-y-4">
+
+    <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
+
+        <div>
+            <h2 class="text-base font-bold text-slate-800">
+                Résultats, Buteurs, Passes & Debrief
+            </h2>
+
+            <p class="text-xs text-slate-500">
+                Scores et causeries d'après-match
+            </p>
+        </div>
+
+        <div class="space-y-3" id="matches-results-list"></div>
+
+    </div>
+
+</div>
+
+<!-- CONVOCATIONS -->
+
+<div id="subtab-convocations" class="space-y-4 hidden">
+
+    <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
+
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+
+            <div>
+                <h2 class="text-base font-bold text-slate-800">
+                    Feuille de Convocations & WhatsApp
+                </h2>
+
+                <p class="text-xs text-slate-500">
+                    Postes, maillots, licences et covoiturages
+                </p>
+            </div>
+
+            <div class="flex items-center space-x-2 w-full sm:w-auto">
+
+                <select
+                    id="match-selector"
+                    onchange="onMatchSelectorChange(this.value)"
+                    class="w-full sm:w-auto bg-slate-50 border border-slate-200 font-bold text-xs text-slate-700 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </select>
+
+                <button
+                    onclick="openModalMatch()"
+                    class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center space-x-1 whitespace-nowrap">
+
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Nouveau Match</span>
+
+                </button>
+
+            </div>
+
+        </div>
 
 
     <div class="flex flex-wrap gap-2 mt-3">

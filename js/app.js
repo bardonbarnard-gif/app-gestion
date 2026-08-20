@@ -514,7 +514,8 @@ function saveStateToFirebase() {
         'results',
         'infos',
         'convocations',
-        'transport'
+        'transport',
+        'composition'
     ];
 
     tabs.forEach(tab => {
@@ -550,12 +551,16 @@ function saveStateToFirebase() {
     }
 
     if (
-        subTabId === 'infos' ||
-        subTabId === 'convocations' ||
-        subTabId === 'transport'
-    ) {
-        renderMatchDetail();
-    }
+    subTabId === 'infos' ||
+    subTabId === 'convocations' ||
+    subTabId === 'transport'
+) {
+    renderMatchDetail();
+}
+
+if (subTabId === 'composition') {
+    renderMatchComposition();
+}
 }
 
         // --- 5. MODULES D'AFFICHAGE & RENDU ---
@@ -3009,6 +3014,7 @@ jerseys: existingMatch.jerseys || {},
 carpool: existingMatch.carpool || {},
 matchStats: existingMatch.matchStats || {},
 debrief: existingMatch.debrief || "",
+composition: existingMatch.composition || {},
 isValidated: existingMatch.isValidated || false
 
     };
@@ -5931,4 +5937,482 @@ Object.entries(poleGroups)
 
 });
 
+}
+
+function renderMatchComposition() {
+
+    const container =
+        document.getElementById(
+            'match-composition-container'
+        );
+
+    if (!container) return;
+
+    if (
+        !state.selectedMatchId ||
+        !state.matches[state.selectedMatchId]
+    ) {
+
+        container.innerHTML = `
+            <div class="text-center py-8 text-slate-400">
+
+                ⚽
+
+                <div>
+                    Sélectionnez un match
+                </div>
+
+            </div>
+        `;
+
+        return;
+    }
+
+    const match =
+        state.matches[state.selectedMatchId];
+
+    if (!match.composition) {
+        match.composition = {};
+    }
+
+    const players =
+        state.players.filter(
+            p =>
+                match.convocations?.[p.id] ===
+                'convoke'
+        );
+
+    const terrainPlayers =
+        players.filter(
+            p =>
+                match.composition[p.id]
+        );
+
+    const benchPlayers =
+        players.filter(
+            p =>
+                !match.composition[p.id]
+        );
+
+    container.innerHTML = `
+
+        <div class="flex flex-wrap gap-2 mb-4">
+
+            <button
+                onclick="applyFormation('433')"
+                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+
+                4-3-3
+
+            </button>
+
+            <button
+                onclick="applyFormation('442')"
+                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+
+                4-4-2
+
+            </button>
+
+            <button
+                onclick="applyFormation('352')"
+                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+
+                3-5-2
+
+            </button>
+
+            <button
+                onclick="applyFormation('4231')"
+                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+
+                4-2-3-1
+
+            </button>
+
+        </div>
+
+        <div class="grid lg:grid-cols-4 gap-4">
+
+            <div class="lg:col-span-3">
+
+                <div
+                    id="composition-terrain"
+                    ondragover="allowDrop(event)"
+                    ondrop="dropPlayer(event)"
+                    class="
+                    relative
+                    bg-green-600
+                    rounded-2xl
+                    min-h-[700px]
+                    overflow-hidden">
+
+                    <div class="absolute inset-4 border-2 border-white/60 rounded-xl"></div>
+
+                    <div class="absolute left-0 right-0 top-1/2 border-t border-white/40"></div>
+
+                    <div class="absolute left-1/2 top-1/2 w-24 h-24 border-2 border-white/40 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+
+                    ${terrainPlayers.map(player => {
+
+                        const pos =
+                            match.composition[player.id];
+
+                        return `
+
+                            <div
+                                draggable="true"
+                                ondragstart="startDragPlayer(event,'${player.id}')"
+
+                                class="
+                                absolute
+                                bg-white
+                                rounded-xl
+                                shadow-lg
+                                cursor-grab
+                                px-3
+                                py-2
+                                text-center
+                                min-w-[110px]
+                                -translate-x-1/2
+                                -translate-y-1/2"
+
+                                style="
+                                    left:${pos.x}%;
+                                    top:${pos.y}%;
+                                ">
+
+                                <div class="font-bold text-xs">
+                                    ${player.name}
+                                </div>
+
+                                <button
+                                    onclick="removePlayerFromComposition('${player.id}')"
+                                    class="text-red-500 text-[10px] mt-1">
+
+                                    Retirer
+
+                                </button>
+
+                            </div>
+
+                        `;
+
+                    }).join('')}
+
+                </div>
+
+            </div>
+
+            <div>
+
+                <h3 class="font-bold mb-3">
+                    🔄 Banc
+                </h3>
+
+                <div class="space-y-2">
+
+                    ${benchPlayers.map(player => `
+
+                        <button
+                            onclick="addPlayerToComposition('${player.id}')"
+
+                            class="
+                            w-full
+                            bg-white
+                            border
+                            rounded-xl
+                            p-3
+                            text-left
+                            hover:bg-sky-50">
+
+                            ${player.name}
+
+                        </button>
+
+                    `).join('')}
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+}
+
+function startDragPlayer(event, playerId) {
+
+    draggedPlayerId = playerId;
+
+}
+
+function allowDrop(event) {
+
+    event.preventDefault();
+
+}
+
+function dropPlayer(event) {
+
+    event.preventDefault();
+
+    if (!draggedPlayerId) return;
+
+    const terrain =
+        document.getElementById(
+            'composition-terrain'
+        );
+
+    const rect =
+        terrain.getBoundingClientRect();
+
+    const x =
+        ((event.clientX - rect.left)
+        / rect.width) * 100;
+
+    const y =
+        ((event.clientY - rect.top)
+        / rect.height) * 100;
+
+    const match =
+        state.matches[
+            state.selectedMatchId
+        ];
+
+    match.composition[
+        draggedPlayerId
+    ] = {
+        x,
+        y
+    };
+
+    saveStateToFirebase();
+
+    draggedPlayerId = null;
+
+    renderMatchComposition();
+}
+
+function selectCompositionPlayer(playerId) {
+
+    selectedCompositionPlayer = playerId;
+
+    showToast(
+        "Cliquez sur une zone du terrain"
+    );
+
+}
+
+function moveSelectedPlayer(event) {
+
+    if (!selectedCompositionPlayer) {
+        return;
+    }
+
+    const terrain =
+        document.getElementById(
+            'composition-terrain'
+        );
+
+    if (!terrain) return;
+
+    const rect =
+        terrain.getBoundingClientRect();
+
+    const x =
+        ((event.clientX - rect.left)
+        / rect.width) * 100;
+
+    const y =
+        ((event.clientY - rect.top)
+        / rect.height) * 100;
+
+    const match =
+        state.matches[
+            state.selectedMatchId
+        ];
+
+    match.composition[
+        selectedCompositionPlayer
+    ] = {
+        x,
+        y
+    };
+
+    saveStateToFirebase();
+
+    selectedCompositionPlayer = null;
+
+    renderMatchComposition();
+
+    showToast(
+        "Joueur déplacé"
+    );
+}
+
+function addPlayerToComposition(playerId) {
+
+    const match =
+        state.matches[state.selectedMatchId];
+
+    match.composition[playerId] = {
+
+        x: 50,
+        y: 50
+
+    };
+
+    saveStateToFirebase();
+
+    renderMatchComposition();
+}
+
+function removePlayerFromComposition(playerId) {
+
+    const match =
+        state.matches[state.selectedMatchId];
+
+    delete match.composition[playerId];
+
+    saveStateToFirebase();
+
+    renderMatchComposition();
+}
+
+function applyFormation(system) {
+
+    if (
+        !state.selectedMatchId ||
+        !state.matches[state.selectedMatchId]
+    ) {
+        return;
+    }
+
+    const match =
+        state.matches[state.selectedMatchId];
+
+    if (!match.composition) {
+        match.composition = {};
+    }
+
+    const playerIds =
+        Object.keys(match.composition);
+
+    if (playerIds.length < 11) {
+
+        showToast(
+            "Placez au moins 11 joueurs sur le terrain"
+        );
+
+        return;
+    }
+
+    const formations = {
+
+        "433": [
+
+            {x:50,y:90}, // GB
+
+            {x:15,y:72},
+            {x:38,y:72},
+            {x:62,y:72},
+            {x:85,y:72},
+
+            {x:25,y:50},
+            {x:50,y:45},
+            {x:75,y:50},
+
+            {x:20,y:18},
+            {x:50,y:10},
+            {x:80,y:18}
+
+        ],
+
+        "442": [
+
+            {x:50,y:90},
+
+            {x:15,y:72},
+            {x:38,y:72},
+            {x:62,y:72},
+            {x:85,y:72},
+
+            {x:12,y:45},
+            {x:37,y:48},
+            {x:63,y:48},
+            {x:88,y:45},
+
+            {x:35,y:15},
+            {x:65,y:15}
+
+        ],
+
+        "352": [
+
+            {x:50,y:90},
+
+            {x:25,y:72},
+            {x:50,y:70},
+            {x:75,y:72},
+
+            {x:10,y:50},
+            {x:30,y:48},
+            {x:50,y:45},
+            {x:70,y:48},
+            {x:90,y:50},
+
+            {x:35,y:15},
+            {x:65,y:15}
+
+        ],
+
+        "4231": [
+
+            {x:50,y:90},
+
+            {x:15,y:72},
+            {x:38,y:72},
+            {x:62,y:72},
+            {x:85,y:72},
+
+            {x:35,y:55},
+            {x:65,y:55},
+
+            {x:15,y:30},
+            {x:50,y:25},
+            {x:85,y:30},
+
+            {x:50,y:10}
+
+        ]
+    };
+
+    const formation =
+        formations[system];
+
+    if (!formation) {
+        return;
+    }
+
+    playerIds
+        .slice(0, 11)
+        .forEach((playerId, index) => {
+
+            match.composition[playerId] = {
+
+                x: formation[index].x,
+                y: formation[index].y
+
+            };
+
+        });
+
+    saveStateToFirebase();
+
+    renderMatchComposition();
+
+    showToast(
+        `Système ${system} appliqué`
+    );
 }
