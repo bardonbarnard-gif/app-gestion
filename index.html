@@ -29,6 +29,36 @@
     <p id="pin-error" style="color: #EF4444; margin-top: 15px; font-size: 14px; display: none;">Code incorrect</p>
 </div>
 
+<div id="function-selector-screen"
+     class="fixed inset-0 bg-slate-900 z-[9998] hidden flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+
+        <div class="text-center mb-6">
+
+            <div class="text-4xl mb-3">
+                👤
+            </div>
+
+            <h2 class="text-xl font-bold text-slate-800">
+                Choisissez votre fonction
+            </h2>
+
+            <p class="text-sm text-slate-500 mt-2">
+                Plusieurs fonctions sont associées à ce compte.
+            </p>
+
+        </div>
+
+        <div id="function-selector-list"
+             class="space-y-3">
+
+        </div>
+
+    </div>
+
+</div>
+
     <header class="blue-gradient text-white sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-3 py-2 flex justify-between items-center">
             <div class="flex items-center space-x-3">
@@ -37,7 +67,7 @@
     <img
         src="rangueil HQ.png"
         alt="Logo Rangueil FC"
-        class="w-full h-full object-contain="w-full h-full object-contain">
+        class="w-full h-full object-contain">
 
 </div>
             </div>
@@ -620,20 +650,7 @@
 
         </div>
 
-        <div
-            id="admin-staff-card"
-            class="bg-white p-4 rounded-xl border border-slate-100 card-shadow">
-
-            <h3 class="font-bold text-slate-800 text-lg">
-                👥 Staff
-            </h3>
-
-            <p class="text-xs text-slate-500 mt-2">
-                Gestion des fonctions du club.
-            </p>
-
-        </div>
-
+        
         <div
     id="admin-teams-card"
     onclick="openAdminModule('teams')"
@@ -680,11 +697,7 @@
                         <h2 class="text-base font-bold text-slate-800">Gestion du Staff & Dirigeants</h2>
                         <p class="text-xs text-slate-500">Éducateurs, dirigeants, accompagnateurs et rôles officiels</p>
                     </div>
-                    <button
-    id="add-staff-btn"
-    onclick="openModalStaff()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center space-x-1 whitespace-nowrap">
-                        <i class="fa-solid fa-user-plus"></i><span>Ajouter un membre</span>
-                    </button>
+                   
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="staff-full-container"></div>
             </div>
@@ -710,77 +723,62 @@
                 <input type="hidden" id="admin-old-pin">
                 </div>
                 <div>
-                    <label class="block text-[11px] font-medium text-slate-600 mb-1">Nom / Prénom / Rôle descriptif</label>
-                    <input type="text" id="admin-name" placeholder="Ex: Thomas (Coach U13)" required class="w-full p-2 text-xs border rounded-md bg-white">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-medium text-slate-600 mb-1">Fonction / Rôle</label>
-                    <select id="admin-role" class="w-full p-2 text-xs border rounded-md bg-white" onchange="toggleTeamInput(this.value)">
-                        <option value="admin">Administrateur</option>
-                        <option value="dirigeant">Dirigeant (Global)</option>
-                        <option value="responsable">Responsable de Catégorie</option>
-                        <option value="coach">Coach (Principal / Adjoint)</option>
-                        <option value="public">Parents / Joueurs (Public)</option>
-                    </select>
-                </div>
-             <div id="team-input-group">
+                    <div class="grid grid-cols-2 gap-3">
 
-    <label class="block text-[11px] font-medium text-slate-600 mb-1">
-        Équipe(s)
-    </label>
+    <div>
+        <label class="block text-[11px] font-medium text-slate-600 mb-1">
+            Prénom
+        </label>
 
-    <select
-        id="admin-team-select"
-        class="team-select w-full p-2 text-xs border rounded-md bg-white mb-2">
-    </select>
+        <input
+            type="text"
+            id="admin-firstname"
+            placeholder="Thomas"
+            class="w-full p-2 text-xs border rounded-md bg-white">
+    </div>
 
-    <input
-        type="text"
-        id="admin-team"
-        placeholder="Ex: u13_1 (ou u13_1,u13_2)"
-        class="w-full p-2 text-xs border rounded-md bg-white">
+    <div>
+        <label class="block text-[11px] font-medium text-slate-600 mb-1">
+            Nom
+        </label>
 
-    <span class="text-[9px] text-slate-400 block mt-0.5">
-        Séparez par des virgules pour un responsable.
-    </span>
+        <input
+            type="text"
+            id="admin-lastname"
+            placeholder="MARTIN"
+            class="w-full p-2 text-xs border rounded-md bg-white">
+    </div>
 
 </div>
+         <div class="border-t pt-3 mt-3">
 
-<div>
+    <div class="flex justify-between items-center mb-3">
 
-    <label class="block text-[11px] font-medium text-slate-600 mb-1">
-        Fonction staff
-    </label>
+        <h4 class="font-bold text-slate-700 text-xs">
+            Fonctions
+        </h4>
 
-    <select
-        id="admin-staff-role"
-        class="w-full p-2 text-xs border rounded-md bg-white">
+        <button
+            type="button"
+            onclick="addFunctionBlock()"
+            class="bg-sky-600 text-white px-3 py-1 rounded-lg text-xs">
 
-        <option value="Éducateur / Entraîneur Principal">
-            Éducateur / Entraîneur Principal
-        </option>
+            ➕ Ajouter une fonction
 
-        <option value="Éducateur Adjoint">
-            Éducateur Adjoint
-        </option>
+        </button>
 
-        <option value="Responsable catégorie">
-            Responsable catégorie
-        </option>
+    
 
-        <option value="Dirigeant / Accompagnateur">
-            Dirigeant / Accompagnateur
-        </option>
+    </div>
 
-        <option value="Préparateur Physique">
-            Préparateur Physique
-        </option>
+    <div id="functions-container">
 
-    </select>
+    </div>
 
-</div>
+</div>      
 
-<div>
+
+
 
     <label class="block text-[11px] font-medium text-slate-600 mb-1">
         Licence
@@ -823,14 +821,11 @@
 </div>
 
                 <div class="flex justify-end pt-1">
-                    <button type="submit" class="px-3 py-1.5 bg-sky-600 text-white font-bold text-xs rounded-lg hover:bg-sky-700 shadow">Enregistrer l'équipe</button>
+                    <button type="submit" class="px-3 py-1.5 bg-sky-600 text-white font-bold text-xs rounded-lg hover:bg-sky-700 shadow">Enregistrer le compte</button>
                 </div>
             </form>
 
-            <div>
-                <h4 class="font-semibold text-xs text-slate-700 mb-2">Équipes enregistrées</h4>
-                <div id="admin-teams-list" class="space-y-2"></div>
-            </div>
+            
         </div>
 
     </div>
@@ -1033,69 +1028,7 @@
         </div>
     </div>
 
-   <div id="modal-staff" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white w-full max-w-md rounded-xl p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
-        <div class="flex justify-between items-center border-b pb-2">
-            <h3 class="font-bold text-slate-800 text-sm" id="modal-staff-title">Ajouter un Membre du Staff</h3>
-            <button onclick="toggleModal('modal-staff', false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <form id="form-staff" onsubmit="handleSaveStaff(event)" class="space-y-3 text-xs">
-            <input type="hidden" id="staff-id">
-            <div>
-                <label class="block text-slate-600 font-semibold mb-1">Nom & Prénom</label>
-                <input type="text" id="staff-name" required placeholder="Ex: MARTIN Thomas" class="w-full p-2 border border-slate-200 rounded-lg">
-            </div>
-            <div>
-                <label class="block text-slate-600 font-semibold mb-1">Numéro de Licence</label>
-                <input type="text" id="staff-licence" placeholder="Ex: 1234567890" class="w-full p-2 border border-slate-200 rounded-lg">
-            </div>
-            <div>
-                <label class="block text-slate-600 font-semibold mb-1">Rôle / Fonction</label>
-                <select id="staff-role" class="w-full p-2 border border-slate-200 rounded-lg">
-                    <option value="Éducateur / Entraîneur Principal">Éducateur / Entraîneur Principal</option>
-                    <option value="Éducateur Adjoint">Éducateur Adjoint</option>
-                    <option value="Dirigeant / Accompagnateur">Dirigeant / Accompagnateur</option>
-                    <option value="Dirigeant Référent Sécurité">Dirigeant Référent Sécurité</option>
-                    <option value="Préparateur Physique">Préparateur Physique</option>
-                    <option value="Entraîneur des Gardiens">Entraîneur des Gardiens</option>
-                    <option value="Responsable catégorie">Responsable catégorie</option>
-                </select>
-            </div>
-            <div>
-            
    
-    <label class="block text-slate-600 font-semibold mb-1">
-        Équipe / Périmètre
-    </label>
-
-    <div
-    id="staff-scope-container"
-    class="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50">
-</div>
-</div>
-
-<div>
-    <label class="block text-slate-600 font-semibold mb-1">
-        Téléphone
-    </label>
-
-    <input
-        type="tel"
-        id="staff-phone"
-        placeholder="Ex: 06 00 00 00 00"
-        class="w-full p-2 border border-slate-200 rounded-lg">
-</div>
-            <div>
-                <label class="block text-slate-600 font-semibold mb-1">Email</label>
-                <input type="email" id="staff-email" placeholder="Ex: email@example.com" class="w-full p-2 border border-slate-200 rounded-lg">
-            </div>
-            <div class="flex justify-end space-x-2 pt-2">
-                <button type="button" onclick="toggleModal('modal-staff', false)" class="px-3 py-2 bg-slate-100 text-slate-600 font-semibold rounded-lg">Annuler</button>
-                <button type="submit" class="px-4 py-2 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700">Enregistrer</button>
-            </div>
-        </form>
-    </div>
-</div> 
 
 
     <div id="modal-player" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
@@ -1302,7 +1235,36 @@
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-    <script src="js/app.js"></script>         
+    <script src="js/app.js"></script> 
+    
+    <template id="function-template">
+
+    <div class="function-block border rounded-lg p-3 mb-3 bg-slate-50">
+
+        <label class="block text-[11px] font-medium text-slate-600 mb-1">
+            Fonction
+        </label>
+
+        <select
+            class="account-function w-full p-2 text-xs border rounded-md bg-white">
+
+        </select>
+
+        <div class="mt-3">
+
+            <label class="block text-[11px] font-medium text-slate-600 mb-2">
+                Équipes ciblées
+            </label>
+
+            <div class="scope-container">
+
+            </div>
+
+        </div>
+
+    </div>
+
+</template>
     
 </body>
 </html>

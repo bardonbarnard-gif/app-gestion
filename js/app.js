@@ -2,14 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pinScreen = document.getElementById("pin-screen");
     const pinInput = document.getElementById("pin-input");
     const pinError = document.getElementById("pin-error");
-    const teamSelect = document.getElementById("admin-team-select");
-    const teamInput = document.getElementById("admin-team");
-
-    if (teamSelect && teamInput) {
-        teamSelect.addEventListener("change", () => {
-            teamInput.value = teamSelect.value;
-        });
-    }
+   
 
 
     /// Vérifier si l'utilisateur s'est déjà authentifié durant cette session
@@ -44,29 +37,160 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     if (snapshot.exists()) {
                         const userData = snapshot.val(); 
+                        console.log("PIN TROUVÉ :", enteredPin);
+console.log("USER DATA :", userData);
+console.log(
+    "NB FONCTIONS :",
+    (userData.functions || []).length
+);
                         userData.pin = enteredPin;
 
 window.currentUserPin = enteredPin;
                         // userData contient par exemple : { name: "Thomas", role: "admin", team: "U14" }
 
                         // On mémorise les infos utilisateur
-                        window.currentUserRole = userData.role; 
-                        window.currentUserName = userData.name;
-                        window.currentUserTeam = userData.team || 'all';
-                        
-                        sessionStorage.setItem("currentUserData", JSON.stringify(userData));
-                        sessionStorage.setItem("currentUserRole", userData.role);
-                        sessionStorage.setItem("isUnlocked", "true");
+                        window.currentUserName =
+    userData.name;
 
-                        // Animation de disparition de l'écran PIN (identique à votre code)
-                        if (pinScreen) {
-                            pinScreen.style.opacity = "0";
-                            pinScreen.style.transition = "opacity 0.3s ease";
-                            setTimeout(() => {
-                                pinScreen.remove();
-                                applyPermissions();
-                            }, 300);
-                        }
+if (
+    (userData.functions || []).length > 1
+) {
+
+    showFunctionSelector(
+        userData
+    );
+
+    return;
+
+}
+if (userData.role === "admin") {
+
+    window.currentUserRole =
+        "admin";
+
+    window.currentUserName =
+        userData.name;
+
+    window.currentUserTeam =
+        "all";
+
+    sessionStorage.setItem(
+        "currentUserData",
+        JSON.stringify(userData)
+    );
+
+    sessionStorage.setItem(
+        "currentUserRole",
+        "admin"
+    );
+
+    sessionStorage.setItem(
+        "isUnlocked",
+        "true"
+    );
+
+    if (pinScreen) {
+
+        pinScreen.style.opacity = "0";
+
+        pinScreen.style.transition =
+            "opacity 0.3s ease";
+
+        setTimeout(() => {
+
+            pinScreen.remove();
+
+            applyPermissions();
+
+        }, 300);
+
+    }
+
+    return;
+
+}
+
+const selectedFunction =
+    (userData.functions || [])[0];
+
+let role = "public";
+
+if (
+    selectedFunction?.functionName ===
+    "Responsable catégorie"
+) {
+    role = "responsable";
+}
+
+if (
+    selectedFunction?.functionName ===
+        "Éducateur principal" ||
+    selectedFunction?.functionName ===
+        "Éducateur adjoint"
+) {
+    role = "coach";
+}
+
+window.currentUserRole =
+    role;
+
+window.currentUserName =
+    userData.name;
+
+window.currentUserTeam =
+    (selectedFunction?.scopes || [])
+        .join(",");
+
+sessionStorage.setItem(
+    "currentUserData",
+    JSON.stringify({
+        ...userData,
+        role: role,
+        team: window.currentUserTeam
+    })
+);
+
+sessionStorage.setItem(
+    "currentUserRole",
+    role
+);
+
+sessionStorage.setItem(
+    "isUnlocked",
+    "true"
+);
+
+sessionStorage.setItem(
+    "currentUserData",
+    JSON.stringify(userData)
+);
+
+sessionStorage.setItem(
+    "currentUserRole",
+    userData.role
+);
+
+sessionStorage.setItem(
+    "isUnlocked",
+    "true"
+);
+
+if (pinScreen) {
+
+    pinScreen.style.opacity = "0";
+
+    pinScreen.style.transition =
+        "opacity 0.3s ease";
+
+    setTimeout(() => {
+
+        pinScreen.remove();
+
+        applyPermissions();
+
+    }, 300);
+
+}
                     } else {
                         // Code incorrect trouvé dans Firebase
                         if (pinError) pinError.style.display = "block";
@@ -197,17 +321,7 @@ if (
                 console.error("Erreur de synchronisation :", err);
             }
         });
-function canEditStaff(member) {
 
-    if (window.currentUserRole === "admin") {
-        return true;
-    }
-
-    return (
-        member.accountPin ===
-        window.currentUserPin
-    );
-}
 function saveStateToFirebase() {
 
     recalculateGlobalStats();
@@ -251,7 +365,7 @@ function saveStateToFirebase() {
             renderMatchDetail();
             renderMatchesResultsList();
             renderEntrainements();
-            renderStaff();
+            renderStaffV2();
             renderCalendar();
             
         }
@@ -3006,266 +3120,7 @@ state.selectedMatchId = matchId;
             setTimeout(() => toast.remove(), 3000);
         }
 
-        function renderStaff() {
-            const container = document.getElementById('staff-full-container');
-            if (!container) return;
-            if (!state.staff || state.staff.length === 0) {
-                container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs">Aucun membre du staff enregistré pour le moment. Clique sur "Ajouter un membre" pour commencer.</div>';
-                return;
-            }
-            const mergedStaff = {};
-
-state.staff.forEach(member => {
-
-    const key =
-        member.name.trim().toUpperCase();
-
-    if (!mergedStaff[key]) {
-
-        mergedStaff[key] = {
-
-            name: member.name,
-
-            licence: member.licence,
-            phone: member.phone,
-            email: member.email,
-
-            entries: []
-
-        };
-
-    }
-
-    const memberScopes =
-        Array.isArray(member.scope)
-            ? member.scope
-            : [member.scope];
-
-    mergedStaff[key].entries.push({
-
-        role:
-            member.staffRole || member.role,
-
-        scopes:
-            memberScopes
-
-    });
-
-});
-
-const staffList =
-    Object.values(mergedStaff);
-
-
-            container.innerHTML = staffList.map(member => `
-                <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 flex flex-col justify-between space-y-3">
-                    <div class="flex items-start justify-between">
-                        <div>
-                        <h3 class="font-extrabold text-slate-800 text-sm">${member.name}</h3>
-
-<div class="mt-2 space-y-2">
-
-    ${member.entries.map(entry => `
-
-        <div class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-2">
-
-            <div class="text-[11px] font-bold text-sky-700">
-                👔 ${entry.role}
-            </div>
-
-            <div class="text-[11px] text-slate-500 mt-1">
-
-                📍 ${entry.scopes.map(scope =>
-                    state.teams?.[scope]?.name || scope
-                ).join(' • ')}
-
-            </div>
-
-        </div>
-
-    `).join('')}
-
-</div>
-                        </div>
-                     ${canEditStaff(member) ? `
-<div class="flex space-x-1">
-
-    <button
-        onclick="editStaff('${member.id}')"
-        class="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs"
-        title="Modifier">
-        <i class="fa-solid fa-pen"></i>
-    </button>
-
-    ${
-        window.currentUserRole === 'admin'
-        ? `
-        <button
-            onclick="deleteStaff('${member.id}')"
-            class="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs"
-            title="Supprimer">
-            <i class="fa-solid fa-trash"></i>
-        </button>
-        `
-        : ''
-    }
-
-</div>
-` : ''}   
-                    </div>
-                    <div class="space-y-1.5 text-xs pt-2 border-t border-slate-100">
-                        <div class="flex items-center justify-between text-slate-600">
-                            <div class="flex items-center space-x-2">
-                                <i class="fa-solid fa-id-card text-sky-600 w-4"></i>
-                                <span>Licence : <strong>${member.licence || 'Non renseigné'}</strong></span>
-                            </div>
-                            ${member.licence ? `<button onclick="navigator.clipboard.writeText('${member.licence}'); showToast('Licence copiée !')" class="text-xs text-sky-600 hover:text-sky-800 p-1" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>` : ''}
-                        </div>
-                        <div class="flex items-center text-slate-600 space-x-2">
-                            <i class="fa-solid fa-phone text-sky-600 w-4"></i>
-                            <span>${member.phone || 'Non renseigné'}</span>
-                        </div>
-                        <div class="flex items-center text-slate-600 space-x-2">
-                            <i class="fa-solid fa-envelope text-sky-600 w-4"></i>
-                            <span class="truncate">${member.email || 'Non renseigné'}</span>
-                        </div>
-                    </div>
-                </div>`).join('');
-        }
-
-        function renderStaffScopes() {
-
-    const container = document.getElementById(
-        "staff-scope-container"
-    );
-
-    if (!container) return;
-
-    container.innerHTML = Object.entries(state.teams)
-        .map(([key, team]) => {
-
-            return `
-                <label class="flex items-center gap-2 text-sm">
-                    <input
-                        type="checkbox"
-                        value="${key}"
-                        class="staff-scope-checkbox">
-
-                    <span>
-                        ${team.name}
-                    </span>
-                </label>
-            `;
-        })
-        .join('');
-}
-
-        function openModalStaff(staffId = null) {
-            renderStaffScopes();
-            document.getElementById('form-staff').reset();
-            document.getElementById('staff-id').value = '';
-            document.getElementById('modal-staff-title').innerText = "Ajouter un Membre du Staff";
-            if (staffId) {
-                const member = state.staff.find(s => s.id === staffId);
-                if (member) {
-                    document.getElementById('staff-id').value = member.id;
-                    document.getElementById('staff-name').value = member.name;
-                    document.getElementById('staff-role').value = member.role;
-                    const scopes = Array.isArray(member.scope)
-    ? member.scope
-    : [member.scope];
-
-document
-    .querySelectorAll('.staff-scope-checkbox')
-    .forEach(cb => {
-        cb.checked = scopes.includes(cb.value);
-    });
-                    document.getElementById('staff-licence').value = member.licence || '';
-                    document.getElementById('staff-phone').value = member.phone || '';
-                    document.getElementById('staff-email').value = member.email || '';
-                    document.getElementById('modal-staff-title').innerText = "Modifier le Membre du Staff";
-                }
-            }
-            toggleModal('modal-staff', true);
-        }
-
-        function handleSaveStaff(event) {
-            event.preventDefault();
-            const staffId =
-    document.getElementById("staff-id").value;
-
-if (staffId) {
-
-    const member =
-        state.staff.find(
-            s => s.id === staffId
-        );
-
-    if (
-        member &&
-        !canEditStaff(member)
-    ) {
-        showToast(
-            "Modification interdite",
-            "error"
-        );
-        return;
-    }
-
-} else {
-
-    if (
-        window.currentUserRole !==
-        "admin"
-    ) {
-        showToast(
-            "Seul l'administrateur peut créer un membre du staff",
-            "error"
-        );
-        return;
-    }
-
-}
-            const idInput = document.getElementById('staff-id').value;
-            const staffData = {
-                id: idInput || 'STF_' + Date.now(),
-                name: document.getElementById('staff-name').value.trim(),
-                role: document.getElementById('staff-role').value,
-               scope: Array.from(
-    document.querySelectorAll('.staff-scope-checkbox:checked')
-).map(cb => cb.value), 
-                licence: document.getElementById('staff-licence').value.trim(),
-                phone: document.getElementById('staff-phone').value.trim(),
-                email: document.getElementById('staff-email').value.trim()
-            };
-            if (idInput) {
-                const index = state.staff.findIndex(s => s.id === idInput);
-                if (index !== -1) state.staff[index] = staffData;
-            } else {
-                state.staff.push(staffData);
-            }
-            saveStateToFirebase();
-            toggleModal('modal-staff', false);
-            renderStaff();
-        }
-
-        function deleteStaff(staffId) {
-            if (confirm("Supprimer ce membre du staff ?")) {
-                state.staff = state.staff.filter(s => s.id !== staffId);
-                saveStateToFirebase();
-                renderStaff();
-            }
-        }
-
-        function editStaff(staffId) {
-            openModalStaff(staffId);
-        }
-
-
-// --- INITIALISATION DES ÉVÉNEMENTS ---
-updateMeetingPreview();
-updateDeadlinePreview();
-
+        
 
 
 function updateDeadlinePreview() {
@@ -3444,7 +3299,15 @@ function renderTeamFilters() {
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
 function applyPermissions() {
 
-    
+   console.log(
+    "ROLE CONNECTE :",
+    window.currentUserRole
+);
+
+console.log(
+    "TEAM CONNECTEE :",
+    window.currentUserTeam
+); 
 
 
     const role = window.currentUserRole || 'public';
@@ -3471,33 +3334,53 @@ function applyPermissions() {
     }
 
     // --- RESTRICTIONS SELON LES RÔLES ---
-    if (role === 'public' || role === 'dirigeant') {
-        document.querySelectorAll('.admin-only, .adjoint-only, .coach-only').forEach(el => {
+   if (
+    role === 'public' ||
+    role === 'dirigeant'
+) {
+
+    document
+        .querySelectorAll(
+            '.admin-only, .adjoint-only, .coach-only'
+        )
+        .forEach(el => {
             el.style.display = 'none';
         });
-        document.querySelectorAll('select, input, button.status-btn').forEach(el => {
-            if (!el.classList.contains('allow-public')) {
+
+    document
+        .querySelectorAll(
+            'select, input, button.status-btn'
+        )
+        .forEach(el => {
+
+            if (
+                !el.classList.contains(
+                    'allow-public'
+                )
+            ) {
                 el.disabled = true;
             }
+
         });
-    } else if (role === 'coach') {
-    document.querySelectorAll('.admin-only').forEach(el => {
-        el.style.display = 'none';
-    });
+
+}
+else if (
+    role === 'coach' ||
+    role === 'responsable'
+) {
+
+    document
+        .querySelectorAll(
+            '.admin-only'
+        )
+        .forEach(el => {
+            el.style.display = 'none';
+        });
+
 }
 
 // --- BOUTON AJOUT STAFF ---
-const addStaffBtn =
-    document.getElementById('add-staff-btn');
 
-if (addStaffBtn) {
-
-    addStaffBtn.style.display =
-        window.currentUserRole === 'admin'
-            ? 'flex'
-            : 'none';
-
-}
 
 // --- AFFICHAGE DU BOUTON ADMIN ---
 if (typeof checkAdminAccessUI === "function") {
@@ -3533,17 +3416,52 @@ function checkAdminAccessUI() {
 }
 
 // Ouvrir ou fermer la modale admin
-window.toggleAdminModal = function(show) {
-    const modal = document.getElementById("admin-access-modal");
-    if (modal) {
-        if (show) {
-            modal.classList.remove("hidden");
-            loadCoachesFromFirebase();
-        } else {
-            modal.classList.add("hidden");
-        }
+
+    window.toggleAdminModal = function(show) {
+
+    const modal =
+        document.getElementById(
+            "admin-access-modal"
+        );
+
+    if (!modal) return;
+
+    if (show) {
+        modal.classList.remove("hidden");
+    } else {
+        modal.classList.add("hidden");
     }
+
+};
+
+function openNewAccountForm() {
+
+    const form =
+        document.getElementById(
+            "coach-form"
+        );
+
+    if (form) {
+        form.reset();
+    }
+
+    document.getElementById(
+        "admin-old-pin"
+    ).value = "";
+
+    const functionsContainer =
+        document.getElementById(
+            "functions-container"
+        );
+
+    if (functionsContainer) {
+        functionsContainer.innerHTML = "";
+    }
+
+    toggleAdminModal(true);
+
 }
+
 
 // Gérer l'affichage du champ équipe selon le rôle sélectionné
 window.toggleTeamInput = function(role) {
@@ -3568,11 +3486,24 @@ const oldPin =
     document.getElementById("admin-old-pin").value.trim();
    
 
-const name = document.getElementById("admin-name").value.trim();
-const role = document.getElementById("admin-role").value;
-const team = document.getElementById("admin-team").value.trim();
-const staffRole =
-    document.getElementById("admin-staff-role").value;
+const firstname =
+    document.getElementById(
+        "admin-firstname"
+    ).value.trim();
+
+const lastname =
+    document.getElementById(
+        "admin-lastname"
+    ).value.trim();
+
+const fullname =
+    firstname +
+    " " +
+    lastname.toUpperCase();
+
+const functions =
+    collectFunctions();
+
 
 const licence =
     document.getElementById("admin-licence").value.trim();
@@ -3602,68 +3533,37 @@ try {
    // Création du compte d'accès
 await firebase.database()
     .ref("rangueil_data/access/" + pin)
-    .set({
-        name: name,
-        role: role,
+   .set({
 
-        team: (
-            role === "admin" ||
-            role === "dirigeant" ||
-            role === "public"
-        )
-            ? "all"
-            : (team || "all"),
+    name: fullname,
 
-        staffRole: staffRole,
-        licence: licence,
-        phone: phone,
-        email: email
-    });
+    firstname: firstname,
+
+    lastname: lastname,
+
+    functions: functions,
+
+    licence: licence,
+
+    phone: phone,
+
+    email: email
+
+});
 
 
 // Création automatique de la fiche staff
-if (
-    role === "coach" ||
-    role === "responsable" ||
-    role === "dirigeant"
-) {
 
-    const staffId = "STF_" + pin;
 
-    const staffRef =
-        firebase.database()
-            .ref("rangueil_data/staff/" + staffId);
+                alert(
+    `Compte "${fullname}" enregistré avec succès !`
+);
 
-    const existingStaff =
-        await staffRef.once("value");
+coachForm.reset();
 
-    if (!existingStaff.exists()) {
 
-        await staffRef.set({
-            id: staffId,
-            accountPin: pin,
-            name: name,
-            role:
-                role === "coach"
-                    ? "Éducateur / Entraîneur Principal"
-                    : role === "responsable"
-                    ? "Responsable catégorie"
-                    : "Dirigeant / Accompagnateur",
-            scope: team
-                ? team.split(",").map(t => t.trim())
-                : [],
-            licence: "",
-            phone: "",
-            email: ""
-        });
 
-    }
-}
-
-                alert(`Accès pour "${name}" enregistré avec succès !`);
-                coachForm.reset();
-                toggleTeamInput(document.getElementById("admin-role").value);
-                loadCoachesFromFirebase();
+renderAdminAccounts();
             } catch (error) {
                 console.error("Erreur lors de l'enregistrement :", error);
                 alert("Erreur lors de l'enregistrement en base.");
@@ -3672,58 +3572,7 @@ if (
     }
 });
 
-// Charger la liste des comptes depuis Firebase pour les afficher dans la modale
-async function loadCoachesFromFirebase() {
-    const container = document.getElementById("coaches-list-container");
-    if (!container) return;
 
-    container.innerHTML = "<p class='text-xs text-slate-400'>Chargement des comptes...</p>";
-
-    try {
-        const snapshot = await firebase.database().ref("rangueil_data/access").once("value");
-        if (snapshot.exists()) {
-            container.innerHTML = "";
-            snapshot.forEach((childSnapshot) => {
-                const pin = childSnapshot.key;
-                const data = childSnapshot.val();
-
-                const item = document.createElement("div");
-                item.className = "flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-md text-xs";
-                item.innerHTML = `
-                    <div>
-                        <span class="font-bold text-slate-800">${data.name}</span> 
-                        <span class="bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded ml-1 text-[10px] font-semibold">${data.role}</span>
-                        <span class="text-slate-500 ml-1">(${data.team})</span>
-                        <div class="text-slate-400 font-mono text-[10px] mt-0.5">PIN : ${pin}</div>
-                    </div>
-                    <div class="flex items-center gap-2">
-
-    <button
-        onclick="editCoachAccount('${pin}')"
-        class="text-sky-500 hover:text-sky-700 p-1.5 cursor-pointer">
-
-        <i class="fa-solid fa-pen"></i>
-    </button>
-
-    <button
-        onclick="deleteCoachAccount('${pin}')"
-        class="text-red-500 hover:text-red-700 p-1.5 cursor-pointer">
-
-        <i class="fa-solid fa-trash"></i>
-    </button>
-
-
-                `;
-                container.appendChild(item);
-            });
-        } else {
-            container.innerHTML = "<p class='text-xs text-slate-400'>Aucun compte trouvé.</p>";
-        }
-    } catch (error) {
-        console.error("Erreur de chargement :", error);
-        container.innerHTML = "<p class='text-xs text-red-500'>Erreur de chargement.</p>";
-    }
-}
 
 // Supprimer un compte de Firebase
 window.editCoachAccount = async function(pin) {
@@ -3740,97 +3589,53 @@ window.editCoachAccount = async function(pin) {
         const data = snapshot.val();
 
         document.getElementById("admin-pin").value = pin;
+
         document.getElementById("admin-old-pin").value = pin;
-  
-        document.getElementById("admin-name").value = data.name || "";
-        document.getElementById("admin-role").value = data.role || "";
-        toggleTeamInput(data.role);
-        document.getElementById("admin-team").value = data.team || "";
-        const teamSelect =
-    document.getElementById("admin-team-select");
 
-if (teamSelect) {
-    teamSelect.value = data.team || "";
+        document.getElementById("admin-firstname").value =
+            data.firstname || "";
 
- console.log(
-    "TEAM DATA :", data.team
-);
+        document.getElementById("admin-lastname").value =
+            data.lastname || "";
 
-console.log(
-    "TEAM SELECT VALUE :", teamSelect.value
-);   
+        document.getElementById("admin-licence").value =
+            data.licence || "";
+
+        document.getElementById("admin-phone").value =
+            data.phone || "";
+
+        document.getElementById("admin-email").value =
+            data.email || "";
+
+        const container =
+    document.getElementById(
+        "functions-container"
+    );
+
+if (container) {
+    container.innerHTML = "";
 }
-        document.getElementById("admin-staff-role").value =
-    data.staffRole || "Dirigeant / Accompagnateur";
 
-document.getElementById("admin-licence").value =
-    data.licence || "";
+(data.functions || [])
+    .forEach(f => {
 
-document.getElementById("admin-phone").value =
-    data.phone || "";
+        addFunctionBlockWithData(
+            f
+        );
 
-document.getElementById("admin-email").value =
-    data.email || "";
+    });
 
-toggleAdminModal(true);
+        toggleAdminModal(true);
 
     } catch (error) {
 
         console.error(error);
-        alert("Impossible de charger ce compte");
+
+        alert(
+            "Impossible de charger ce compte"
+        );
 
     }
-}
-window.deleteCoachAccount = async function(pin) {
-
-    if (
-        confirm(
-            `Voulez-vous vraiment supprimer l'accès associé au PIN ${pin} ?`
-        )
-    ) {
-
-        try {
-
-            // Suppression du compte
-            await firebase.database()
-                .ref("rangueil_data/access/" + pin)
-                .remove();
-
-            // Suppression automatique de la fiche staff liée
-            const staffSnapshot = await firebase.database()
-    .ref("rangueil_data/staff")
-    .once("value");
-
-staffSnapshot.forEach(child => {
-
-    const staff = child.val();
-
-    if (staff.accountPin === pin) {
-        child.ref.remove();
-    }
-
-});
-
-            loadCoachesFromFirebase();
-
-            showToast(
-                "Compte et fiche staff supprimés"
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Erreur lors de la suppression :",
-                error
-            );
-
-            alert(
-                "Impossible de supprimer ce compte."
-            );
-        }
-
-    }
-
 };
 
 // 1. Enregistrer ou créer une équipe dans Firebase
@@ -3857,32 +3662,12 @@ function handleSaveTeam(event) {
 
 // 2. Afficher la liste des équipes dans l'admin et mettre à jour l'application
 function renderAdminTeams(teamsData) {
-    const container = document.getElementById('admin-teams-list');
-    if (!container) return;
+    
 
     state.teams = teamsData || {};
     renderTeamFilters();
     renderAll();
-    const keys = Object.keys(state.teams);
-
-    if (keys.length === 0) {
-        container.innerHTML = `<div class="p-3 text-center text-slate-400 text-xs bg-slate-50 rounded-lg">Aucune équipe enregistrée.</div>`;
-        return;
-    }
-
-    container.innerHTML = keys.map(tKey => {
-        const team = state.teams[tKey];
-        return `
-            <div class="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                <div>
-                    <span class="font-bold uppercase text-slate-800">${tKey}</span> : <span class="text-slate-600">${team.name}</span>
-                </div>
-                <button type="button" onclick="deleteTeam('${tKey}')" class="text-red-500 hover:text-red-700 p-1"><i class="fa-solid fa-trash"></i></button>
-            </div>
-        `;
-    }).join('');
-
-    // Mettre à jour automatiquement tous les menus déroulants d'équipes du site
+    
     updateAllTeamDropdowns();
 }
 
@@ -5096,91 +4881,182 @@ function getTeamBadge(event) {
         .join(' ');
 
 }
-async function regenerateStaffFromAccess() {
 
-    if (
-        !confirm(
-            "Le staff actuel sera supprimé puis recréé depuis les comptes d'accès.\n\nContinuer ?"
-        )
-    ) {
+function addFunctionBlock() {
+
+    const template =
+        document.getElementById(
+            "function-template"
+        );
+
+    const container =
+        document.getElementById(
+            "functions-container"
+        );
+
+    if (!template || !container) {
         return;
     }
 
-    try {
+    const clone =
+        template.content.cloneNode(true);
 
-        const accessSnapshot =
-            await firebase.database()
-                .ref("rangueil_data/access")
-                .once("value");
+    const block =
+        clone.querySelector(
+            ".function-block"
+        );
 
-        const accessData =
-            accessSnapshot.val() || {};
+    const select =
+        clone.querySelector(
+            ".account-function"
+        );
 
-        const regeneratedStaff = {};
+    const scopeContainer =
+        clone.querySelector(
+            ".scope-container"
+        );
 
-        Object.entries(accessData)
-            .forEach(([pin, user]) => {
+    const functions = [
+        "Président",
+        "Vice-président",
+        "Trésorier",
+        "Secrétaire",
+        "Responsable catégorie",
+        "Éducateur principal",
+        "Éducateur adjoint",
+        "Parent"
+    ];
 
-                if (
-                    user.role === "admin" ||
-                    user.role === "public"
-                ) {
-                    return;
-                }
+    select.innerHTML =
+        functions.map(f =>
+            `<option value="${f}">
+                ${f}
+            </option>`
+        ).join('');
 
-                const staffId =
-                    "STF_" + pin;
+    Object.entries(state.teams || {})
+        .forEach(([key, team]) => {
 
-                regeneratedStaff[staffId] = {
+            scopeContainer.innerHTML += `
+                <label
+                    class="flex items-center gap-2 text-xs mb-1">
 
-                    id: staffId,
+                    <input
+                        type="checkbox"
+                        class="scope-checkbox"
+                        value="${key}">
 
-                    accountPin: pin,
+                    ${team.name}
 
-                    name: user.name || "",
+                </label>
+            `;
 
-                    role:
-                        user.staffRole ||
-                        "Dirigeant / Accompagnateur",
+        });
 
-                    scope:
-                        user.team
-                            ? user.team
-                                .split(",")
-                                .map(t => t.trim())
-                            : [],
+    block.insertAdjacentHTML(
+        "beforeend",
+        `
+        <div class="mt-3 text-right">
 
-                    licence:
-                        user.licence || "",
+            <button
+                type="button"
+                class="text-red-600 text-xs font-bold remove-function-btn">
 
-                    phone:
-                        user.phone || "",
+                🗑 Supprimer
 
-                    email:
-                        user.email || ""
+            </button>
 
-                };
+        </div>
+        `
+    );
+
+    block
+        .querySelector(
+            ".remove-function-btn"
+        )
+        .addEventListener(
+            "click",
+            () => block.remove()
+        );
+
+    container.appendChild(block);
+
+}
+
+function addFunctionBlockWithData(functionData) {
+
+    addFunctionBlock();
+
+    const blocks =
+        document.querySelectorAll(
+            ".function-block"
+        );
+
+    const block =
+        blocks[blocks.length - 1];
+
+    if (!block) return;
+
+    const select =
+        block.querySelector(
+            ".account-function"
+        );
+
+    if (select) {
+        select.value =
+            functionData.functionName || "";
+    }
+
+    const scopes =
+        functionData.scopes || [];
+
+    block
+        .querySelectorAll(
+            ".scope-checkbox"
+        )
+        .forEach(cb => {
+
+            cb.checked =
+                scopes.includes(
+                    cb.value
+                );
+
+        });
+
+}
+
+function collectFunctions() {
+
+    const functions = [];
+
+    document
+        .querySelectorAll('.function-block')
+        .forEach(block => {
+
+            const functionName =
+                block.querySelector(
+                    '.account-function'
+                )?.value || '';
+
+            const scopes = [];
+
+            block
+                .querySelectorAll(
+                    '.scope-checkbox:checked'
+                )
+                .forEach(cb => {
+                    scopes.push(cb.value);
+                });
+
+            functions.push({
+                functionName,
+                scopes
             });
 
-        await firebase.database()
-            .ref("rangueil_data/staff")
-            .set(regeneratedStaff);
+        });
 
-        showToast(
-            "✅ Staff régénéré"
-        );
+    return functions;
 
-        renderStaff();
-
-    } catch(error) {
-
-        console.error(error);
-
-        showToast(
-            "❌ Erreur de régénération",
-            "error"
-        );
-    }
 }
 
 
@@ -5327,14 +5203,12 @@ async function renderAdminAccounts() {
             </h2>
 
             <button
-    onclick="toggleAdminModal(true)"
-    class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
+                onclick="openNewAccountForm()"
+                class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
 
-    ➕ Nouveau compte
+                ➕ Nouveau compte
 
-</button>
-
-
+            </button>
 
             <button
                 onclick="closeAdminModule()"
@@ -5351,7 +5225,7 @@ async function renderAdminAccounts() {
     Object.entries(accounts).forEach(
         ([pin, user]) => {
 
-      html += `
+            html += `
 
 <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3">
 
@@ -5363,51 +5237,63 @@ async function renderAdminAccounts() {
                 ${user.name || ""}
             </div>
 
-            <div class="text-xs text-slate-500">
-    👔 ${user.staffRole || user.role || ""}
-</div>
+            <div class="text-xs text-slate-500 mt-2">
 
-            
+                ${
+    (user.functions || [])
+        .map(f => {
 
-            <div class="text-xs text-slate-500">
-                👔 ${user.staffRole || ""}
-            </div>
+            const scopes =
+                (f.scopes || [])
+                .map(scope =>
+                    state.teams?.[scope]?.name || scope
+                )
+                .join(", ");
 
-            <div class="text-xs text-slate-500">
-                📍 ${user.team || ""}
+            return `
+                👔 ${f.functionName}
+                ${scopes ? `<br><span class="ml-6 text-slate-400">📍 ${scopes}</span>` : ""}
+            `;
+
+        })
+        .join("<br><br>")
+}
+
             </div>
 
         </div>
 
         <div class="flex gap-2 mt-3">
 
-    <button
-        onclick="editCoachAccount('${pin}')"
-        class="bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-1 rounded-lg text-xs font-bold">
+            <button
+                onclick="editCoachAccount('${pin}')"
+                class="bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-1 rounded-lg text-xs font-bold">
 
-        ✏️ Modifier
+                ✏️ Modifier
 
-    </button>
+            </button>
 
-    <button
-        onclick="deleteCoachAccount('${pin}')"
-        class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded-lg text-xs font-bold">
+            <button
+                onclick="deleteCoachAccount('${pin}')"
+                class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded-lg text-xs font-bold">
 
-        🗑️ Supprimer
+                🗑️ Supprimer
 
-    </button>
+            </button>
 
-</div>
+        </div>
 
     </div>
 
 </div>
 
-`;      
+            `;
+
         }
     );
 
     container.innerHTML = html;
+
 }
 
 function closeAdminModule() {
@@ -5472,4 +5358,577 @@ function editTeam(teamId) {
     showToast(
         "✅ Équipe modifiée"
     );
+}
+
+function showFunctionSelector(userData) {
+
+    console.log(
+        "AFFICHAGE SELECTEUR",
+        userData.name
+    );
+
+    const screen =
+        document.getElementById(
+            "function-selector-screen"
+        );
+
+    const list =
+        document.getElementById(
+            "function-selector-list"
+        );
+
+    const pinScreen =
+        document.getElementById(
+            "pin-screen"
+        );
+
+    if (pinScreen) {
+        pinScreen.style.display = "none";
+    }
+
+    if (!screen || !list) return;
+
+    list.innerHTML = "";
+
+    (userData.functions || [])
+    .forEach((func, index) => {
+
+            const scopes =
+                (func.scopes || [])
+                .map(scope =>
+                    state.teams?.[scope]?.name ||
+                    scope
+                )
+                .join(", ");
+
+            list.innerHTML += `
+
+                <button
+                    type="button"
+                    class="w-full text-left border rounded-xl p-4 hover:bg-sky-50 transition"
+                    onclick="selectFunction('${userData.pin}', ${index})"
+
+                    <div class="font-bold text-slate-800">
+                        👔 ${func.functionName}
+                    </div>
+
+                    ${
+                        scopes
+                            ? `<div class="text-xs text-slate-500 mt-1">
+                                   📍 ${scopes}
+                               </div>`
+                            : `<div class="text-xs text-slate-500 mt-1">
+                                   🌍 Accès global
+                               </div>`
+                    }
+
+                </button>
+
+            `;
+
+        });
+
+        console.log(
+    "OUVERTURE ECRAN"
+);
+
+    screen.classList.remove("hidden");
+
+}
+
+function hideFunctionSelector() {
+
+    document
+        .getElementById(
+            "function-selector-screen"
+        )
+        ?.classList.add("hidden");
+
+}
+
+window.selectFunction = function (
+    pin,
+    functionIndex
+) {
+
+    firebase.database()
+        .ref("rangueil_data/access/" + pin)
+        .once("value")
+        .then(snapshot => {
+
+            if (!snapshot.exists()) {
+                return;
+            }
+
+            const userData =
+                snapshot.val();
+if (userData.role === "admin") {
+
+    window.currentUserRole = "admin";
+
+    window.currentUserName =
+        userData.name;
+
+    window.currentUserTeam = "all";
+
+    sessionStorage.setItem(
+        "currentUserData",
+        JSON.stringify(userData)
+    );
+
+    sessionStorage.setItem(
+        "currentUserRole",
+        "admin"
+    );
+
+    sessionStorage.setItem(
+        "isUnlocked",
+        "true"
+    );
+
+    if (pinScreen) {
+
+        pinScreen.style.opacity = "0";
+
+        pinScreen.style.transition =
+            "opacity 0.3s ease";
+
+        setTimeout(() => {
+
+            pinScreen.remove();
+
+            applyPermissions();
+
+        }, 300);
+
+    }
+
+    return;
+
+}
+            const selectedFunction =
+    (userData.functions || [])
+    [functionIndex];
+
+            if (!selectedFunction) {
+                return;
+            }
+
+            let role = "public";
+
+            if (
+    selectedFunction.functionName ===
+    "Responsable catégorie"
+)
+ {
+                role = "responsable";
+            }
+
+            if (
+    selectedFunction.functionName ===
+        "Éducateur principal" ||
+    selectedFunction.functionName ===
+        "Éducateur adjoint"
+) {
+                role = "coach";
+            }
+
+            window.currentUserPin =
+                pin;
+
+            window.currentUserRole =
+                role;
+
+            window.currentUserName =
+                userData.name;
+
+            window.currentUserTeam =
+                (selectedFunction.scopes || [])
+                    .join(",");
+
+            sessionStorage.setItem(
+                "currentUserData",
+                JSON.stringify({
+                    ...userData,
+                    role: role,
+                    team: window.currentUserTeam
+                })
+            );
+
+            sessionStorage.setItem(
+                "currentUserRole",
+                role
+            );
+
+            sessionStorage.setItem(
+                "isUnlocked",
+                "true"
+            );
+
+            hideFunctionSelector();
+
+            const pinScreen =
+                document.getElementById(
+                    "pin-screen"
+                );
+
+            if (pinScreen) {
+
+                pinScreen.style.opacity =
+                    "0";
+
+                setTimeout(() => {
+
+                    pinScreen.remove();
+
+                    applyPermissions();
+console.log(
+    "ROLE CONNECTE :",
+    window.currentUserRole
+);
+
+console.log(
+    "TEAM CONNECTEE :",
+    window.currentUserTeam
+);
+                }, 300);
+
+            }
+
+        });
+
+};
+
+function buildStaffFromAccounts(accounts) {
+
+    const technicalFunctions = [
+        "Administrateur système",
+        "Administrateur adjoint"
+    ];
+
+    const staff = [];
+
+    Object.values(accounts || {})
+        .forEach(user => {
+
+            (user.functions || [])
+                .forEach(func => {
+
+                    if (
+                        technicalFunctions.includes(
+                            func.functionName
+                        )
+                    ) {
+                        return;
+                    }
+
+                    staff.push({
+                        name: user.name,
+                        licence: user.licence || "",
+                        functionName:
+                            func.functionName,
+                        scopes:
+                            func.scopes || []
+                    });
+
+                });
+
+        });
+
+    return staff;
+
+}
+
+function getPoleFromTeam(teamKey) {
+
+    const teamName =
+        state.teams?.[teamKey]?.name || "";
+
+    const match =
+        teamName.match(/U(\d+)/i);
+
+    if (match) {
+
+        const age =
+            parseInt(match[1]);
+
+        if (age >= 6 && age <= 11) {
+            return "Académie";
+        }
+
+        if (age >= 12 && age <= 15) {
+            return "Pré-Formation";
+        }
+
+        if (age >= 16 && age <= 20) {
+            return "Formation";
+        }
+
+    }
+
+    return "Seniors";
+
+}
+async function renderStaffV2() {
+
+    const container =
+        document.getElementById(
+            "staff-full-container"
+        );
+
+    if (!container) return;
+
+    const snapshot =
+        await firebase.database()
+            .ref("rangueil_data/access")
+            .once("value");
+
+    const accounts =
+        snapshot.val() || {};
+
+    const staff =
+        buildStaffFromAccounts(
+            accounts
+        );
+
+        const direction = [];
+
+const categoryManagers = [];
+
+const teamGroups = {};
+
+const poleGroups = {
+    "Académie": {},
+    "Pré-Formation": {},
+    "Formation": {},
+    "Seniors": {}
+};
+
+    container.innerHTML = "";
+
+    staff.forEach(member => {
+
+    if (
+        [
+            "Président",
+            "Vice-président",
+            "Trésorier",
+            "Secrétaire"
+        ].includes(member.functionName)
+    ) {
+
+        direction.push(member);
+
+        return;
+
+    }
+
+    if (
+        member.functionName ===
+        "Responsable catégorie"
+    ) {
+
+        categoryManagers.push(member);
+
+        return;
+
+    }
+
+    member.scopes.forEach(scope => {
+
+       const pole =
+    getPoleFromTeam(scope);
+
+if (!poleGroups[pole][scope]) {
+    poleGroups[pole][scope] = [];
+}
+
+poleGroups[pole][scope].push(member);
+
+    });
+
+});
+
+container.innerHTML += `
+
+<div class="col-span-full">
+
+    <h2 class="text-xl font-bold mb-4">
+
+        👔 Direction
+
+    </h2>
+
+</div>
+
+`;
+
+direction.forEach(member => {
+
+    container.innerHTML += `
+
+    <div class="bg-white p-4 rounded-xl border">
+
+        <div class="font-bold">
+
+            ${member.name}
+
+        </div>
+
+        <div class="text-sky-700 mt-1">
+
+            👔 ${member.functionName}
+
+        </div>
+
+    </div>
+
+    `;
+
+});
+
+container.innerHTML += `
+
+<div class="col-span-full mt-6">
+
+    <h2 class="text-xl font-bold mb-4">
+
+        📋 Responsables catégories
+
+    </h2>
+
+</div>
+
+`;
+
+categoryManagers.forEach(member => {
+
+    const scopes =
+        member.scopes
+            .map(scope =>
+                state.teams?.[scope]?.name
+                || scope
+            )
+            .join(", ");
+
+    container.innerHTML += `
+
+    <div class="bg-white p-4 rounded-xl border">
+
+        <div class="font-bold text-slate-800">
+
+            ${member.name}
+
+        </div>
+
+        <div class="text-sm text-sky-700 mt-1">
+
+            👔 Responsable catégorie
+
+        </div>
+
+        <div class="text-xs text-slate-500 mt-1">
+
+            📍 ${scopes}
+
+        </div>
+
+    </div>
+
+    `;
+
+});
+
+
+
+Object.entries(poleGroups)
+.forEach(([poleName, teams]) => {
+
+    container.innerHTML += `
+
+    <div class="col-span-full mt-6">
+
+        <details class="bg-slate-100 rounded-xl overflow-hidden">
+
+            <summary
+                class="cursor-pointer p-4 font-bold text-slate-900">
+
+                ⚽ ${poleName}
+
+            </summary>
+
+            <div class="p-4 space-y-4">
+
+    `;
+
+    Object.entries(teams)
+    .forEach(([teamKey, members]) => {
+
+        const teamName =
+            state.teams?.[teamKey]?.name
+            || teamKey;
+
+        container.innerHTML += `
+
+        <details class="bg-white border rounded-xl overflow-hidden">
+
+            <summary
+                class="cursor-pointer p-3 font-semibold text-slate-800">
+
+                ⚽ ${teamName}
+                (${members.length})
+
+            </summary>
+
+            <div class="p-4 border-t grid gap-3">
+
+        `;
+
+        members.forEach(member => {
+
+            container.innerHTML += `
+
+            <div class="bg-slate-50 p-3 rounded-lg">
+
+                <div class="font-bold text-slate-800">
+
+                    ${member.name}
+
+                </div>
+
+                <div class="text-sm text-sky-700">
+
+                    👔 ${member.functionName}
+
+                </div>
+
+            </div>
+
+            `;
+
+        });
+
+        container.innerHTML += `
+
+            </div>
+
+        </details>
+
+        `;
+
+    });
+
+ 
+    container.innerHTML += `
+
+            </div>
+
+        </details>
+
+    </div>
+
+    `;
+
+});
+
 }
