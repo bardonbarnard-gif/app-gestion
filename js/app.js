@@ -117,6 +117,13 @@ let role = "public";
 
 if (
     selectedFunction?.functionName ===
+    "Administrateur système"
+) {
+    role = "admin";
+}
+
+if (
+    selectedFunction?.functionName ===
     "Responsable catégorie"
 ) {
     role = "responsable";
@@ -3015,6 +3022,8 @@ carpool: existingMatch.carpool || {},
 matchStats: existingMatch.matchStats || {},
 debrief: existingMatch.debrief || "",
 composition: existingMatch.composition || {},
+slotAssignments:
+    existingMatch.slotAssignments || {},
 isValidated: existingMatch.isValidated || false
 
     };
@@ -4923,6 +4932,8 @@ function addFunctionBlock() {
         );
 
     const functions = [
+        "Administrateur système",
+        "Administrateur adjoint",
         "Président",
         "Vice-président",
         "Trésorier",
@@ -5524,6 +5535,13 @@ if (userData.role === "admin") {
 
             if (
     selectedFunction.functionName ===
+    "Administrateur système"
+) {
+    role = "admin";
+}
+
+            if (
+    selectedFunction.functionName ===
     "Responsable catégorie"
 )
  {
@@ -5988,11 +6006,18 @@ function renderMatchComposition() {
                 match.composition[p.id]
         );
 
-    const benchPlayers =
-        players.filter(
-            p =>
-                !match.composition[p.id]
-        );
+    const assignedPlayers =
+    Object.values(
+        match.slotAssignments || {}
+    );
+
+const benchPlayers =
+    players.filter(
+        p =>
+            !assignedPlayers.includes(
+                p.id
+            )
+    );
 
     container.innerHTML = `
 
@@ -6030,6 +6055,14 @@ function renderMatchComposition() {
 
             </button>
 
+            <button
+    onclick="resetComposition()"
+    class="px-3 py-2 bg-red-600 text-white rounded-lg text-xs font-bold">
+
+    🔄 Tout au banc
+
+</button>
+
         </div>
 
         <div class="grid lg:grid-cols-4 gap-4">
@@ -6051,31 +6084,123 @@ function renderMatchComposition() {
 
                     <div class="absolute left-0 right-0 top-1/2 border-t border-white/40"></div>
 
-                    <div class="absolute left-1/2 top-1/2 w-24 h-24 border-2 border-white/40 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+                   <div class="absolute left-1/2 top-1/2 w-24 h-24 border-2 border-white/40 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
 
-                    ${terrainPlayers.map(player => {
+${getFormationSlots(
+    match.currentFormation || "433"
+).map(pos => {
 
-                        const pos =
-                            match.composition[player.id];
+    const playerId =
+        match.slotAssignments?.[pos.slot];
 
-                        return `
+    const player =
+        state.players.find(
+            p => p.id === playerId
+        );
+
+        const jersey =
+    player
+        ? (match.jerseys?.[player.id] || "")
+        : "";
+
+    return `
+
+        <div
+            onclick="assignPlayerToSlot('${pos.slot}')"
+
+            class="
+            absolute
+            border-2
+            border-dashed
+            border-white/70
+            bg-white/10
+            rounded-xl
+            px-3
+            py-2
+            text-xs
+            font-bold
+            text-white
+            cursor-pointer
+            -translate-x-1/2
+            -translate-y-1/2"
+
+            style="
+                left:${pos.x}%;
+                top:${pos.y}%;
+            ">
+
+          ${
+    player
+        ? `
+            <div class="flex flex-col items-center">
+
+                <div
+                    class="
+                    w-10 h-10
+                    rounded-full
+                    bg-white
+                    flex
+                    items-center
+                    justify-center
+                    shadow">
+
+                    <input
+                        type="number"
+                        min="1"
+                        max="99"
+                        value="${jersey || ""}"
+
+                        onchange="
+                            setMatchJersey(
+                                '${match.id}',
+                                '${player.id}',
+                                this.value
+                            )
+                        "
+
+                        class="
+                        w-8
+                        bg-transparent
+                        text-center
+                        text-green-700
+                        font-black
+                        text-sm
+                        outline-none">
+
+                </div>
+
+                <div
+                    class="
+                    text-[10px]
+                    leading-tight
+                    mt-1
+                    text-center">
+
+                    ${player.name}
+
+                </div>
+
+            </div>
+          `
+        : pos.slot
+}
+        </div>
+
+    `;
+
+}).join('')}
+
+${terrainPlayers.map(player => {
+
+    const pos =
+        match.composition[player.id];
+
+    return `
 
                             <div
-                                draggable="true"
-                                ondragstart="startDragPlayer(event,'${player.id}')"
+                                draggable="true" ondragstart="startDragPlayer(event,'${player.id}')"
 
-                                class="
-                                absolute
-                                bg-white
-                                rounded-xl
-                                shadow-lg
-                                cursor-grab
-                                px-3
-                                py-2
-                                text-center
-                                min-w-[110px]
-                                -translate-x-1/2
-                                -translate-y-1/2"
+                                class="absolute bg-white rounded-xl shadow-lg cursor-grab px-3 py-2 text-center min-w-[110px] -translate-x-1/2 -translate-y-1/2"
 
                                 style="
                                     left:${pos.x}%;
@@ -6115,16 +6240,9 @@ function renderMatchComposition() {
                     ${benchPlayers.map(player => `
 
                         <button
-                            onclick="addPlayerToComposition('${player.id}')"
+                            onclick="selectBenchPlayer('${player.id}')"
 
-                            class="
-                            w-full
-                            bg-white
-                            border
-                            rounded-xl
-                            p-3
-                            text-left
-                            hover:bg-sky-50">
+                            class="w-full bg-white border rounded-xl p-3 text-left hover:bg-sky-50">
 
                             ${player.name}
 
@@ -6299,14 +6417,7 @@ function applyFormation(system) {
     const playerIds =
         Object.keys(match.composition);
 
-    if (playerIds.length < 11) {
-
-        showToast(
-            "Placez au moins 11 joueurs sur le terrain"
-        );
-
-        return;
-    }
+    
 
     const formations = {
 
@@ -6408,6 +6519,8 @@ function applyFormation(system) {
 
         });
 
+        match.currentFormation = system;
+
     saveStateToFirebase();
 
     renderMatchComposition();
@@ -6416,3 +6529,128 @@ function applyFormation(system) {
         `Système ${system} appliqué`
     );
 }
+
+function getFormationSlots(system = "433") {
+
+    const formations = {
+
+        "433": [
+
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DG", x:15, y:72 },
+            { slot:"DC1", x:38, y:72 },
+            { slot:"DC2", x:62, y:72 },
+            { slot:"DD", x:85, y:72 },
+
+            { slot:"MC1", x:25, y:50 },
+            { slot:"MC2", x:50, y:45 },
+            { slot:"MC3", x:75, y:50 },
+
+            { slot:"AG", x:20, y:18 },
+            { slot:"BU", x:50, y:10 },
+            { slot:"AD", x:80, y:18 }
+
+        ],
+
+        "442": [
+
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DG", x:15, y:72 },
+            { slot:"DC1", x:38, y:72 },
+            { slot:"DC2", x:62, y:72 },
+            { slot:"DD", x:85, y:72 },
+
+            { slot:"MG", x:12, y:45 },
+            { slot:"MC1", x:37, y:48 },
+            { slot:"MC2", x:63, y:48 },
+            { slot:"MD", x:88, y:45 },
+
+            { slot:"AT1", x:35, y:15 },
+            { slot:"AT2", x:65, y:15 }
+
+        ]
+
+    };
+
+    return formations[system] || formations["433"];
+}
+
+let selectedBenchPlayer = null;
+
+function selectBenchPlayer(playerId) {
+
+    selectedBenchPlayer = playerId;
+
+    const player =
+        state.players.find(
+            p => p.id === playerId
+        );
+
+    showToast(
+        `${player.name} sélectionné`
+    );
+}
+
+function assignPlayerToSlot(slot) {
+
+    if (!selectedBenchPlayer) {
+
+        showToast(
+            "Sélectionnez un joueur du banc"
+        );
+
+        return;
+    }
+
+    const match =
+        state.matches[
+            state.selectedMatchId
+        ];
+
+    if (!match.slotAssignments) {
+
+        match.slotAssignments = {};
+
+    }
+
+    match.slotAssignments[slot] =
+        selectedBenchPlayer;
+
+    selectedBenchPlayer = null;
+
+    saveStateToFirebase();
+
+    renderMatchComposition();
+
+}
+
+function resetComposition() {
+
+    if (
+        !confirm(
+            "Remettre tous les joueurs sur le banc ?"
+        )
+    ) {
+        return;
+    }
+
+    const match =
+        state.matches[
+            state.selectedMatchId
+        ];
+
+    match.slotAssignments = {};
+
+    match.composition = {};
+
+    saveStateToFirebase();
+
+    renderMatchComposition();
+
+    showToast(
+        "Tous les joueurs ont été remis au banc"
+    );
+}
+``
