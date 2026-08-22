@@ -4926,23 +4926,107 @@ function addFunctionBlock() {
             ".account-function"
         );
 
+        const fonctionsSansEquipe = [
+    "Président",
+    "Vice-président",
+    "Secrétaire Général",
+    "Secrétaire",
+    "Trésorier",
+    "Trésorier adjoint",
+    "Gestionnaire des accès",
+    "Administrateur système",
+    "Administrateur adjoint"
+];
+
+select.addEventListener("change", () => {
+
+    const equipesBloc =
+        clone.querySelector(".scope-container").parentElement;
+
+    equipesBloc.style.display =
+        fonctionsSansEquipe.includes(select.value)
+            ? "none"
+            : "block";
+});
+
     const scopeContainer =
         clone.querySelector(
             ".scope-container"
         );
 
-    const functions = [
-        "Administrateur système",
-        "Administrateur adjoint",
-        "Président",
-        "Vice-président",
-        "Trésorier",
-        "Secrétaire",
-        "Responsable catégorie",
-        "Éducateur principal",
-        "Éducateur adjoint",
-        "Parent"
-    ];
+const functions = [
+
+    // Administration
+    "Super Administrateur",
+    "Administrateur système",
+    "Administrateur adjoint",
+    "Gestionnaire des accès",
+    "Correspondant Footclubs",
+
+    // Direction
+    "Président",
+    "Vice-président",
+    "Secrétaire Général",
+    "Secrétaire",
+    "Trésorier",
+    "Trésorier adjoint",
+
+    // Pôle sportif
+    "Directeur Sportif",
+    "Responsable Technique",
+    "Responsable Catégorie",
+    "Responsable École de Foot",
+    "Responsable Jeunes",
+    "Responsable Seniors",
+    "Responsable Féminines",
+    "Responsable Arbitrage",
+    "Responsable Gardiens",
+
+    // Encadrement
+    "Éducateur principal",
+    "Éducateur adjoint",
+    "Coach Principal",
+    "Coach Adjoint",
+    "Dirigeant d'équipe",
+    "Préparateur Physique",
+    "Analyste Vidéo",
+    "Référent Parents",
+
+    // Arbitrage
+    "Arbitre Officiel",
+    "Arbitre Bénévole",
+    "Délégué Match",
+
+    // Santé
+    "Médecin",
+    "Kinésithérapeute",
+    "Référent Santé",
+
+    // Logistique
+    "Responsable Équipements",
+    "Responsable Terrains",
+    "Responsable Tournois",
+    "Responsable Transport",
+    "Responsable Buvette",
+    "Responsable Manifetations",
+    "Intendant",
+
+    // Communication
+    "Responsable Communication",
+    "Community Manager",
+    "Photographe",
+    "Responsable Réseaux Sociaux",
+    "Responsable Partenaires",
+
+    // Référents FFF
+    "Référent PEF",
+    "Référent Féminines",
+    "Référent Handicap",
+    "Référent Protection des Mineurs",
+
+    // Autres
+    "Parent"
+];
 
     select.innerHTML =
         functions.map(f =>
