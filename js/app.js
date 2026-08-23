@@ -6131,13 +6131,45 @@ const benchPlayers =
 
             </button>
 
-            <button
-                onclick="applyFormation('4231')"
-                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+            <button onclick="applyFormation('4231')"
+    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+    4-2-3-1
+</button>
 
-                4-2-3-1
+<button onclick="applyFormation('4141')"
+    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+    4-1-4-1
+</button>
 
-            </button>
+<button onclick="applyFormation('451')"
+    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+    4-5-1
+</button>
+
+<button onclick="applyFormation('343')"
+    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+    3-4-3
+</button>
+
+<button onclick="applyFormation('532')"
+    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+    5-3-2
+</button>
+
+<button onclick="applyFormation('541')"
+    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+    5-4-1
+</button>
+
+<button onclick="applyFormation('4312')"
+    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+    4-3-1-2
+</button>
+
+<button onclick="applyFormation('4222')"
+    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
+    4-2-2-2
+</button>
 
             <button
     onclick="resetComposition()"
@@ -6501,90 +6533,10 @@ function applyFormation(system) {
     const playerIds =
         Object.keys(match.composition);
 
-    
-
-    const formations = {
-
-        "433": [
-
-            {x:50,y:90}, // GB
-
-            {x:15,y:72},
-            {x:38,y:72},
-            {x:62,y:72},
-            {x:85,y:72},
-
-            {x:25,y:50},
-            {x:50,y:45},
-            {x:75,y:50},
-
-            {x:20,y:18},
-            {x:50,y:10},
-            {x:80,y:18}
-
-        ],
-
-        "442": [
-
-            {x:50,y:90},
-
-            {x:15,y:72},
-            {x:38,y:72},
-            {x:62,y:72},
-            {x:85,y:72},
-
-            {x:12,y:45},
-            {x:37,y:48},
-            {x:63,y:48},
-            {x:88,y:45},
-
-            {x:35,y:15},
-            {x:65,y:15}
-
-        ],
-
-        "352": [
-
-            {x:50,y:90},
-
-            {x:25,y:72},
-            {x:50,y:70},
-            {x:75,y:72},
-
-            {x:10,y:50},
-            {x:30,y:48},
-            {x:50,y:45},
-            {x:70,y:48},
-            {x:90,y:50},
-
-            {x:35,y:15},
-            {x:65,y:15}
-
-        ],
-
-        "4231": [
-
-            {x:50,y:90},
-
-            {x:15,y:72},
-            {x:38,y:72},
-            {x:62,y:72},
-            {x:85,y:72},
-
-            {x:35,y:55},
-            {x:65,y:55},
-
-            {x:15,y:30},
-            {x:50,y:25},
-            {x:85,y:30},
-
-            {x:50,y:10}
-
-        ]
-    };
-
-    const formation =
-        formations[system];
+    const formation = getFormationSlots(system).map(pos => ({
+        x: pos.x,
+        y: pos.y
+    }));
 
     if (!formation) {
         return;
@@ -6595,15 +6547,13 @@ function applyFormation(system) {
         .forEach((playerId, index) => {
 
             match.composition[playerId] = {
-
                 x: formation[index].x,
                 y: formation[index].y
-
             };
 
         });
 
-        match.currentFormation = system;
+    match.currentFormation = system;
 
     saveStateToFirebase();
 
@@ -6615,13 +6565,10 @@ function applyFormation(system) {
 }
 
 function getFormationSlots(system = "433") {
-
     const formations = {
 
         "433": [
-
             { slot:"GB", x:50, y:88 },
-
             { slot:"DG", x:15, y:72 },
             { slot:"DC1", x:38, y:72 },
             { slot:"DC2", x:62, y:72 },
@@ -6634,13 +6581,10 @@ function getFormationSlots(system = "433") {
             { slot:"AG", x:20, y:18 },
             { slot:"BU", x:50, y:10 },
             { slot:"AD", x:80, y:18 }
-
         ],
 
         "442": [
-
             { slot:"GB", x:50, y:88 },
-
             { slot:"DG", x:15, y:72 },
             { slot:"DC1", x:38, y:72 },
             { slot:"DC2", x:62, y:72 },
@@ -6653,9 +6597,164 @@ function getFormationSlots(system = "433") {
 
             { slot:"AT1", x:35, y:15 },
             { slot:"AT2", x:65, y:15 }
+        ],
 
+        "352": [
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DC1", x:25, y:72 },
+            { slot:"DC2", x:50, y:68 },
+            { slot:"DC3", x:75, y:72 },
+
+            { slot:"MG", x:10, y:45 },
+            { slot:"MC1", x:35, y:48 },
+            { slot:"MC2", x:50, y:42 },
+            { slot:"MC3", x:65, y:48 },
+            { slot:"MD", x:90, y:45 },
+
+            { slot:"AT1", x:38, y:15 },
+            { slot:"AT2", x:62, y:15 }
+        ],
+
+        "4231": [
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DG", x:15, y:72 },
+            { slot:"DC1", x:38, y:72 },
+            { slot:"DC2", x:62, y:72 },
+            { slot:"DD", x:85, y:72 },
+
+            { slot:"MDF1", x:40, y:55 },
+            { slot:"MDF2", x:60, y:55 },
+
+            { slot:"MOG", x:20, y:30 },
+            { slot:"MOC", x:50, y:25 },
+            { slot:"MOD", x:80, y:30 },
+
+            { slot:"BU", x:50, y:10 }
+        ],
+
+        "4141": [
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DG", x:15, y:72 },
+            { slot:"DC1", x:38, y:72 },
+            { slot:"DC2", x:62, y:72 },
+            { slot:"DD", x:85, y:72 },
+
+            { slot:"MDF", x:50, y:58 },
+
+            { slot:"MG", x:12, y:40 },
+            { slot:"MC1", x:37, y:42 },
+            { slot:"MC2", x:63, y:42 },
+            { slot:"MD", x:88, y:40 },
+
+            { slot:"BU", x:50, y:12 }
+        ],
+
+        "451": [
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DG", x:15, y:72 },
+            { slot:"DC1", x:38, y:72 },
+            { slot:"DC2", x:62, y:72 },
+            { slot:"DD", x:85, y:72 },
+
+            { slot:"MG", x:10, y:42 },
+            { slot:"MC1", x:30, y:45 },
+            { slot:"MC2", x:50, y:40 },
+            { slot:"MC3", x:70, y:45 },
+            { slot:"MD", x:90, y:42 },
+
+            { slot:"BU", x:50, y:12 }
+        ],
+
+        "343": [
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DC1", x:25, y:72 },
+            { slot:"DC2", x:50, y:68 },
+            { slot:"DC3", x:75, y:72 },
+
+            { slot:"MG", x:12, y:45 },
+            { slot:"MC1", x:37, y:48 },
+            { slot:"MC2", x:63, y:48 },
+            { slot:"MD", x:88, y:45 },
+
+            { slot:"AG", x:20, y:18 },
+            { slot:"BU", x:50, y:10 },
+            { slot:"AD", x:80, y:18 }
+        ],
+
+        "532": [
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DG", x:10, y:68 },
+            { slot:"DC1", x:30, y:72 },
+            { slot:"DC2", x:50, y:68 },
+            { slot:"DC3", x:70, y:72 },
+            { slot:"DD", x:90, y:68 },
+
+            { slot:"MC1", x:30, y:45 },
+            { slot:"MC2", x:50, y:40 },
+            { slot:"MC3", x:70, y:45 },
+
+            { slot:"AT1", x:38, y:15 },
+            { slot:"AT2", x:62, y:15 }
+        ],
+
+        "541": [
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DG", x:10, y:68 },
+            { slot:"DC1", x:30, y:72 },
+            { slot:"DC2", x:50, y:68 },
+            { slot:"DC3", x:70, y:72 },
+            { slot:"DD", x:90, y:68 },
+
+            { slot:"MG", x:12, y:45 },
+            { slot:"MC1", x:37, y:48 },
+            { slot:"MC2", x:63, y:48 },
+            { slot:"MD", x:88, y:45 },
+
+            { slot:"BU", x:50, y:12 }
+        ],
+
+        "4312": [
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DG", x:15, y:72 },
+            { slot:"DC1", x:38, y:72 },
+            { slot:"DC2", x:62, y:72 },
+            { slot:"DD", x:85, y:72 },
+
+            { slot:"MC1", x:25, y:48 },
+            { slot:"MC2", x:50, y:44 },
+            { slot:"MC3", x:75, y:48 },
+
+            { slot:"MOC", x:50, y:28 },
+
+            { slot:"AT1", x:38, y:12 },
+            { slot:"AT2", x:62, y:12 }
+        ],
+
+        "4222": [
+            { slot:"GB", x:50, y:88 },
+
+            { slot:"DG", x:15, y:72 },
+            { slot:"DC1", x:38, y:72 },
+            { slot:"DC2", x:62, y:72 },
+            { slot:"DD", x:85, y:72 },
+
+            { slot:"MDF1", x:40, y:55 },
+            { slot:"MDF2", x:60, y:55 },
+
+            { slot:"MOG", x:35, y:30 },
+            { slot:"MOD", x:65, y:30 },
+
+            { slot:"AT1", x:38, y:12 },
+            { slot:"AT2", x:62, y:12 }
         ]
-
     };
 
     return formations[system] || formations["433"];
