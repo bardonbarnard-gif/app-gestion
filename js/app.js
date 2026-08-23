@@ -3738,6 +3738,20 @@ try {
     }
 
    // Création du compte d'accès
+
+   const existingUser =
+    await firebase.database()
+        .ref("rangueil_data/access/" + pin)
+        .once("value");
+
+if (existingUser.exists()) {
+
+    showToast(
+        "⚠️ Ce code PIN est déjà utilisé"
+    );
+
+    return;
+}
 await firebase.database()
     .ref("rangueil_data/access/" + pin)
    .set({
@@ -5955,35 +5969,26 @@ function buildStaffFromAccounts(accounts) {
 
 }
 
-function getPoleFromTeam(teamKey) {
-
+function getTeamFamily(teamKey) {
     const teamName =
-        state.teams?.[teamKey]?.name || "";
+        (state.teams?.[teamKey]?.name || "")
+        .toLowerCase();
 
-    const match =
-        teamName.match(/U(\d+)/i);
+    if (
+        ["u6","u7","u8","u9","u10","u11"]
+        .some(age => teamName.includes(age))
+    ) {
+        return "École de Foot";
+    }
 
-    if (match) {
-
-        const age =
-            parseInt(match[1]);
-
-        if (age >= 6 && age <= 11) {
-            return "Académie";
-        }
-
-        if (age >= 12 && age <= 15) {
-            return "Pré-Formation";
-        }
-
-        if (age >= 16 && age <= 20) {
-            return "Formation";
-        }
-
+    if (
+        ["u12","u13","u14","u15","u16","u17","u18"]
+        .some(age => teamName.includes(age))
+    ) {
+        return "Jeunes";
     }
 
     return "Seniors";
-
 }
 async function renderStaffV2() {
 
@@ -5991,6 +5996,17 @@ async function renderStaffV2() {
         document.getElementById(
             "staff-full-container"
         );
+
+     const directionContainer =
+    document.getElementById("staff-direction");
+
+const functionsContainer =
+    document.getElementById("staff-functions");
+
+    
+
+const teamsContainer =
+    document.getElementById("staff-teams");   
 
     if (!container) return;
 
@@ -6007,65 +6023,116 @@ async function renderStaffV2() {
             accounts
         );
 
-        const direction = [];
+       const direction = [];
+const clubFunctions = [];
+const sportManagement = [];
+const directionRoles = [
+    "Président",
+    "Vice-président",
+    "Secrétaire",
+    "Secrétaire Général",
+    "Trésorier",
+    "Trésorier adjoint",
+    "Directeur Sportif",
+    "Responsable Technique"
 
-const categoryManagers = [];
+];
 
-const teamGroups = {};
+const sportRoles = [
+    "Directeur Sportif",
+    "Responsable École de Foot",
+    "Responsable Seniors",
+    "Responsable Catégorie"
+];
 
-const poleGroups = {
-    "Académie": {},
-    "Pré-Formation": {},
-    "Formation": {},
+const clubRoles = [
+    "Correspondant Footclubs",
+    "Community Manager",
+    "Responsable Communication",
+    "Responsable Partenaires",
+    "Responsable Arbitrage",
+    "Responsable Équipements",
+    "Responsable Terrains",
+    "Responsable Tournois",
+    "Responsable Transport",
+    "Responsable Buvette",
+    "Responsable Manifetations",
+    "Référent PEF",
+    "Référent Féminines",
+    "Référent Handicap",
+    "Référent Protection des Mineurs"
+];
+const teamGroups = {
+    "École de Foot": {},
+    "Jeunes": {},
     "Seniors": {}
 };
 
-    container.innerHTML = "";
 
-    staff.forEach(member => {
+    directionContainer.innerHTML = "";
+functionsContainer.innerHTML = "";
+teamsContainer.innerHTML = "";
+
+   staff.forEach(member => {
 
     if (
-        [
-            "Président",
-            "Vice-président",
-            "Trésorier",
-            "Secrétaire"
-        ].includes(member.functionName)
+        directionRoles.includes(
+            member.functionName
+        )
     ) {
-
         direction.push(member);
-
         return;
-
     }
 
     if (
-        member.functionName ===
-        "Responsable catégorie"
+    sportRoles.includes(
+        member.functionName
+    )
+) {
+    sportManagement.push(member);
+    return;
+}
+
+    if (
+        clubRoles.includes(
+            member.functionName
+        )
     ) {
-
-        categoryManagers.push(member);
-
+        clubFunctions.push(member);
         return;
-
     }
 
     member.scopes.forEach(scope => {
 
-       const pole =
-    getPoleFromTeam(scope);
+        const family =
+            getTeamFamily(scope);
 
-if (!poleGroups[pole][scope]) {
-    poleGroups[pole][scope] = [];
+        if (!teamGroups[family][scope]) {
+            teamGroups[family][scope] = [];
+        }
+console.log(
+    "ADD",
+    family,
+    scope,
+    member.name,
+    member.functionName
+);
+        const exists =
+    teamGroups[family][scope]
+        .some(m =>
+            m.name === member.name &&
+            m.functionName === member.functionName
+        );
+
+if (!exists) {
+    teamGroups[family][scope].push(member);
 }
-
-poleGroups[pole][scope].push(member);
 
     });
 
 });
-
-container.innerHTML += `
+ 
+directionContainer.innerHTML += `
 
 <div class="col-span-full">
 
@@ -6078,10 +6145,22 @@ container.innerHTML += `
 </div>
 
 `;
+const directionOrder = {
+    "Président": 1,
+    "Vice-président": 2,
+    "Secrétaire Général": 3,
+    "Trésorier": 4,
+    "Secrétaire": 5,
+    "Trésorier adjoint": 6
+};
 
+direction.sort((a, b) =>
+    (directionOrder[a.functionName] || 99)
+    - (directionOrder[b.functionName] || 99)
+);
 direction.forEach(member => {
 
-    container.innerHTML += `
+    directionContainer.innerHTML += `
 
     <div class="bg-white p-4 rounded-xl border">
 
@@ -6103,21 +6182,55 @@ direction.forEach(member => {
 
 });
 
-container.innerHTML += `
-
+functionsContainer.innerHTML += `
 <div class="col-span-full mt-6">
-
     <h2 class="text-xl font-bold mb-4">
-
-        📋 Responsables catégories
-
+        ⚽ Organisation Sportive
     </h2>
-
 </div>
-
 `;
 
-categoryManagers.forEach(member => {
+const sportOrder = {
+    "Directeur Sportif": 1,
+    "Responsable École de Foot": 2,
+    "Responsable Seniors": 3,
+    "Responsable Catégorie": 4
+};
+
+sportManagement.sort((a, b) =>
+    (sportOrder[a.functionName] || 99) -
+    (sportOrder[b.functionName] || 99)
+);
+
+sportManagement.forEach(member => {
+
+    functionsContainer.innerHTML += `
+        <div class="bg-white p-4 rounded-xl border">
+
+            <div class="font-bold text-slate-800">
+                ${member.name}
+            </div>
+
+            <div class="text-sm text-sky-700 mt-1">
+                ⚽ ${member.functionName}
+            </div>
+
+        </div>
+    `;
+
+});
+
+
+functionsContainer.innerHTML += `
+<div class="col-span-full mt-6">
+    <h2 class="text-xl font-bold mb-4">
+        ⚙️ Fonctions Club
+    </h2>
+</div>
+`;
+
+clubFunctions.forEach(member => {
+
 
     const scopes =
         member.scopes
@@ -6127,7 +6240,7 @@ categoryManagers.forEach(member => {
             )
             .join(", ");
 
-    container.innerHTML += `
+    functionsContainer.innerHTML += `
 
     <div class="bg-white p-4 rounded-xl border">
 
@@ -6139,7 +6252,7 @@ categoryManagers.forEach(member => {
 
         <div class="text-sm text-sky-700 mt-1">
 
-            👔 Responsable catégorie
+           👔 ${member.functionName}
 
         </div>
 
@@ -6154,101 +6267,110 @@ categoryManagers.forEach(member => {
     `;
 
 });
+console.log(teamGroups);
 
 
 
-Object.entries(poleGroups)
-.forEach(([poleName, teams]) => {
+Object.entries(teamGroups).forEach(([poleName, teams]) => {
 
-    container.innerHTML += `
-
-    <div class="col-span-full mt-6">
-
-        <details class="bg-slate-100 rounded-xl overflow-hidden">
-
-            <summary
-                class="cursor-pointer p-4 font-bold text-slate-900">
-
-                ⚽ ${poleName}
-
-            </summary>
-
-            <div class="p-4 space-y-4">
-
-    `;
+    let teamsHtml = "";
 
     Object.entries(teams)
-    .forEach(([teamKey, members]) => {
+.sort(([a], [b]) => {
+
+    const nameA =
+        state.teams?.[a]?.name || a;
+
+    const nameB =
+        state.teams?.[b]?.name || b;
+
+    const numA =
+        parseInt(
+            (nameA.match(/U(\d+)/i) || [])[1]
+        ) || 999;
+
+    const numB =
+        parseInt(
+            (nameB.match(/U(\d+)/i) || [])[1]
+        ) || 999;
+
+    return numA - numB;
+
+})
+.forEach(([teamKey, members]) => {
 
         const teamName =
-            state.teams?.[teamKey]?.name
-            || teamKey;
+            state.teams?.[teamKey]?.name || teamKey;
 
-        container.innerHTML += `
+        
 
-        <details class="bg-white border rounded-xl overflow-hidden">
+        let membersHtml = "";
 
-            <summary
-                class="cursor-pointer p-3 font-semibold text-slate-800">
+members
+    .filter(member =>
+        member.functionName !== "Responsable Catégorie" &&
+        member.functionName !== "Responsable catégorie"
+    )
+    .forEach(member => {
 
-                ⚽ ${teamName}
-                (${members.length})
-
-            </summary>
-
-            <div class="p-4 border-t grid gap-3">
-
-        `;
-
-        members.forEach(member => {
-
-            container.innerHTML += `
-
+        membersHtml += `
             <div class="bg-slate-50 p-3 rounded-lg">
 
                 <div class="font-bold text-slate-800">
-
                     ${member.name}
-
                 </div>
 
                 <div class="text-sm text-sky-700">
-
-                    👔 ${member.functionName}
-
+                    ${member.functionName}
                 </div>
 
             </div>
-
-            `;
-
-        });
-
-        container.innerHTML += `
-
-            </div>
-
-        </details>
-
         `;
 
     });
 
- 
-    container.innerHTML += `
+teamsHtml += `
+    <div class="ml-4 border-l-4 border-sky-200 pl-4">
 
+        <details class="bg-white border rounded-xl overflow-hidden">
+
+            <summary class="cursor-pointer p-3 font-semibold text-slate-800">
+                ⚽ ${teamName}
+            </summary>
+
+            <div class="p-4 border-t flex flex-col gap-2">
+                ${membersHtml}
             </div>
 
         </details>
 
     </div>
+`;
+    
 
-    `;
+    });
+
+   teamsContainer.innerHTML += `
+    <div class="mt-6">
+
+        <details open class="bg-slate-100 rounded-xl overflow-hidden">
+
+            <summary class="cursor-pointer p-4 font-bold text-slate-900">
+                ⚽ ${poleName}
+            </summary>
+
+            <div class="p-4 flex flex-col gap-4">
+                ${teamsHtml}
+            </div>
+
+        </details>
+
+    </div>
+`;
 
 });
 
 }
-
 function renderMatchComposition() {
 
     const container =
@@ -7044,4 +7166,3 @@ function resetComposition() {
         "Tous les joueurs ont été remis au banc"
     );
 }
-``
