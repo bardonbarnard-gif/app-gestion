@@ -307,7 +307,17 @@ state.carpoolResponses =
                         state.trainings = {};
                         Object.entries(rawTrainings).forEach(([num, presData]) => {
                             const id = 'T_legacy_' + num;
-                            state.trainings[id] = { id, title: 'Séance E' + String(num).padStart(2,'0'), date: '', heure: '18:00', theme: '', presence: presData, pdfData: null, pdfName: null };
+                            state.trainings[id] = {
+    id,
+    title: 'Séance E' + String(num).padStart(2,'0'),
+    date: '',
+    heure: '18:00',
+    theme: '',
+    team: 'U14',
+    presence: presData,
+    pdfData: null,
+    pdfName: null
+};
                         });
                     } else {
                         state.trainings = rawTrainings;
@@ -1745,7 +1755,10 @@ const nbTotal = playersForTraining.length;
                     ? 'bg-sky-50 border-sky-200 hover:border-sky-400'
                     : 'bg-slate-50 hover:bg-sky-50 border-slate-200 hover:border-sky-200';
 
-                html += `<div onclick="openTrainingDetail('${s.id}')" class="p-3.5 ${cardBg} border rounded-xl cursor-pointer transition-all group">
+                    const teamColors = getTeamColorClasses(s.team);
+
+                html += `<div onclick="openTrainingDetail('${s.id}')"
+     class="p-3.5 ${cardBg} border ${teamColors.border} border-l-4 rounded-xl cursor-pointer transition-all group">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-xl ${isPast ? 'bg-slate-400' : 'bg-gradient-to-br from-sky-500 to-blue-600'} text-white flex items-center justify-center shadow-sm">
@@ -1754,7 +1767,15 @@ const nbTotal = playersForTraining.length;
                             <div>
                                 <div class="flex items-center space-x-2">
                                     ${statusDot}
-                                    <p class="font-bold text-slate-800 text-xs">${s.title || 'Séance sans titre'}</p>
+                                    <div>
+    <p class="font-bold text-slate-800 text-xs">
+        ${s.title || 'Séance sans titre'}
+    </p>
+
+    <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${teamColors.badge}">
+        ⚽ ${state.teams?.[s.team]?.name || s.team || 'Équipe'}
+    </span>
+</div>
                                     ${hasPdf ? '<span class="text-[10px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded"><i class="fa-solid fa-file-pdf mr-0.5"></i>PDF</span>' : ''}
                                 </div>
                                 <p class="text-[11px] text-slate-500 mt-0.5 capitalize">${dayName} · ${s.heure || '18:00'} – 20:00</p>
@@ -4284,11 +4305,18 @@ const matches =
     trainings.forEach(training => {
 
         html += `
-            <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-2">
+            <div class="
+    ${getTeamColorClasses(training.team).bg}
+    border
+    ${getTeamColorClasses(training.team).border}
+    border-l-4
+    p-3
+    rounded-lg
+    mb-2
+">
 
-                <div class="font-bold text-emerald-800">
-                    🏃 ${training.title || 'Entraînement'}
-                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+    <div class="font-bold 
 
                 <div class="text-xs text-slate-600">
                     ${training.heure || '--'}
@@ -4300,8 +4328,16 @@ const matches =
 
              <div class="mt-2">
 
-    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold
-        ${getTeamColorClasses(training.team).badge}">
+    <span class="
+    px-3
+    py-1
+    rounded-full
+    text-xs
+    font-bold
+    ${getTeamColorClasses(training.team).badge}
+">
+    ⚽ ${state.teams?.[training.team]?.name || training.team}
+</span>
 
         ${state.teams?.[training.team]?.name || training.team}
 
@@ -4646,12 +4682,13 @@ ${match.heure || ""}
             ) {
 
                 items.push({
-                    date: training.date,
-                    message:
-`🏃 ${training.title || "Entraînement"}
-${training.heure || ""}
-`
-                });
+    date: training.date,
+    message:
+`🏃 *${training.title || "Entraînement"}*
+⚽ ${state.teams?.[training.team]?.name || training.team || "Équipe"}
+🕒 ${training.heure || "18:00"}`
+
+});
 
             }
 
