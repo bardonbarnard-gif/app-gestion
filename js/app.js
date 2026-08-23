@@ -5517,36 +5517,79 @@ async function renderAdminAccounts() {
     const accounts =
         snapshot.val() || {};
 
-    let html = `
+    const accountsList =
+    Object.entries(accounts || {})
+        .sort(([, a], [, b]) =>
+            (a.name || "").localeCompare(
+                b.name || "",
+                "fr",
+                { sensitivity: "base" }
+            )
+        );
 
-        <div class="flex justify-between items-center mb-4">
+let html = `
+    <div class="flex justify-between items-center mb-4">
 
-            <h2 class="text-lg font-bold text-slate-800">
-                🪪 Comptes d'accès
-            </h2>
+        <h2 class="text-lg font-bold text-slate-800">
+            🪪 Comptes d'accès
+            <span class="text-slate-500 text-sm">
+                (${accountsList.length})
+            </span>
+        </h2>
+
+        <div class="flex gap-2">
 
             <button
                 onclick="openNewAccountForm()"
                 class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
-
                 ➕ Nouveau compte
-
             </button>
 
             <button
                 onclick="closeAdminModule()"
                 class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold">
-
                 ← Retour
-
             </button>
 
         </div>
 
-    `;
+    </div>
 
-    Object.entries(accounts).forEach(
-        ([pin, user]) => {
+    <div class="mb-4">
+        <input
+            type="text"
+            id="account-search"
+            placeholder="🔍 Rechercher un nom, une fonction ou un PIN..."
+            oninput="renderAdminAccounts()"
+            class="w-full border rounded-xl p-3">
+    </div>
+`;
+
+const search =
+    (
+        document.getElementById(
+            "account-search"
+        )?.value || ""
+    ).toLowerCase();
+
+            
+
+       
+    accountsList
+    .filter(([pin, user]) => {
+
+        const text = `
+            ${pin}
+            ${user.name || ""}
+            ${(user.functions || [])
+                .map(f => f.functionName)
+                .join(" ")}
+        `.toLowerCase();
+
+        return text.includes(search);
+
+    })
+    .forEach(([pin, user]) => {
 
             html += `
 
