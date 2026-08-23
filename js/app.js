@@ -390,108 +390,187 @@ function saveStateToFirebase() {
         // === FONCTION GLOBALE : Couleurs d'équipe ===
         function getTeamColorClasses(teamKey) {
             // Récupère la couleur stockée en Firebase pour cette équipe
-            const colorName = state.teams?.[teamKey]?.color || 'slate';
-            
-            const colorMap = {
-                sky: {
-                    bg: 'bg-sky-50',
-                    bgDark: 'bg-sky-100',
-                    bgButton: 'bg-sky-500',
-                    border: 'border-sky-300',
-                    borderDark: 'border-sky-400',
-                    text: 'text-sky-800',
-                    textBold: 'text-sky-900',
-                    textLight: 'text-sky-600',
-                    badge: 'bg-sky-200 text-sky-900',
-                    badgeDark: 'bg-sky-600 text-white'
-                },
-                emerald: {
-                    bg: 'bg-emerald-50',
-                    bgDark: 'bg-emerald-100',
-                    bgButton: 'bg-emerald-500',
-                    border: 'border-emerald-300',
-                    borderDark: 'border-emerald-400',
-                    text: 'text-emerald-800',
-                    textBold: 'text-emerald-900',
-                    textLight: 'text-emerald-600',
-                    badge: 'bg-emerald-200 text-emerald-900',
-                    badgeDark: 'bg-emerald-600 text-white'
-                },
-                red: {
-                    bg: 'bg-red-50',
-                    bgDark: 'bg-red-100',
-                    bgButton: 'bg-red-500',
-                    border: 'border-red-300',
-                    borderDark: 'border-red-400',
-                    text: 'text-red-800',
-                    textBold: 'text-red-900',
-                    textLight: 'text-red-600',
-                    badge: 'bg-red-200 text-red-900',
-                    badgeDark: 'bg-red-600 text-white'
-                },
-                orange: {
-                    bg: 'bg-orange-50',
-                    bgDark: 'bg-orange-100',
-                    bgButton: 'bg-orange-500',
-                    border: 'border-orange-300',
-                    borderDark: 'border-orange-400',
-                    text: 'text-orange-800',
-                    textBold: 'text-orange-900',
-                    textLight: 'text-orange-600',
-                    badge: 'bg-orange-200 text-orange-900',
-                    badgeDark: 'bg-orange-600 text-white'
-                },
-                purple: {
-                    bg: 'bg-purple-50',
-                    bgDark: 'bg-purple-100',
-                    bgButton: 'bg-purple-500',
-                    border: 'border-purple-300',
-                    borderDark: 'border-purple-400',
-                    text: 'text-purple-800',
-                    textBold: 'text-purple-900',
-                    textLight: 'text-purple-600',
-                    badge: 'bg-purple-200 text-purple-900',
-                    badgeDark: 'bg-purple-600 text-white'
-                },
-                pink: {
-                    bg: 'bg-pink-50',
-                    bgDark: 'bg-pink-100',
-                    bgButton: 'bg-pink-500',
-                    border: 'border-pink-300',
-                    borderDark: 'border-pink-400',
-                    text: 'text-pink-800',
-                    textBold: 'text-pink-900',
-                    textLight: 'text-pink-600',
-                    badge: 'bg-pink-200 text-pink-900',
-                    badgeDark: 'bg-pink-600 text-white'
-                },
-                amber: {
-                    bg: 'bg-amber-50',
-                    bgDark: 'bg-amber-100',
-                    bgButton: 'bg-amber-500',
-                    border: 'border-amber-300',
-                    borderDark: 'border-amber-400',
-                    text: 'text-amber-800',
-                    textBold: 'text-amber-900',
-                    textLight: 'text-amber-600',
-                    badge: 'bg-amber-200 text-amber-900',
-                    badgeDark: 'bg-amber-600 text-white'
-                },
-                slate: {
-                    bg: 'bg-slate-50',
-                    bgDark: 'bg-slate-100',
-                    bgButton: 'bg-slate-500',
-                    border: 'border-slate-300',
-                    borderDark: 'border-slate-400',
-                    text: 'text-slate-800',
-                    textBold: 'text-slate-900',
-                    textLight: 'text-slate-600',
-                    badge: 'bg-slate-200 text-slate-900',
-                    badgeDark: 'bg-slate-600 text-white'
-                }
-            };
+            console.log(
+    "TEAMKEY =",
+    teamKey,
+    "TEAM =",
+    state.teams?.[teamKey]
+);
 
-            return colorMap[colorName] || colorMap.slate;
+const colorName = state.teams?.[teamKey]?.color || 'slate';
+
+            console.log(
+    teamKey,
+    state.teams?.[teamKey]?.color
+);
+            
+           const createColor = (name) => ({
+    bg: `bg-${name}-50`,
+    bgDark: `bg-${name}-100`,
+    bgButton: `bg-${name}-500`,
+    border: `border-${name}-300`,
+    borderDark: `border-${name}-400`,
+    text: `text-${name}-800`,
+    textBold: `text-${name}-900`,
+    textLight: `text-${name}-600`,
+    badge: `bg-${name}-200 text-${name}-900`,
+    badgeDark: `bg-${name}-600 text-white`
+});
+
+const colorMap = {
+    sky: createColor('sky'),
+    blue: createColor('blue'),
+    indigo: createColor('indigo'),
+    violet: createColor('violet'),
+    purple: createColor('purple'),
+    fuchsia: createColor('fuchsia'),
+    pink: createColor('pink'),
+    rose: createColor('rose'),
+
+    red: createColor('red'),
+    orange: createColor('orange'),
+    amber: createColor('amber'),
+    yellow: createColor('yellow'),
+    lime: createColor('lime'),
+
+    green: createColor('green'),
+    emerald: createColor('emerald'),
+    teal: createColor('teal'),
+    cyan: createColor('cyan'),
+
+    slate: createColor('slate'),
+    gray: createColor('gray'),
+    zinc: createColor('zinc'),
+    neutral: createColor('neutral'),
+    stone: createColor('stone'),
+
+    skyDark: {
+        bg: 'bg-sky-100',
+        bgDark: 'bg-sky-200',
+        bgButton: 'bg-sky-700',
+        border: 'border-sky-500',
+        borderDark: 'border-sky-600',
+        text: 'text-sky-900',
+        textBold: 'text-sky-950',
+        textLight: 'text-sky-700',
+        badge: 'bg-sky-300 text-sky-950',
+        badgeDark: 'bg-sky-700 text-white'
+    },
+
+    blueDark: {
+        bg: 'bg-blue-100',
+        bgDark: 'bg-blue-200',
+        bgButton: 'bg-blue-700',
+        border: 'border-blue-500',
+        borderDark: 'border-blue-600',
+        text: 'text-blue-900',
+        textBold: 'text-blue-950',
+        textLight: 'text-blue-700',
+        badge: 'bg-blue-300 text-blue-950',
+        badgeDark: 'bg-blue-700 text-white'
+    },
+
+    indigoDark: {
+        bg: 'bg-indigo-100',
+        bgDark: 'bg-indigo-200',
+        bgButton: 'bg-indigo-700',
+        border: 'border-indigo-500',
+        borderDark: 'border-indigo-600',
+        text: 'text-indigo-900',
+        textBold: 'text-indigo-950',
+        textLight: 'text-indigo-700',
+        badge: 'bg-indigo-300 text-indigo-950',
+        badgeDark: 'bg-indigo-700 text-white'
+    },
+
+    greenDark: {
+        bg: 'bg-green-100',
+        bgDark: 'bg-green-200',
+        bgButton: 'bg-green-700',
+        border: 'border-green-500',
+        borderDark: 'border-green-600',
+        text: 'text-green-900',
+        textBold: 'text-green-950',
+        textLight: 'text-green-700',
+        badge: 'bg-green-300 text-green-950',
+        badgeDark: 'bg-green-700 text-white'
+    },
+
+    emeraldDark: {
+        bg: 'bg-emerald-100',
+        bgDark: 'bg-emerald-200',
+        bgButton: 'bg-emerald-700',
+        border: 'border-emerald-500',
+        borderDark: 'border-emerald-600',
+        text: 'text-emerald-900',
+        textBold: 'text-emerald-950',
+        textLight: 'text-emerald-700',
+        badge: 'bg-emerald-300 text-emerald-950',
+        badgeDark: 'bg-emerald-700 text-white'
+    },
+
+    purpleDark: {
+        bg: 'bg-purple-100',
+        bgDark: 'bg-purple-200',
+        bgButton: 'bg-purple-700',
+        border: 'border-purple-500',
+        borderDark: 'border-purple-600',
+        text: 'text-purple-900',
+        textBold: 'text-purple-950',
+        textLight: 'text-purple-700',
+        badge: 'bg-purple-300 text-purple-950',
+        badgeDark: 'bg-purple-700 text-white'
+    },
+
+    redDark: {
+        bg: 'bg-red-100',
+        bgDark: 'bg-red-200',
+        bgButton: 'bg-red-700',
+        border: 'border-red-500',
+        borderDark: 'border-red-600',
+        text: 'text-red-900',
+        textBold: 'text-red-950',
+        textLight: 'text-red-700',
+        badge: 'bg-red-300 text-red-950',
+        badgeDark: 'bg-red-700 text-white'
+    },
+
+    orangeDark: {
+        bg: 'bg-orange-100',
+        bgDark: 'bg-orange-200',
+        bgButton: 'bg-orange-700',
+        border: 'border-orange-500',
+        borderDark: 'border-orange-600',
+        text: 'text-orange-900',
+        textBold: 'text-orange-950',
+        textLight: 'text-orange-700',
+        badge: 'bg-orange-300 text-orange-950',
+        badgeDark: 'bg-orange-700 text-white'
+    },
+
+    tealDark: {
+        bg: 'bg-teal-100',
+        bgDark: 'bg-teal-200',
+        bgButton: 'bg-teal-700',
+        border: 'border-teal-500',
+        borderDark: 'border-teal-600',
+        text: 'text-teal-900',
+        textBold: 'text-teal-950',
+        textLight: 'text-teal-700',
+        badge: 'bg-teal-300 text-teal-950',
+        badgeDark: 'bg-teal-700 text-white'
+    }
+};
+
+            if (!colorMap[colorName]) {
+    console.warn(
+        "Couleur inconnue pour l'équipe :",
+        teamKey,
+        colorName
+    );
+}
+
+return colorMap[colorName] || colorMap.slate;
         }
 
        function switchTab(tabId) {
