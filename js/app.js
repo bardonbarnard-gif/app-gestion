@@ -6048,6 +6048,7 @@ const sportRoles = [
 const clubRoles = [
     "Correspondant Footclubs",
     "Community Manager",
+    "Intendant",
     "Responsable Communication",
     "Responsable Partenaires",
     "Responsable Arbitrage",
