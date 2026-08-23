@@ -3211,11 +3211,18 @@ state.selectedMatchId = matchId;
                 btn.classList.remove('bg-sky-600', 'text-white', 'bg-blue-600', 'bg-purple-600');
                 btn.classList.add('bg-slate-100', 'text-slate-600');
             });
-            const active = document.getElementById('filter-' + cat);
-            if (active) {
-                active.classList.remove('bg-slate-100', 'text-slate-600');
-                active.classList.add(cat === 'U14' ? 'bg-blue-600' : cat === 'U13' ? 'bg-purple-600' : 'bg-sky-600', 'text-white');
-            }
+            document
+    .querySelectorAll('.team-chip')
+    .forEach(btn => btn.classList.remove('active'));
+
+const active =
+    document.getElementById(
+        'filter-' + cat
+    );
+
+if (active) {
+    active.classList.add('active');
+}
             filterPlayers();
         }
 
@@ -3325,91 +3332,176 @@ function filterPlayers(query = "") {
 }
 
 function renderTeamFilters() {
-
     const container = document.getElementById('team-filters');
     if (!container) return;
 
     const role = window.currentUserRole || 'public';
     const userTeam = window.currentUserTeam || '';
 
-    container.innerHTML = '';
+    let teamsToDisplay = Object.entries(state.teams || {});
 
-    // ADMIN
-    if (role === 'admin') {
-
-        container.innerHTML =
-            `<button onclick="setFilterCat('all')"
-                id="filter-all"
-                class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-sky-600 text-white">
-                Tous
-            </button>`;
-
-        Object.entries(state.teams).forEach(([key, team]) => {
-
-            container.innerHTML += `
-                <button
-                    onclick="setFilterCat('${key}')"
-                    id="filter-${key}"
-                    class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-600">
-                    ${team.name}
-                </button>
-            `;
-        });
-
-        return;
-    }
-
-    // COACH
+    // Coach
     if (role === 'coach') {
-
-        const team = state.teams[userTeam];
-
-     if (team) {
-
-    currentCatFilter = userTeam;
-
-    container.innerHTML = `
-        <button
-            onclick="setFilterCat('${userTeam}')"
-            id="filter-${userTeam}"
-            class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg bg-sky-600 text-white">
-            ${team.name}
-        </button>
-    `;
-}   
-
-        return;
+        teamsToDisplay = teamsToDisplay.filter(
+            ([key]) => key === userTeam
+        );
     }
 
-    // RESPONSABLE
+    // Responsable
     if (role === 'responsable') {
+        const scopes = userTeam
+            .split(',')
+            .map(t => t.trim());
 
-    const teams = userTeam
-        .split(',')
-        .map(t => t.trim())
-        .filter(Boolean);
+        teamsToDisplay = teamsToDisplay.filter(
+            ([key]) => scopes.includes(key)
+        );
+    }
 
-    currentCatFilter = teams[0];
+    const totalPlayers = state.players.length;
 
-    teams.forEach((teamKey, index) => {
+    function getGroup(teamName) {
 
-        const team = state.teams[teamKey];
+    const name = teamName.toLowerCase();
 
-        if (!team) return;
+    // Féminines
+    if (name.includes('fem')) {
+        return 'FÉMININES';
+    }
 
-        container.innerHTML += `
-            <button
-                onclick="setFilterCat('${teamKey}')"
-                id="filter-${teamKey}"
-                class="cat-filter-btn px-2.5 py-1.5 text-xs font-bold rounded-lg
-                ${index === 0
-                    ? 'bg-sky-600 text-white'
-                    : 'bg-slate-100 text-slate-600'}">
-                ${team.name}
-            </button>
-        `;
-    });
+    // Seniors
+    if (name.includes('senior')) {
+        return 'SENIORS';
+    }
+
+    // École de foot
+    if (
+        name === 'u6' ||
+        name === 'u7' ||
+        name === 'u8' ||
+        name === 'u9' ||
+        name === 'u10' ||
+        name === 'u11'
+    ) {
+        return 'ÉCOLE DE FOOT';
+    }
+
+    // Départemental
+    if (
+        name.includes('départemental')
+    ) {
+        return 'JEUNES DÉPARTEMENTAL';
+    }
+
+    // Territoire
+    if (
+        name.includes('territoire') ||
+        name === 'u14' ||
+        name === 'u15' ||
+        name === 'u16' ||
+        name === 'u17' ||
+        name === 'u18'
+    ) {
+        return 'JEUNES TERRITOIRE';
+    }
+
+    return 'AUTRES';
 }
+        
+
+    const groups = {
+        'FÉMININES': [],
+        'SENIORS': [],
+        'JEUNES TERRITOIRE': [],
+        'JEUNES DÉPARTEMENTAL': [],
+        'ÉCOLE DE FOOT': [],
+        'AUTRES': []
+    };
+
+    teamsToDisplay.forEach(([key, team]) => {
+        const count = state.players.filter(
+            p => (p.team || '').toLowerCase() === key.toLowerCase()
+        ).length;
+
+        groups[getGroup(team.name || key)].push({
+            key,
+            name: team.name || key,
+            count
+        });
+    });
+
+    let html = `
+        <div class="bg-white rounded-xl border p-4 mb-4 card-shadow">
+            <div class="text-xs uppercase font-bold text-slate-500">
+                Effectif total
+            </div>
+
+            <div class="text-3xl font-extrabold text-sky-600 mt-1">
+                ${totalPlayers}
+            </div>
+
+            <div class="text-xs text-slate-500">
+                joueurs licenciés
+            </div>
+        </div>
+
+        <div class="team-group">
+            <button
+                onclick="setFilterCat('all')"
+                id="filter-all"
+                class="team-chip active">
+
+                Toutes
+
+                <span class="count">
+                    ${totalPlayers}
+                </span>
+            </button>
+        </div>
+    `;
+
+    Object.entries(groups).forEach(([groupName, teams]) => {
+
+        if (!teams.length) return;
+
+        html += `
+            <div class="team-group">
+
+                <div class="team-group-title">
+                    ${groupName}
+                </div>
+        `;
+
+        teams
+            .sort((a, b) => {
+
+    const numA = parseInt(a.name.match(/\d+/)?.[0] || 999);
+    const numB = parseInt(b.name.match(/\d+/)?.[0] || 999);
+
+    return numA - numB;
+})
+            .forEach(team => {
+
+                html += `
+                    <button
+                        onclick="setFilterCat('${team.key}')"
+                        id="filter-${team.key}"
+                        class="team-chip cat-filter-btn">
+
+                        ${team.name}
+
+                        <span class="count">
+                            ${team.count}
+                        </span>
+
+                    </button>
+                `;
+            });
+
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
 }
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
 function applyPermissions() {

@@ -94,6 +94,11 @@
         <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-btn text-xs font-semibold px-3.5 px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition bg-white/20 text-white">
             <i class="fa-solid fa-chart-pie"></i><span>Tableau</span>
         </button>
+
+        <button onclick="switchTab('effectif')" id="tab-effectif" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+            <i class="fa-solid fa-users"></i><span>Effectif & Stats</span>
+        </button>
+
         <button onclick="switchTab('matchs')" id="tab-matchs" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
             <i class="fa-solid fa-trophy"></i><span>Matchs</span>
         </button>
@@ -109,9 +114,7 @@
         <button onclick="switchTab('staff')" id="tab-staff" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
             <i class="fa-solid fa-user-tie"></i><span>Staff</span>
         </button>
-        <button onclick="switchTab('effectif')" id="tab-effectif" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
-            <i class="fa-solid fa-users"></i><span>Effectif & Stats</span>
-        </button>
+        
         <button
     onclick="switchTab('admin')"
     id="tab-admin"
@@ -201,18 +204,49 @@
 
         <section id="sec-effectif" class="space-y-4 hidden">
             <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                    <div><h2 class="text-base font-bold text-slate-800">Gestion de l'Effectif & Stats</h2><p class="text-xs text-slate-500">Suivi des matchs, buts, passes et cartons</p></div>
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-                        <div class="flex items-center space-x-1">
-                            <div id="team-filters" class="flex items-center space-x-1"></div>
-                        </div>
-                                                <div class="relative w-full sm:w-56">
-                            <input type="text" id="search-player" placeholder="Rechercher un joueur..." class="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
-                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-                        </div>
-                        <button onclick="openModalPlayer()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center space-x-1 whitespace-nowrap"><i class="fa-solid fa-user-plus"></i><span>Ajouter</span></button>
-                    </div>
+                <div class="effectif-header mb-5">
+
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h2 class="text-xl font-bold text-slate-800">
+                Effectif Club
+            </h2>
+
+            <p class="text-sm text-slate-500">
+                Navigation par catégorie d'équipes
+            </p>
+        </div>
+
+        <button id="all-teams-btn" class="team-chip active">
+            Toutes
+            <span class="count" id="club-total-count">0</span>
+        </button>
+    </div>
+
+    <div id="team-filters"></div>
+
+    <div class="mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+        <div class="relative w-full sm:w-72">
+            <input
+    type="text"
+    id="search-player"
+    placeholder="Rechercher un joueur..."
+    oninput="filterPlayers(this.value)"
+    class="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+        </div>
+
+        <button
+            onclick="openModalPlayer()"
+            class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center space-x-1">
+            <i class="fa-solid fa-user-plus"></i>
+            <span>Ajouter</span>
+        </button>
+    </div>
+
+</div>
+                                                
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="effectif-full-container"></div>
             </div>
