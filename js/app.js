@@ -130,10 +130,10 @@ if (
 }
 
 if (
-    selectedFunction?.functionName ===
-        "Éducateur principal" ||
-    selectedFunction?.functionName ===
-        "Éducateur adjoint"
+    selectedFunction?.functionName === "Éducateur principal" ||
+    selectedFunction?.functionName === "Éducateur adjoint" ||
+    selectedFunction?.functionName === "Coach Principal" ||
+    selectedFunction?.functionName === "Coach Adjoint"
 ) {
     role = "coach";
 }
@@ -3739,20 +3739,7 @@ try {
 
    // Création du compte d'accès
 
-   const existingUser =
-    await firebase.database()
-        .ref("rangueil_data/access/" + pin)
-        .once("value");
-
-if (existingUser.exists()) {
-
-    showToast(
-        "⚠️ Ce code PIN est déjà utilisé"
-    );
-
-    return;
-}
-await firebase.database()
+  await firebase.database()
     .ref("rangueil_data/access/" + pin)
    .set({
 
@@ -5898,13 +5885,13 @@ if (userData.role === "admin") {
             }
 
             if (
-    selectedFunction.functionName ===
-        "Éducateur principal" ||
-    selectedFunction.functionName ===
-        "Éducateur adjoint"
+    selectedFunction?.functionName === "Éducateur principal" ||
+    selectedFunction?.functionName === "Éducateur adjoint" ||
+    selectedFunction?.functionName === "Coach Principal" ||
+    selectedFunction?.functionName === "Coach Adjoint"
 ) {
-                role = "coach";
-            }
+    role = "coach";
+}
 
             window.currentUserPin =
                 pin;
