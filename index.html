@@ -609,6 +609,22 @@
                 <!-- Stats présence séance -->
                 <div class="grid grid-cols-4 gap-2" id="session-presence-stats"></div>
 
+                <!-- Génération d'équipes -->
+<div class="mt-4 bg-white p-4 rounded-xl card-shadow border border-slate-100">
+
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+
+        <button
+            onclick="generateBalancedTeams()"
+            class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold">
+            ⚽ Générer les équipes
+        </button>
+
+    </div>
+
+    <div id="training-teams-zone"></div>
+
+</div>
                 <!-- Appel -->
                 <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
 
@@ -618,33 +634,43 @@
             🗣️ Appel de la séance
         </h3>
 
-        <div class="flex flex-wrap gap-2">
+       <div class="flex flex-wrap gap-2">
 
-            <button
-                onclick="setAllTrainingPresent()"
-                class="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold">
-                ✅ Tous présents
-            </button>
+    <button
+        onclick="setAllTrainingPresent()"
+        class="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold">
+        ✅ Tous présents
+    </button>
 
-            <button
-                onclick="setAllTrainingAbsent()"
-                class="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold">
-                ❌ Tous absents
-            </button>
+    <button
+        onclick="setAllTrainingAbsent()"
+        class="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold">
+        ❌ Tous absents
+    </button>
 
-            <button
-                onclick="resetTrainingAttendance()"
-                class="px-3 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-xs font-bold">
-                🔄 Réinitialiser
-            </button>
+    <button
+        onclick="resetTrainingAttendance()"
+        class="px-3 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-xs font-bold">
+        🔄 Réinitialiser
+    </button>
 
-        </div>
+    <button
+        onclick="generateBalancedTeams()"
+        class="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold">
+        ⚽ Générer les équipes
+    </button>
+
+</div>
+
 
     </div>
 
     <div class="space-y-2" id="entrainements-tbody"></div>
 
 </div>
+
+<!-- Equipes générées -->
+<div id="training-teams-zone" class="mt-4"></div>
 
                 <!-- Taux de présence joueurs -->
                 <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">

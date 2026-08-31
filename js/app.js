@@ -1959,6 +1959,8 @@ const nbTotal = playersForTraining.length;
             renderSessionPresenceStats(s);
             renderAppel(s);
             renderAttendanceBars();
+            renderGeneratedTeams();
+
         }
 
         function backToTrainingList() {
@@ -7214,4 +7216,180 @@ function resetComposition() {
     showToast(
         "Tous les joueurs ont été remis au banc"
     );
+}
+
+function getNiveauIcon(niveau) {
+    if (niveau === 3) return '🟢';
+    if (niveau === 2) return '🟡';
+    return '🔴';
+}
+
+function generateBalancedTeams() {
+
+    alert("Génération lancée");
+
+    const session = state.trainings[currentTrainingId];
+    if (!session) return;
+
+    const presents = state.players.filter(p =>
+    session.presence?.[p.id] === 'present' ||
+    session.presence?.[p.id] === 'retard'
+);
+
+const gardiens = presents.filter(
+    p => (p.poste1 || '').toUpperCase() === 'GB'
+);
+
+const joueursChamp = presents.filter(
+    p => (p.poste1 || '').toUpperCase() !== 'GB'
+);
+
+    const categories = {
+        DEF: [],
+        MIL: [],
+        ATT: [],
+        AUTRE: []
+    };
+
+    joueursChamp.forEach(player => {
+
+        const poste = (player.poste1 || '').toUpperCase();
+
+        if (['DC', 'DG', 'DD'].includes(poste))
+            categories.DEF.push(player);
+
+        else if (['MC', 'MOC'].includes(poste))
+            categories.MIL.push(player);
+
+        else if (['AD', 'AG', 'BU'].includes(poste))
+            categories.ATT.push(player);
+
+        else
+            categories.AUTRE.push(player);
+    });
+
+    const teamA = [];
+    const teamB = [];
+
+    Object.values(categories).forEach(group => {
+
+        group.sort((a, b) =>
+            (b.niveau || 2) - (a.niveau || 2)
+        );
+
+        let scoreA = teamA.reduce((s, p) => s + (p.niveau || 2), 0);
+let scoreB = teamB.reduce((s, p) => s + (p.niveau || 2), 0);
+
+group.forEach(player => {
+
+    if (teamA.length < teamB.length) {
+        teamA.push(player);
+        scoreA += player.niveau || 2;
+    }
+    else if (teamB.length < teamA.length) {
+        teamB.push(player);
+        scoreB += player.niveau || 2;
+    }
+    else {
+
+        if (scoreA <= scoreB) {
+            teamA.push(player);
+            scoreA += player.niveau || 2;
+        } else {
+            teamB.push(player);
+            scoreB += player.niveau || 2;
+        }
+
+    }
+
+});
+
+});
+
+    session.generatedTeams = {
+    gardiens: gardiens.map(p => p.id),
+    teamA: teamA.map(p => p.id),
+    teamB: teamB.map(p => p.id)
+};
+
+    saveStateToFirebase();
+
+    renderGeneratedTeams();
+}
+
+function renderGeneratedTeams() {
+
+    const session = state.trainings[currentTrainingId];
+    const container = document.getElementById('training-teams-zone');
+
+    if (!container) return;
+
+    if (!session || !session.generatedTeams) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const gardiens = (session.generatedTeams.gardiens || [])
+        .map(id => state.players.find(p => p.id === id))
+        .filter(Boolean);
+
+    const teamA = (session.generatedTeams.teamA || [])
+        .map(id => state.players.find(p => p.id === id))
+        .filter(Boolean);
+
+    const teamB = (session.generatedTeams.teamB || [])
+        .map(id => state.players.find(p => p.id === id))
+        .filter(Boolean);
+
+    let html = '';
+
+    if (gardiens.length > 0) {
+        html += `
+            <div class="mb-4 p-4 rounded-xl border bg-emerald-50">
+                <h3 class="font-bold text-emerald-700 mb-2">
+                    🧤 Gardien
+                </h3>
+
+                ${gardiens.map(p => `
+                    <div class="py-1">
+                        ${getNiveauIcon(p.niveau)} ${p.name}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    html += `
+        <div class="grid md:grid-cols-2 gap-4">
+
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <h3 class="font-bold text-blue-700 mb-3">
+                    🔵 Équipe A (${teamA.length})
+                </h3>
+
+                ${teamA.map(p => `
+                    <div class="flex justify-between py-1 border-b border-blue-100 text-sm">
+                        <span>${getNiveauIcon(p.niveau)} ${p.name}</span>
+                        <span class="text-slate-500">${p.poste1 || '-'}</span>
+                    </div>
+                `).join('')}
+            </div>
+
+            <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+                <h3 class="font-bold text-red-700 mb-3">
+                    🔴 Équipe B (${teamB.length})
+                </h3>
+
+                ${teamB.map(p => `
+                    <div class="flex justify-between py-1 border-b border-red-100 text-sm">
+                        <span>${getNiveauIcon(p.niveau)} ${p.name}</span>
+                        <span class="text-slate-500">${p.poste1 || '-'}</span>
+                    </div>
+                `).join('')}
+            </div>
+
+        </div>
+    `;
+
+    container.innerHTML = html;
 }
