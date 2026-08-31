@@ -122,10 +122,10 @@ if (
     role = "admin";
 }
 
-if (
-    selectedFunction?.functionName ===
-    "Responsable catégorie"
-) {
+const functionName =
+    selectedFunction?.functionName || "";
+
+if (functionName.startsWith("Responsable")) {
     role = "responsable";
 }
 
@@ -167,20 +167,6 @@ sessionStorage.setItem(
     "true"
 );
 
-sessionStorage.setItem(
-    "currentUserData",
-    JSON.stringify(userData)
-);
-
-sessionStorage.setItem(
-    "currentUserRole",
-    userData.role
-);
-
-sessionStorage.setItem(
-    "isUnlocked",
-    "true"
-);
 
 if (pinScreen) {
 
@@ -1052,7 +1038,21 @@ if (role === 'coach') {
 
     let playersToDisplay = state.players;
 
-    if (role === 'coach') {
+if (role === 'responsable') {
+
+    const allowedTeams = userTeam
+        .split(',')
+        .map(t => t.trim().toLowerCase());
+
+    playersToDisplay = state.players.filter(
+        p =>
+            allowedTeams.includes(
+                (p.team || p.cat || '').toLowerCase()
+            )
+    );
+
+} else if (role === 'coach') {
+
     playersToDisplay = state.players.filter(
         p =>
             (p.team || p.cat || '').toLowerCase() ===
@@ -1172,11 +1172,21 @@ Object.values(state.trainings).forEach(session => {
 
     let matches = Object.values(state.matches);
 
-    if (role === 'coach') {
-        matches = matches.filter(m =>
-            (m.team || '').toLowerCase() === userTeam.toLowerCase()
-        );
-    }
+    if (
+    role === 'coach' ||
+    role === 'responsable'
+) {
+
+    const allowedTeams = userTeam
+        .split(',')
+        .map(t => t.trim().toLowerCase());
+
+    matches = matches.filter(m =>
+        allowedTeams.includes(
+            (m.team || '').toLowerCase()
+        )
+    );
+}
 
     // Tri par date
     matches.sort((a, b) => {
@@ -2315,11 +2325,21 @@ function duplicateTraining() {
     let matches = Object.values(state.matches);
 
     // Coach : seulement les matchs de son équipe
-    if (role === 'coach') {
-        matches = matches.filter(m =>
-            (m.team || '').toLowerCase() === userTeam.toLowerCase()
-        );
-    }
+    if (
+    role === 'coach' ||
+    role === 'responsable'
+) {
+
+    const allowedTeams = userTeam
+        .split(',')
+        .map(t => t.trim().toLowerCase());
+
+    matches = matches.filter(m =>
+        allowedTeams.includes(
+            (m.team || '').toLowerCase()
+        )
+    );
+}
 
     // Trier les matchs par date (prochain d'abord)
     matches.sort((a, b) => {
@@ -3185,6 +3205,26 @@ state.selectedMatchId = matchId;
                 document.getElementById('modal-player-title').innerText = "Ajouter un Joueur";
                 document.getElementById('p-id').value = '';
             }
+            const role = window.currentUserRole || 'public';
+const userTeam = window.currentUserTeam || '';
+
+if (role === 'responsable') {
+
+    const teamSelect =
+        document.getElementById('p-team');
+
+    const scopes = userTeam
+        .split(',')
+        .map(t => t.trim());
+
+    Array.from(teamSelect.options)
+        .forEach(option => {
+
+            option.hidden =
+                !scopes.includes(option.value);
+
+        });
+}
             toggleModal('modal-player', true);
         }
 
@@ -3318,14 +3358,29 @@ function filterPlayers(query = "") {
     const role = window.currentUserRole || 'public';
     const userTeam = window.currentUserTeam || 'all';
 
-    const playersSource =
-        role === 'coach'
-            ? state.players.filter(
-                p =>
-                    (p.team || p.cat || '').toLowerCase() ===
-                    userTeam.toLowerCase()
+    let playersSource = state.players;
+
+if (role === 'responsable') {
+
+    const allowedTeams = userTeam
+        .split(',')
+        .map(t => t.trim().toLowerCase());
+
+    playersSource = state.players.filter(
+        p =>
+            allowedTeams.includes(
+                (p.team || p.cat || '').toLowerCase()
             )
-            : state.players;
+    );
+
+} else if (role === 'coach') {
+
+    playersSource = state.players.filter(
+        p =>
+            (p.team || p.cat || '').toLowerCase() ===
+            userTeam.toLowerCase()
+    );
+}
 
     const container = document.getElementById('effectif-full-container');
     const cards = Array.from(container.children);
@@ -3451,27 +3506,29 @@ function renderTeamFilters() {
     });
 
     let html = `
-        <div class="bg-white rounded-xl border p-4 mb-4 card-shadow">
-            <div class="text-xs uppercase font-bold text-slate-500">
-                Effectif total
-            </div>
+    <div class="bg-white rounded-xl border p-4 mb-4 card-shadow">
+        ...
+    </div>
+`;
 
-            <div class="text-3xl font-extrabold text-sky-600 mt-1">
-                ${totalPlayers}
-            </div>
+if (role === 'admin') {
+    html += `
+        ${role === 'admin' ? `
+<div class="team-group">
+    <button
+        onclick="setFilterCat('all')"
+        id="filter-all"
+        class="team-chip active">
 
-            <div class="text-xs text-slate-500">
-                joueurs licenciés
-            </div>
-        </div>
+        Toutes
 
-        <div class="team-group">
-            <button
-                onclick="setFilterCat('all')"
-                id="filter-all"
-                class="team-chip active">
+        <span class="count">
+            ${totalPlayers}
+        </span>
+    </button>
+</div>
+` : ''}
 
-                Toutes
 
                 <span class="count">
                     ${totalPlayers}
@@ -3479,6 +3536,7 @@ function renderTeamFilters() {
             </button>
         </div>
     `;
+}
 
     Object.entries(groups).forEach(([groupName, teams]) => {
 
@@ -5896,13 +5954,13 @@ if (userData.role === "admin") {
     role = "admin";
 }
 
-            if (
-    selectedFunction.functionName ===
-    "Responsable catégorie"
-)
- {
-                role = "responsable";
-            }
+            const functionName =
+    selectedFunction.functionName || "";
+
+if (functionName.startsWith("Responsable")) {
+    role = "responsable";
+}
+
 
             if (
     selectedFunction?.functionName === "Éducateur principal" ||
