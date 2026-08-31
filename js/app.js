@@ -1064,6 +1064,14 @@ if (role === 'coach') {
             const container = document.getElementById('effectif-full-container');
             container.innerHTML = playersToDisplay.map(p => {
                 const p1 = p.poste1 || '-', p2 = p.poste2 || '-', p3 = p.poste3 || '-';
+                const niveau = p.niveau || 2;
+
+const niveauBadge =
+    niveau === 3
+        ? '<span class="font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">🟢 Niveau 3</span>'
+        : niveau === 2
+        ? '<span class="font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700">🟡 Niveau 2</span>'
+        : '<span class="font-bold px-2 py-0.5 rounded bg-red-100 text-red-700">🔴 Niveau 1</span>';
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
@@ -1136,6 +1144,12 @@ Object.values(state.trainings).forEach(session => {
                                 ${presencePct !== null ? `${presencePct}% 📅 (${presences}/${totalSessions})` : '<span class="text-slate-400 font-normal italic">Aucune séance passée</span>'}
                             </span>
                         </div>
+                        <div class="bg-white p-2 rounded border">
+    <p class="text-[10px] text-slate-500 uppercase font-extrabold mb-1">
+        Niveau :
+    </p>
+    ${niveauBadge}
+</div>
                         <div class="bg-white p-2 rounded border space-y-1">
                             <p class="text-[10px] text-slate-500 uppercase font-extrabold">Postes :</p>
                             <div class="flex items-center space-x-1.5 text-[11px]">
@@ -3160,6 +3174,7 @@ state.selectedMatchId = matchId;
                     document.getElementById('p-poste1').value = (player.poste1 || '').replace('-', '');
                     document.getElementById('p-poste2').value = (player.poste2 || '').replace('-', '');
                     document.getElementById('p-poste3').value = (player.poste3 || '').replace('-', '');
+                    document.getElementById('p-niveau').value = player.niveau || 2;
                     document.getElementById('p-phone-pere').value = player.phonePere !== '-' ? player.phonePere : '';
                     document.getElementById('p-phone-mere').value = player.phoneMere !== '-' ? player.phoneMere : '';
                     document.getElementById('p-phone-joueur').value = player.phoneJoueur !== '-' ? player.phoneJoueur : '';
@@ -3175,17 +3190,20 @@ state.selectedMatchId = matchId;
             e.preventDefault();
             const pId = document.getElementById('p-id').value;
             const playerData = {
-                id: pId || 'J_' + Date.now(),
-                name: document.getElementById('p-name').value,
-                licence: document.getElementById('p-licence').value.trim() || '-',
-                team: document.getElementById('p-team').value,
-                poste1: document.getElementById('p-poste1').value.trim() || '-',
-                poste2: document.getElementById('p-poste2').value.trim() || '-',
-                poste3: document.getElementById('p-poste3').value.trim() || '-',
-                phonePere: document.getElementById('p-phone-pere').value || '-',
-                phoneMere: document.getElementById('p-phone-mere').value || '-',
-                phoneJoueur: document.getElementById('p-phone-joueur').value || '-'
-            };
+    id: pId || 'J_' + Date.now(),
+    name: document.getElementById('p-name').value,
+    licence: document.getElementById('p-licence').value.trim() || '-',
+    team: document.getElementById('p-team').value,
+    poste1: document.getElementById('p-poste1').value.trim() || '-',
+    poste2: document.getElementById('p-poste2').value.trim() || '-',
+    poste3: document.getElementById('p-poste3').value.trim() || '-',
+
+    niveau: parseInt(document.getElementById('p-niveau').value) || 2,
+
+    phonePere: document.getElementById('p-phone-pere').value || '-',
+    phoneMere: document.getElementById('p-phone-mere').value || '-',
+    phoneJoueur: document.getElementById('p-phone-joueur').value || '-'
+};
             if (pId) {
                 const idx = state.players.findIndex(p => p.id === pId);
                 if (idx !== -1) state.players[idx] = playerData;
