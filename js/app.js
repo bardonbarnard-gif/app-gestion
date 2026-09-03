@@ -7375,6 +7375,47 @@ group.forEach(player => {
     renderGeneratedTeams();
 }
 
+function movePlayerToOtherTeam(playerId) {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session || !session.generatedTeams) return;
+
+    if (!session.generatedTeams.teamA) {
+        session.generatedTeams.teamA = [];
+    }
+
+    if (!session.generatedTeams.teamB) {
+        session.generatedTeams.teamB = [];
+    }
+
+    let teamA = [...session.generatedTeams.teamA];
+    let teamB = [...session.generatedTeams.teamB];
+
+    if (teamA.includes(playerId)) {
+
+        teamA = teamA.filter(id => id !== playerId);
+
+        if (!teamB.includes(playerId)) {
+            teamB.push(playerId);
+        }
+
+    } else if (teamB.includes(playerId)) {
+
+        teamB = teamB.filter(id => id !== playerId);
+
+        if (!teamA.includes(playerId)) {
+            teamA.push(playerId);
+        }
+    }
+
+    session.generatedTeams.teamA = teamA;
+    session.generatedTeams.teamB = teamB;
+
+    saveStateToFirebase();
+    renderGeneratedTeams();
+}
+
 function renderGeneratedTeams() {
 
     const session = state.trainings[currentTrainingId];
@@ -7402,6 +7443,7 @@ function renderGeneratedTeams() {
     let html = '';
 
     if (gardiens.length > 0) {
+
         html += `
             <div class="mb-4 p-4 rounded-xl border bg-emerald-50">
                 <h3 class="font-bold text-emerald-700 mb-2">
@@ -7421,33 +7463,533 @@ function renderGeneratedTeams() {
         <div class="grid md:grid-cols-2 gap-4">
 
             <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+
                 <h3 class="font-bold text-blue-700 mb-3">
                     🔵 Équipe A (${teamA.length})
                 </h3>
 
                 ${teamA.map(p => `
-                    <div class="flex justify-between py-1 border-b border-blue-100 text-sm">
-                        <span>${getNiveauIcon(p.niveau)} ${p.name}</span>
-                        <span class="text-slate-500">${p.poste1 || '-'}</span>
+
+                    <div class="flex justify-between items-center py-1 border-b border-blue-100 text-sm">
+
+                        <span>
+                            ${getNiveauIcon(p.niveau)} ${p.name}
+                        </span>
+
+                        <div class="flex items-center gap-2">
+
+                            <span class="text-slate-500">
+                                ${p.poste1 || '-'}
+                            </span>
+
+                            <button
+                                onclick="movePlayerToOtherTeam('${p.id}')"
+                                class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-xs">
+                                ➡️
+                            </button>
+
+                        </div>
+
                     </div>
+
                 `).join('')}
+
             </div>
 
             <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+
                 <h3 class="font-bold text-red-700 mb-3">
                     🔴 Équipe B (${teamB.length})
                 </h3>
 
                 ${teamB.map(p => `
-                    <div class="flex justify-between py-1 border-b border-red-100 text-sm">
-                        <span>${getNiveauIcon(p.niveau)} ${p.name}</span>
-                        <span class="text-slate-500">${p.poste1 || '-'}</span>
+
+                    <div class="flex justify-between items-center py-1 border-b border-red-100 text-sm">
+
+                        <span>
+                            ${getNiveauIcon(p.niveau)} ${p.name}
+                        </span>
+
+                        <div class="flex items-center gap-2">
+
+                            <button
+                                onclick="movePlayerToOtherTeam('${p.id}')"
+                                class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-xs">
+                                ⬅️
+                            </button>
+
+                            <span class="text-slate-500">
+                                ${p.poste1 || '-'}
+                            </span>
+
+                        </div>
+
                     </div>
+
                 `).join('')}
+
             </div>
+
+        </div>
+
+        <div class="mt-4 text-center">
+
+            <button
+                onclick="openExerciseBoard()"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold">
+                ⚽ Créer un exercice
+            </button>
 
         </div>
     `;
 
     container.innerHTML = html;
+}
+
+function openExerciseBoard() {
+
+    const session =
+        state.trainings[currentTrainingId];
+
+    if (!session?.generatedTeams) return;
+
+    const container =
+        document.getElementById(
+            "training-exercise-board"
+        );
+
+    container.classList.remove("hidden");
+
+    container.innerHTML = `
+
+        <h3 class="font-bold text-slate-800 mb-4">
+            ⚽ Exercices
+        </h3>
+
+        <div class="flex flex-wrap gap-2 mb-4">
+
+            <button
+                onclick="renderExercise4v4()"
+                class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
+                4 vs 4
+            </button>
+
+            <button
+                onclick="renderExercise6v6()"
+                class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
+                6 vs 6
+            </button>
+
+            <button
+    onclick="renderExercise8v8_242()"
+    class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
+    8v8 2-4-2
+</button>
+
+<button
+    onclick="renderExercise8v8_332()"
+    class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
+    8v8 3-3-2
+</button>
+
+<button
+    onclick="renderExercise8v8_251()"
+    class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
+    8v8 2-5-1
+</button>
+
+            <button
+                onclick="renderExercise10v10()"
+                class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
+                10 vs 10
+            </button>
+
+        </div>
+
+        <div
+            id="exercise-field"
+            style="
+                position:relative;
+                width:100%;
+                height:700px;
+                background:#2E7D32;
+                border:4px solid white;
+                border-radius:12px;
+                overflow:hidden;
+            ">
+        </div>
+
+    `;
+
+    renderExercise8v8();
+}
+
+function createPosition(
+    label,
+    x,
+    y,
+    color
+) {
+
+    return `
+        <div
+            style="
+                position:absolute;
+                left:${x}%;
+                top:${y}%;
+                transform:translate(-50%,-50%);
+                width:60px;
+                height:60px;
+                border-radius:50%;
+                background:${color};
+                color:white;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:11px;
+                font-weight:bold;
+                border:2px solid white;
+                box-shadow:0 2px 5px rgba(0,0,0,.3);
+            "
+        >
+            ${label}
+        </div>
+    `;
+}
+
+function renderExercise8v8() {
+
+    const field =
+        document.getElementById(
+            "exercise-field"
+        );
+
+    if (!field) return;
+
+    field.innerHTML = `
+
+        <div
+            style="
+                position:absolute;
+                left:0;
+                right:0;
+                top:50%;
+                height:4px;
+                background:white;
+            ">
+        </div>
+
+        ${createPosition("GB",50,12,"#2563eb")}
+
+        ${createPosition("DG",30,24,"#2563eb")}
+        ${createPosition("DC",50,24,"#2563eb")}
+        ${createPosition("DD",70,24,"#2563eb")}
+
+        ${createPosition("MC",40,36,"#2563eb")}
+        ${createPosition("MC",60,36,"#2563eb")}
+
+        ${createPosition("AG",30,46,"#2563eb")}
+        ${createPosition("BU",50,46,"#2563eb")}
+        ${createPosition("AD",70,46,"#2563eb")}
+
+        ${createPosition("AG",30,54,"#dc2626")}
+        ${createPosition("BU",50,54,"#dc2626")}
+        ${createPosition("AD",70,54,"#dc2626")}
+
+        ${createPosition("MC",40,64,"#dc2626")}
+        ${createPosition("MC",60,64,"#dc2626")}
+
+        ${createPosition("DG",30,76,"#dc2626")}
+        ${createPosition("DC",50,76,"#dc2626")}
+        ${createPosition("DD",70,76,"#dc2626")}
+
+        ${createPosition("GB",50,88,"#dc2626")}
+
+    `;
+}
+
+function renderExercise4v4() {
+
+    const field =
+        document.getElementById(
+            "exercise-field"
+        );
+
+    if (!field) return;
+
+    field.innerHTML = `
+
+        <div
+            style="
+                position:absolute;
+                left:0;
+                right:0;
+                top:50%;
+                height:4px;
+                background:white;
+            ">
+        </div>
+
+        ${createPosition("MC",50,30,"#2563eb")}
+
+        ${createPosition("AG",30,45,"#2563eb")}
+        ${createPosition("BU",50,45,"#2563eb")}
+        ${createPosition("AD",70,45,"#2563eb")}
+
+        ${createPosition("AG",30,55,"#dc2626")}
+        ${createPosition("BU",50,55,"#dc2626")}
+        ${createPosition("AD",70,55,"#dc2626")}
+
+        ${createPosition("MC",50,70,"#dc2626")}
+
+    `;
+}
+
+function renderExercise6v6() {
+
+    const field =
+        document.getElementById(
+            "exercise-field"
+        );
+
+    if (!field) return;
+
+    field.innerHTML = `
+
+        <div
+            style="
+                position:absolute;
+                left:0;
+                right:0;
+                top:50%;
+                height:4px;
+                background:white;
+            ">
+        </div>
+
+        ${createPosition("GB",50,15,"#2563eb")}
+
+        ${createPosition("DG",35,28,"#2563eb")}
+        ${createPosition("DD",65,28,"#2563eb")}
+
+        ${createPosition("MC",40,38,"#2563eb")}
+        ${createPosition("MC",60,38,"#2563eb")}
+
+        ${createPosition("AG",35,46,"#2563eb")}
+        ${createPosition("BU",50,46,"#2563eb")}
+        ${createPosition("AD",65,46,"#2563eb")}
+
+
+        ${createPosition("AG",35,54,"#dc2626")}
+        ${createPosition("BU",50,54,"#dc2626")}
+        ${createPosition("AD",65,54,"#dc2626")}
+
+        ${createPosition("MC",40,62,"#dc2626")}
+        ${createPosition("MC",60,62,"#dc2626")}
+
+        ${createPosition("DG",35,72,"#dc2626")}
+        ${createPosition("DD",65,72,"#dc2626")}
+
+        ${createPosition("GB",50,85,"#dc2626")}
+
+    `;
+}
+
+function renderExercise10v10() {
+
+    const field =
+        document.getElementById(
+            "exercise-field"
+        );
+
+    if (!field) return;
+
+    field.innerHTML = `
+
+        <div
+            style="
+                position:absolute;
+                left:0;
+                right:0;
+                top:50%;
+                height:4px;
+                background:white;
+            ">
+        </div>
+
+        ${createPosition("GB",50,10,"#2563eb")}
+
+        ${createPosition("DG",20,22,"#2563eb")}
+        ${createPosition("DC",40,22,"#2563eb")}
+        ${createPosition("DC",60,22,"#2563eb")}
+        ${createPosition("DD",80,22,"#2563eb")}
+
+        ${createPosition("MC",40,35,"#2563eb")}
+        ${createPosition("MC",60,35,"#2563eb")}
+
+        ${createPosition("AG",25,45,"#2563eb")}
+        ${createPosition("MOC",50,45,"#2563eb")}
+        ${createPosition("AD",75,45,"#2563eb")}
+
+        ${createPosition("BU",50,49,"#2563eb")}
+
+
+        ${createPosition("BU",50,51,"#dc2626")}
+
+        ${createPosition("AG",25,55,"#dc2626")}
+        ${createPosition("MOC",50,55,"#dc2626")}
+        ${createPosition("AD",75,55,"#dc2626")}
+
+        ${createPosition("MC",40,65,"#dc2626")}
+        ${createPosition("MC",60,65,"#dc2626")}
+
+                ${createPosition("DG",20,78,"#dc2626")}
+        ${createPosition("DC",40,78,"#dc2626")}
+        ${createPosition("DC",60,78,"#dc2626")}
+        ${createPosition("DD",80,78,"#dc2626")}
+
+        ${createPosition("GB",50,90,"#dc2626")}
+
+    `;
+}
+
+function renderExercise8v8_242() {
+
+    const field =
+        document.getElementById("exercise-field");
+
+    if (!field) return;
+
+    field.innerHTML = `
+
+        <div style="
+            position:absolute;
+            left:0;
+            right:0;
+            top:50%;
+            height:4px;
+            background:white;">
+        </div>
+
+        ${createPosition("GB",50,12,"#2563eb")}
+
+        ${createPosition("DC",40,25,"#2563eb")}
+        ${createPosition("DC",60,25,"#2563eb")}
+
+        ${createPosition("MG",20,37,"#2563eb")}
+        ${createPosition("MC",40,37,"#2563eb")}
+        ${createPosition("MC",60,37,"#2563eb")}
+        ${createPosition("MD",80,37,"#2563eb")}
+
+        ${createPosition("BU",40,47,"#2563eb")}
+        ${createPosition("BU",60,47,"#2563eb")}
+
+        ${createPosition("BU",40,53,"#dc2626")}
+        ${createPosition("BU",60,53,"#dc2626")}
+
+        ${createPosition("MG",20,63,"#dc2626")}
+        ${createPosition("MC",40,63,"#dc2626")}
+        ${createPosition("MC",60,63,"#dc2626")}
+        ${createPosition("MD",80,63,"#dc2626")}
+
+        ${createPosition("DC",40,75,"#dc2626")}
+        ${createPosition("DC",60,75,"#dc2626")}
+
+        ${createPosition("GB",50,88,"#dc2626")}
+
+    `;
+}
+
+function renderExercise8v8_332() {
+
+    const field =
+        document.getElementById("exercise-field");
+
+    if (!field) return;
+
+    field.innerHTML = `
+
+        <div style="
+            position:absolute;
+            left:0;
+            right:0;
+            top:50%;
+            height:4px;
+            background:white;">
+        </div>
+
+        ${createPosition("GB",50,12,"#2563eb")}
+
+        ${createPosition("DG",25,25,"#2563eb")}
+        ${createPosition("DC",50,25,"#2563eb")}
+        ${createPosition("DD",75,25,"#2563eb")}
+
+        ${createPosition("MC",30,37,"#2563eb")}
+        ${createPosition("MC",50,37,"#2563eb")}
+        ${createPosition("MC",70,37,"#2563eb")}
+
+        ${createPosition("BU",40,47,"#2563eb")}
+        ${createPosition("BU",60,47,"#2563eb")}
+
+        ${createPosition("BU",40,53,"#dc2626")}
+        ${createPosition("BU",60,53,"#dc2626")}
+
+        ${createPosition("MC",30,63,"#dc2626")}
+        ${createPosition("MC",50,63,"#dc2626")}
+        ${createPosition("MC",70,63,"#dc2626")}
+
+        ${createPosition("DG",25,75,"#dc2626")}
+        ${createPosition("DC",50,75,"#dc2626")}
+        ${createPosition("DD",75,75,"#dc2626")}
+
+        ${createPosition("GB",50,88,"#dc2626")}
+
+    `;
+}
+
+function renderExercise8v8_251() {
+
+    const field =
+        document.getElementById("exercise-field");
+
+    if (!field) return;
+
+    field.innerHTML = `
+
+        <div style="
+            position:absolute;
+            left:0;
+            right:0;
+            top:50%;
+            height:4px;
+            background:white;">
+        </div>
+
+        ${createPosition("GB",50,12,"#2563eb")}
+
+        ${createPosition("DC",40,25,"#2563eb")}
+        ${createPosition("DC",60,25,"#2563eb")}
+
+        ${createPosition("MG",15,37,"#2563eb")}
+        ${createPosition("MC",32,37,"#2563eb")}
+        ${createPosition("MC",50,37,"#2563eb")}
+        ${createPosition("MC",68,37,"#2563eb")}
+        ${createPosition("MD",85,37,"#2563eb")}
+
+        ${createPosition("BU",50,47,"#2563eb")}
+
+        ${createPosition("BU",50,53,"#dc2626")}
+
+        ${createPosition("MG",15,63,"#dc2626")}
+        ${createPosition("MC",32,63,"#dc2626")}
+        ${createPosition("MC",50,63,"#dc2626")}
+        ${createPosition("MC",68,63,"#dc2626")}
+        ${createPosition("MD",85,63,"#dc2626")}
+
+        ${createPosition("DC",40,75,"#dc2626")}
+        ${createPosition("DC",60,75,"#dc2626")}
+
+        ${createPosition("GB",50,88,"#dc2626")}
+
+    `;
 }
