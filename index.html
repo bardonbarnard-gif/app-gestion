@@ -22,38 +22,59 @@
 </head>
 <body class="text-slate-800 pb-20 md:pb-10">
 
-<div id="pin-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111827; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-family: sans-serif;">
-    <h2 style="margin-bottom: 20px;">🔒 Accès Restreint</h2>
-    <p style="margin-bottom: 15px; font-size: 14px; color: #9CA3AF;">Entrez le code PIN à 4 chiffres</p>
-    <input type="password" id="pin-input" maxlength="4" pattern="[0-9]*" inputmode="numeric" style="font-size: 24px; padding: 10px; width: 120px; text-align: center; letter-spacing: 5px; border-radius: 8px; border: 1px solid #4B5563; background: #1F2937; color: white; outline: none;" placeholder="••••">
-    <p id="pin-error" style="color: #EF4444; margin-top: 15px; font-size: 14px; display: none;">Code incorrect</p>
+<div id="pin-screen">
+    <div class="pin-card">
+        <img src="rangueil HQ.png" alt="Logo Rangueil FC" class="pin-logo">
+        <h2 class="pin-title">Rangueil FC</h2>
+        <p class="pin-subtitle">Entrez votre code PIN à 4 chiffres</p>
+        <div class="pin-dots" id="pin-dots" aria-hidden="true">
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+        </div>
+        <input type="password" id="pin-input" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="••••" autocomplete="off" aria-label="Code PIN à 4 chiffres">
+        <p id="pin-error" class="pin-error">Code incorrect</p>
+    </div>
 </div>
 
 <div id="function-selector-screen"
-     class="fixed inset-0 bg-slate-900 z-[9998] hidden flex items-center justify-center p-4">
+     class="fs-screen">
 
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+    <div class="fs-card">
 
-        <div class="text-center mb-6">
+        <img src="rangueil HQ.png"
+             alt="Logo Rangueil FC"
+             class="fs-logo">
 
-            <div class="text-4xl mb-3">
-                👤
-            </div>
+        <h2 class="fs-title">
+            Bonjour 👋
+        </h2>
 
-            <h2 class="text-xl font-bold text-slate-800">
-                Choisissez votre fonction
-            </h2>
+        <p class="fs-subtitle">
+            Choisissez la fonction à utiliser
+        </p>
 
-            <p class="text-sm text-slate-500 mt-2">
-                Plusieurs fonctions sont associées à ce compte.
-            </p>
-
-        </div>
+        <p class="fs-user">
+            <i class="fa-solid fa-user-check"></i>
+            <span id="fs-user-name">—</span>
+        </p>
 
         <div id="function-selector-list"
-             class="space-y-3">
+             class="fs-list">
 
         </div>
+
+        <button
+            type="button"
+            onclick="logoutUser()"
+            class="fs-back"
+            title="Revenir à l'écran de connexion">
+
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            Se déconnecter
+
+        </button>
 
     </div>
 
@@ -61,8 +82,8 @@
 
     <header class="blue-gradient text-white sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-3 py-2 flex justify-between items-center">
-            <div class="flex items-center space-x-3">
-                <div class="w-20 h-20 shrink-0 ml-3">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-11 h-11 sm:w-14 sm:h-14 shrink-0">
 
     <img
         src="rangueil HQ.png"
@@ -70,6 +91,10 @@
         class="w-full h-full object-contain">
 
 </div>
+                <div class="leading-tight min-w-0">
+                    <h1 class="text-sm sm:text-base font-extrabold tracking-tight truncate">Rangueil FC</h1>
+                    <p class="text-[9px] sm:text-[10px] text-sky-100/80 font-semibold tracking-[0.18em] uppercase">Administration</p>
+                </div>
             </div>
             
             <div class="flex items-center gap-2">
@@ -132,21 +157,41 @@
 
         <section id="sec-dashboard" class="space-y-4">
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-100 flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center text-lg font-bold"><i class="fa-solid fa-user-group" aria-hidden="true"></i></div>
-                    <div><h2 class="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Joueurs</h2><p class="text-lg font-extrabold text-slate-800" id="stat-effectif">0</p></div>
+                <div class="grad-card grad-card-sky">
+                    <div class="grad-card-content flex flex-col">
+                        <div class="flex items-center justify-between">
+                            <i class="fa-solid fa-user-group text-lg opacity-90" aria-hidden="true"></i>
+                            <p class="text-xl font-extrabold drop-shadow-sm" id="stat-effectif">0</p>
+                        </div>
+                        <p class="mt-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-90">Joueurs</p>
+                    </div>
                 </div>
-                <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-100 flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-bold"><i class="fa-solid fa-futbol" aria-hidden="true"></i></div>
-                    <div><h2 class="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Matchs</h2><p class="text-lg font-extrabold text-slate-800" id="stat-matchs">0</p></div>
+                <div class="grad-card grad-card-blue">
+                    <div class="grad-card-content flex flex-col">
+                        <div class="flex items-center justify-between">
+                            <i class="fa-solid fa-futbol text-lg opacity-90" aria-hidden="true"></i>
+                            <p class="text-xl font-extrabold drop-shadow-sm" id="stat-matchs">0</p>
+                        </div>
+                        <p class="mt-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-90">Matchs</p>
+                    </div>
                 </div>
-                <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-100 flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg font-bold"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></div>
-                    <div><h2 class="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Bilan V-N-D</h2><p class="text-sm font-extrabold text-slate-800" id="stat-bilan-vdn">0 - 0 - 0</p></div>
+                <div class="grad-card grad-card-emerald">
+                    <div class="grad-card-content flex flex-col">
+                        <div class="flex items-center justify-between">
+                            <i class="fa-solid fa-chart-line text-lg opacity-90" aria-hidden="true"></i>
+                            <p class="text-base sm:text-lg font-extrabold drop-shadow-sm" id="stat-bilan-vdn">0 - 0 - 0</p>
+                        </div>
+                        <p class="mt-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-90">Bilan V-N-D</p>
+                    </div>
                 </div>
-                <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-100 flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center text-lg font-bold"><i class="fa-solid fa-square text-amber-400 mr-0.5" aria-hidden="true"></i><i class="fa-solid fa-square text-red-600" aria-hidden="true"></i></div>
-                    <div><h2 class="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Cartons</h2><p class="text-lg font-extrabold text-slate-800" id="stat-total-cards">0</p></div>
+                <div class="grad-card grad-card-red">
+                    <div class="grad-card-content flex flex-col">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm opacity-90"><i class="fa-solid fa-square text-amber-300 mr-0.5" aria-hidden="true"></i><i class="fa-solid fa-square text-white/80" aria-hidden="true"></i></span>
+                            <p class="text-xl font-extrabold drop-shadow-sm" id="stat-total-cards">0</p>
+                        </div>
+                        <p class="mt-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-90">Cartons</p>
+                    </div>
                 </div>
             </div>
 
@@ -499,7 +544,7 @@
 
                     <div class="pt-2 border-t flex flex-col sm:flex-row justify-between items-center gap-3">
                         <div id="match-validation-status" class="text-xs font-semibold"></div>
-                        <button onclick="validateCurrentMatchSheet()" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition shadow-sm"><i class="fa-solid fa-circle-check"></i><span>Valider et verrouiller</span></button>
+                        <div id="match-validate-btn"></div>
                     </div>
                 </div>
             </div>
@@ -863,8 +908,8 @@
 
     </main>
 
-    <div id="admin-access-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white w-full max-w-xl rounded-xl p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div id="admin-access-modal" class="modal-overlay hidden">
+    <div class="modal-card max-w-xl p-5 space-y-4 accent-slate">
         
         <div class="flex justify-between items-center border-b pb-3">
             <h3 class="font-bold text-slate-800 text-base"><i class="fa-solid fa-users-gear text-sky-600 mr-2"></i>Console Admin - Gestion des Accès</h3>
@@ -988,8 +1033,8 @@
     </div>
 </div>
 
-<div id="modal-match" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white w-full max-w-md rounded-xl p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+<div id="modal-match" class="modal-overlay hidden">
+    <div class="modal-card max-w-md p-5 space-y-4 accent-sky">
         <div class="flex justify-between items-center border-b pb-2">
             <h3 class="font-bold text-slate-800 text-sm" id="modal-match-title">Nouveau Match</h3>
             <button onclick="toggleModal('modal-match', false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
@@ -1125,8 +1170,8 @@
 </div>
 
    <!-- MODALE TRAINING -->
-    <div id="modal-training" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white w-full max-w-md rounded-xl p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div id="modal-training" class="modal-overlay hidden">
+        <div class="modal-card max-w-md p-5 space-y-4 accent-amber">
             <div class="flex justify-between items-center border-b pb-2">
                 <h3 class="font-bold text-slate-800 text-sm" id="modal-training-title">Nouvelle Séance</h3>
                 <button onclick="toggleModal('modal-training', false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
@@ -1188,8 +1233,8 @@
    
 
 
-    <div id="modal-player" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white w-full max-w-md rounded-xl p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div id="modal-player" class="modal-overlay hidden">
+        <div class="modal-card max-w-md p-5 space-y-4 accent-indigo">
             <div class="flex justify-between items-center border-b pb-2">
                 <h3 class="font-bold text-slate-800 text-sm" id="modal-player-title">Ajouter un Joueur</h3>
                 <button onclick="toggleModal('modal-player', false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
@@ -1250,8 +1295,8 @@
         </div>
     </div>
 
-    <div id="modal-match-bilan" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white w-full max-w-2xl rounded-xl p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div id="modal-match-bilan" class="modal-overlay hidden">
+        <div class="modal-card max-w-2xl p-5 space-y-4 accent-emerald">
             <div class="flex justify-between items-center border-b pb-2">
                 <h3 class="font-bold text-slate-800 text-sm" id="modal-bilan-title">Bilan du Match</h3>
                 <button onclick="toggleModal('modal-match-bilan', false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
@@ -1263,9 +1308,9 @@
         </div>
     </div>
     <div id="modal-event"
-     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+     class="modal-overlay hidden">
 
-    <div class="bg-white w-full max-w-md rounded-xl p-5 shadow-xl space-y-3">
+    <div class="modal-card max-w-md p-5 space-y-3 accent-purple">
 
         <div class="flex justify-between items-center">
 
@@ -1363,56 +1408,87 @@
     </div>
 
 </div>
+
+<div id="modal-team" class="modal-overlay hidden">
+    <div class="modal-card max-w-md p-5 space-y-4 accent-sky">
+        <div class="flex justify-between items-center border-b pb-2">
+            <h3 class="font-bold text-slate-800 text-sm" id="modal-team-title">Nouvelle équipe</h3>
+            <button onclick="toggleModal('modal-team', false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="form-team" onsubmit="handleSaveTeamModal(event)" class="space-y-3 text-xs">
+            <input type="hidden" id="team-id">
+            <div>
+                <label class="block text-slate-600 font-semibold mb-1">Nom de l'équipe</label>
+                <input type="text" id="team-name" required placeholder="Ex: U14 Territoire" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400">
+            </div>
+            <div>
+                <label class="block text-slate-600 font-semibold mb-1">Identifiant</label>
+                <input type="text" id="team-key" required pattern="[A-Za-z0-9]+" placeholder="ex: u14" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400">
+                <p class="text-[10px] text-slate-400 mt-1">Code interne (sans espaces, ex: u14). Non modifiable après création.</p>
+            </div>
+            <div class="bg-sky-50 border border-sky-200 rounded-xl p-3">
+                <label class="block text-slate-700 font-semibold mb-1">Objectif de convocations</label>
+                <input type="number" id="team-target" min="1" max="25" value="14" class="w-full p-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-400">
+                <p class="text-[10px] text-sky-700 mt-1.5 flex items-start gap-1"><i class="fa-solid fa-circle-info mt-0.5"></i>Nombre de joueurs à convoquer pour un match de cette équipe.</p>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button type="button" onclick="toggleModal('modal-team', false)" class="px-3 py-2 bg-slate-100 text-slate-600 font-semibold rounded-lg">Annuler</button>
+                <button type="submit" class="px-4 py-2 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
 <!-- Navigation mobile -->
-<div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50">
+<div class="md:hidden fixed bottom-0 left-0 right-0 mob-bottom-nav z-50">
 
     <div class="grid grid-cols-7">
 
-        <button onclick="switchTab('dashboard')" class="py-2 flex flex-col items-center text-slate-600">
-            <i class="fa-solid fa-chart-pie text-lg"></i>
-            <span class="text-[10px] mt-1">Tab.</span>
+        <button onclick="switchTab('dashboard')" id="mob-tab-dashboard" class="mob-nav-btn active">
+            <i class="fa-solid fa-chart-pie"></i>
+            <span>Tab.</span>
         </button>
 
-        <button onclick="switchTab('matchs')" class="py-2 flex flex-col items-center text-slate-600">
-            <i class="fa-solid fa-trophy text-lg"></i>
-            <span class="text-[10px] mt-1">Matchs</span>
+        <button onclick="switchTab('matchs')" id="mob-tab-matchs" class="mob-nav-btn">
+            <i class="fa-solid fa-trophy"></i>
+            <span>Matchs</span>
         </button>
 
-        <button onclick="switchTab('entrainements')" class="py-2 flex flex-col items-center text-slate-600">
-            <i class="fa-solid fa-stopwatch text-lg"></i>
-            <span class="text-[10px] mt-1">Séances</span>
-        </button>
-<button onclick="switchTab('calendrier')"
-        class="py-2 flex flex-col items-center text-slate-600">
-    <i class="fa-solid fa-calendar-days text-lg"></i>
-    <span class="text-[10px] mt-1">Calendrier</span>
-</button>
-        <button onclick="switchTab('effectif')" class="py-2 flex flex-col items-center text-slate-600">
-            <i class="fa-solid fa-users text-lg"></i>
-            <span class="text-[10px] mt-1">Effectif</span>
+        <button onclick="switchTab('entrainements')" id="mob-tab-entrainements" class="mob-nav-btn">
+            <i class="fa-solid fa-stopwatch"></i>
+            <span>Séances</span>
         </button>
 
-        <button onclick="switchTab('staff')" class="py-2 flex flex-col items-center text-slate-600">
-            <i class="fa-solid fa-user-tie text-lg"></i>
-            <span class="text-[10px] mt-1">Staff</span>
+        <button onclick="switchTab('calendrier')" id="mob-tab-calendrier" class="mob-nav-btn">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>Calendrier</span>
+        </button>
+
+        <button onclick="switchTab('effectif')" id="mob-tab-effectif" class="mob-nav-btn">
+            <i class="fa-solid fa-users"></i>
+            <span>Effectif</span>
+        </button>
+
+        <button onclick="switchTab('staff')" id="mob-tab-staff" class="mob-nav-btn">
+            <i class="fa-solid fa-user-tie"></i>
+            <span>Staff</span>
         </button>
 
         <button
     onclick="switchTab('admin')"
     id="tab-admin-mobile"
-    class="py-2 flex flex-col items-center text-slate-600 admin-only">
+    class="mob-nav-btn admin-only">
 
-    <i class="fa-solid fa-gear text-lg"></i>
-    <span class="text-[10px] mt-1">Admin</span>
+    <i class="fa-solid fa-gear"></i>
+    <span>Admin</span>
 
 </button>
-
 
     </div>
 
 </div>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <script src="js/app.js"></script> 
     

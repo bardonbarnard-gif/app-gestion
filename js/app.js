@@ -26,23 +26,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (pinInput) {
         pinInput.focus();
+        const pinDots = Array.from(document.querySelectorAll(".pin-dot"));
+        const syncPinDots = () => {
+            const len = pinInput.value.length;
+            pinDots.forEach((dot, i) => dot.classList.toggle("filled", i < len));
+        };
+        pinInput.addEventListener("input", syncPinDots);
         pinInput.addEventListener("input", async (e) => {
             const enteredPin = e.target.value;
 
             if (enteredPin.length === 4) {
                 try {
+                    await window.authReady;
                     // Interrogation de Firebase Realtime Database
                     const pinRef = firebase.database().ref("rangueil_data/access/" + enteredPin);
                     const snapshot = await pinRef.once("value");
 
                     if (snapshot.exists()) {
                         const userData = snapshot.val(); 
-                        console.log("PIN TROUVÉ :", enteredPin);
-console.log("USER DATA :", userData);
-console.log(
-    "NB FONCTIONS :",
-    (userData.functions || []).length
-);
                         userData.pin = enteredPin;
 
 window.currentUserPin = enteredPin;
@@ -223,6 +224,9 @@ if (pinScreen) {
         };
 
         try { firebase.initializeApp(firebaseConfig); } catch(e) {}
+        window.authReady = firebase.auth().signInAnonymously().catch(function (err) {
+            console.error("Auth anonyme indisponible :", err);
+        });
         const db = firebase.database();
 
         // Données initiales par défaut (Effectif de base)
@@ -280,11 +284,6 @@ let currentCatFilter = 'all';
     state.staff = Object.values(
     data.staff || {}
 );
-console.log(
-    "STAFF CHARGE :",
-    state.staff
-);
-
 state.carpoolResponses =
     data.carpoolResponses || {};
                     // Migration ancien format numérique → nouveau format objet
@@ -360,6 +359,8 @@ function saveStateToFirebase() {
     location.reload();
 }
 
+        window.logoutUser = logoutUser;
+
         function renderAll() {
             renderDashboard();
             renderTeamFilters();
@@ -376,19 +377,7 @@ function saveStateToFirebase() {
         // === FONCTION GLOBALE : Couleurs d'équipe ===
         function getTeamColorClasses(teamKey) {
             // Récupère la couleur stockée en Firebase pour cette équipe
-            console.log(
-    "TEAMKEY =",
-    teamKey,
-    "TEAM =",
-    state.teams?.[teamKey]
-);
-
-const colorName = state.teams?.[teamKey]?.color || 'slate';
-
-            console.log(
-    teamKey,
-    state.teams?.[teamKey]?.color
-);
+            const colorName = state.teams?.[teamKey]?.color || 'slate';
             
            const createColor = (name) => ({
     bg: `bg-${name}-50`,
@@ -575,6 +564,8 @@ return colorMap[colorName] || colorMap.slate;
                 if(sec) sec.classList.add('hidden');
                 const btn = document.getElementById(`tab-${t}`);
                 if (btn) btn.classList.remove('bg-white/20', 'text-white');
+                const mobBtn = document.getElementById(`mob-tab-${t}`);
+                if (mobBtn) mobBtn.classList.remove('active');
             });
 
             const targetSec = document.getElementById(`sec-${tabId}`);
@@ -584,6 +575,8 @@ return colorMap[colorName] || colorMap.slate;
 }
             const activeBtn = document.getElementById(`tab-${tabId}`);
             if (activeBtn) activeBtn.classList.add('bg-white/20', 'text-white');
+            const activeMobBtn = document.getElementById(`mob-tab-${tabId}`);
+            if (activeMobBtn) activeMobBtn.classList.add('active');
         }
 
     function switchMatchSubTab(subTabId) {
@@ -1373,14 +1366,22 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
                 validationStatus.innerHTML = m.isValidated ? `<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-bold text-xs"><i class="fa-solid fa-lock mr-1"></i> Feuille verrouillée</span>` : `<span class="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg font-bold text-xs"><i class="fa-solid fa-lock-open mr-1"></i> Brouillon</span>`;
             }
 
+            const validateBtnZone = document.getElementById('match-validate-btn');
+            if (validateBtnZone) {
+                validateBtnZone.innerHTML = m.isValidated
+                    ? `<button onclick="unlockCurrentMatchSheet()" class="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition shadow-sm"><i class="fa-solid fa-lock-open"></i><span>Déverrouiller la feuille</span></button>`
+                    : `<button onclick="validateCurrentMatchSheet()" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition shadow-sm"><i class="fa-solid fa-circle-check"></i><span>Valider et verrouiller</span></button>`;
+            }
+
             let convokedCount = 0, totalSeats = 0;
+            const targetConvoked = parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
             playersForMatch.forEach(p => {
                 if (m.convocations[p.id] === 'convoke') convokedCount++;
                 totalSeats += parseInt(m.carpool[p.id]) || 0;
             });
 
-            counterBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${convokedCount < 14 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`;
-            counterBanner.innerHTML = `<div class="font-bold text-xs">Convocations : ${convokedCount} / 14</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${convokedCount < 14 ? 'bg-amber-200' : 'bg-sky-200'}">${convokedCount < 14 ? '⚠️ Incomplet' : '🔵 OK'}</span>`;
+            counterBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${convokedCount < targetConvoked ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`;
+            counterBanner.innerHTML = `<div class="font-bold text-xs">Convocations : ${convokedCount} / ${targetConvoked}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${convokedCount < targetConvoked ? 'bg-amber-200' : 'bg-sky-200'}">${convokedCount < targetConvoked ? '⚠️ Incomplet' : '🔵 OK'}</span>`;
 
     const carpoolResponses =
     state.carpoolResponses?.[
@@ -2744,10 +2745,6 @@ text +=
 
     text +=
     `⏳ *Merci de confirmer votre présence avant :*\n\n`;
-console.log(
-    "Deadline = ",
-    document.getElementById('m-deadline-preview')?.innerText
-);
 text +=
     `${getResponseDeadline(m.date)}\n\n`;
 
@@ -2833,6 +2830,20 @@ https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpool
             renderMatchDetail();
             showToast("Feuille de match verrouillée !");
         }
+
+        function unlockCurrentMatchSheet() {
+            if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) return;
+            const m = state.matches[state.selectedMatchId];
+            if (!m.isValidated) return;
+            if (!confirm("Déverrouiller cette feuille de match ? Les convocations et la composition redeviendront modifiables.")) return;
+            m.isValidated = false;
+            saveStateToFirebase();
+            renderMatchDetail();
+            showToast("Feuille déverrouillée");
+        }
+
+        window.validateCurrentMatchSheet = validateCurrentMatchSheet;
+        window.unlockCurrentMatchSheet = unlockCurrentMatchSheet;
 
         function openMatchBilanModal(mId) {
             const m = state.matches[mId];
@@ -3302,6 +3313,8 @@ if (active) {
             setTimeout(() => toast.remove(), 3000);
         }
 
+        window.showToast = showToast;
+
         
 
 
@@ -3584,17 +3597,6 @@ if (role === 'admin') {
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
 function applyPermissions() {
 
-   console.log(
-    "ROLE CONNECTE :",
-    window.currentUserRole
-);
-
-console.log(
-    "TEAM CONNECTEE :",
-    window.currentUserTeam
-); 
-
-
     const role = window.currentUserRole || 'public';
     const userTeam = window.currentUserTeam || 'all';
 
@@ -3800,7 +3802,7 @@ const email =
     document.getElementById("admin-email").value.trim();
 
 if (pin.length !== 4) {
-    alert("Le code PIN doit comporter exactement 4 chiffres.");
+    showToast("Le code PIN doit comporter exactement 4 chiffres.", "error");
     return;
 }
 
@@ -3841,9 +3843,7 @@ try {
 // Création automatique de la fiche staff
 
 
-                alert(
-    `Compte "${fullname}" enregistré avec succès !`
-);
+                showToast(`Compte "${fullname}" enregistré avec succès !`);
 
 coachForm.reset();
 
@@ -3852,7 +3852,7 @@ coachForm.reset();
 renderAdminAccounts();
             } catch (error) {
                 console.error("Erreur lors de l'enregistrement :", error);
-                alert("Erreur lors de l'enregistrement en base.");
+                showToast("Erreur lors de l'enregistrement en base.", "error");
             }
         });
     }
@@ -3917,9 +3917,7 @@ if (container) {
 
         console.error(error);
 
-        alert(
-            "Impossible de charger ce compte"
-        );
+        showToast("Impossible de charger ce compte", "error");
 
     }
 };
@@ -3938,7 +3936,7 @@ function handleSaveTeam(event) {
         name: teamNameInput
     }, (error) => {
         if (error) {
-            alert("Erreur lors de l'enregistrement de l'équipe.");
+            showToast("Erreur lors de l'enregistrement de l'équipe.", "error");
         } else {
             // Réinitialiser le formulaire de l'équipe
             document.getElementById('team-form').reset();
@@ -4446,8 +4444,6 @@ function nextMonth() {
     renderCalendar();
 }
 function showEventsForDate(date) {
-
-    console.log("DATE CLIQUEE :", date);
 
     const container =
         document.getElementById(
@@ -5533,6 +5529,11 @@ function renderAdminTeamsModule() {
                                 ${team.name}
                             </div>
 
+                            <div class="mt-1.5 inline-flex items-center gap-1.5 bg-sky-100 text-sky-700 px-2 py-0.5 rounded-md text-[10px] font-bold">
+                                <i class="fa-solid fa-clipboard-list"></i>
+                                Feuille : ${team.targetConvocations || 14} joueurs
+                            </div>
+
                         </div>
 
                         <div class="flex gap-2">
@@ -5744,59 +5745,79 @@ function closeAdminModule() {
 
 function openModalTeam(teamId = null) {
 
-    const id = prompt(
-        "Identifiant équipe (ex: u18)"
-    );
+    const titleEl = document.getElementById('modal-team-title');
+    const idHidden = document.getElementById('team-id');
+    const keyInput = document.getElementById('team-key');
+    const nameInput = document.getElementById('team-name');
+    const targetInput = document.getElementById('team-target');
+    const form = document.getElementById('form-team');
 
-    if (!id) return;
+    if (form) form.reset();
 
-    const name = prompt(
-        "Nom complet de l'équipe"
-    );
+    if (teamId && state.teams?.[teamId]) {
 
-    if (!name) return;
+        const team = state.teams[teamId];
 
-    firebase.database()
-        .ref("teams/" + id.toLowerCase())
-        .set({
-            name: name
-        });
+        if (titleEl) titleEl.textContent = "Modifier l'équipe";
+        if (idHidden) idHidden.value = teamId;
+        if (keyInput) {
+            keyInput.value = teamId;
+            keyInput.disabled = true;
+        }
+        if (nameInput) nameInput.value = team.name || '';
+        if (targetInput) targetInput.value = team.targetConvocations || 14;
 
-    showToast(
-        "✅ Équipe créée"
-    );
+    } else {
+
+        if (titleEl) titleEl.textContent = 'Nouvelle équipe';
+        if (idHidden) idHidden.value = '';
+        if (keyInput) {
+            keyInput.value = '';
+            keyInput.disabled = false;
+        }
+        if (targetInput) targetInput.value = 14;
+
+    }
+
+    toggleModal('modal-team', true);
 }
 function editTeam(teamId) {
-
-    const team =
-        state.teams?.[teamId];
-
-    if (!team) return;
-
-    const newName = prompt(
-        "Nom de l'équipe",
-        team.name || ""
-    );
-
-    if (!newName) return;
-
-    firebase.database()
-        .ref("teams/" + teamId)
-        .update({
-            name: newName
-        });
-
-    showToast(
-        "✅ Équipe modifiée"
-    );
+    openModalTeam(teamId);
 }
 
-function showFunctionSelector(userData) {
+function handleSaveTeamModal(event) {
+    event.preventDefault();
 
-    console.log(
-        "AFFICHAGE SELECTEUR",
-        userData.name
-    );
+    const existingId = document.getElementById('team-id').value;
+    const keyInput = document.getElementById('team-key');
+    const nameInput = document.getElementById('team-name');
+    const targetInput = document.getElementById('team-target');
+
+    const key = existingId || (keyInput.value.trim().toLowerCase());
+    const name = nameInput.value.trim();
+    const target = parseInt(targetInput.value) || 14;
+
+    if (!key || !name) return;
+
+    firebase.database().ref('teams/' + key).set({
+        name: name,
+        targetConvocations: target
+    }, (error) => {
+        if (error) {
+            showToast("Erreur lors de l'enregistrement de l'équipe.", "error");
+            return;
+        }
+        toggleModal('modal-team', false);
+        showToast("✅ Équipe enregistrée");
+    });
+}
+
+window.openModalTeam = openModalTeam;
+window.editTeam = editTeam;
+window.deleteTeam = deleteTeam;
+window.handleSaveTeamModal = handleSaveTeamModal;
+
+function showFunctionSelector(userData) {
 
     const screen =
         document.getElementById(
@@ -5821,6 +5842,34 @@ function showFunctionSelector(userData) {
 
     list.innerHTML = "";
 
+    const nameEl =
+        document.getElementById(
+            "fs-user-name"
+        );
+
+    if (nameEl && userData.name) {
+        nameEl.textContent = userData.name;
+    }
+
+    const iconFor = (name = "") => {
+        if (name.includes("Administrateur")) {
+            return '<i class="fa-solid fa-shield-halved"></i>';
+        }
+        if (name.startsWith("Responsable")) {
+            return '<i class="fa-solid fa-user-gear"></i>';
+        }
+        if (name.includes("Éducateur")) {
+            return '<i class="fa-solid fa-graduation-cap"></i>';
+        }
+        if (name.toLowerCase().includes("coach")) {
+            return '<i class="fa-solid fa-chalkboard-user"></i>';
+        }
+        if (name.includes("Dirigeant")) {
+            return '<i class="fa-solid fa-handshake"></i>';
+        }
+        return '<i class="fa-solid fa-circle-user"></i>';
+    };
+
     (userData.functions || [])
     .forEach((func, index) => {
 
@@ -5832,26 +5881,31 @@ function showFunctionSelector(userData) {
                 )
                 .join(", ");
 
+            const scopeLine = scopes
+                ? `<i class="fa-solid fa-location-dot"></i> ${scopes}`
+                : `<i class="fa-solid fa-earth-europe"></i> Accès global`;
+
             list.innerHTML += `
 
                 <button
                     type="button"
-                    class="w-full text-left border rounded-xl p-4 hover:bg-sky-50 transition"
-                    onclick="selectFunction('${userData.pin}', ${index})"
+                    class="fs-option"
+                    onclick="selectFunction('${userData.pin}', ${index})">
 
-                    <div class="font-bold text-slate-800">
-                        👔 ${func.functionName}
-                    </div>
+                    <span class="fs-option-icon">
+                        ${iconFor(func.functionName)}
+                    </span>
 
-                    ${
-                        scopes
-                            ? `<div class="text-xs text-slate-500 mt-1">
-                                   📍 ${scopes}
-                               </div>`
-                            : `<div class="text-xs text-slate-500 mt-1">
-                                   🌍 Accès global
-                               </div>`
-                    }
+                    <span class="fs-option-text">
+                        <span class="fs-option-title">
+                            ${func.functionName}
+                        </span>
+                        <span class="fs-option-scope">
+                            ${scopeLine}
+                        </span>
+                    </span>
+
+                    <i class="fa-solid fa-chevron-right fs-option-arrow"></i>
 
                 </button>
 
@@ -5859,11 +5913,7 @@ function showFunctionSelector(userData) {
 
         });
 
-        console.log(
-    "OUVERTURE ECRAN"
-);
-
-    screen.classList.remove("hidden");
+        screen.classList.remove("hidden");
 
 }
 
@@ -6020,15 +6070,6 @@ if (functionName.startsWith("Responsable")) {
                     pinScreen.remove();
 
                     applyPermissions();
-console.log(
-    "ROLE CONNECTE :",
-    window.currentUserRole
-);
-
-console.log(
-    "TEAM CONNECTEE :",
-    window.currentUserTeam
-);
                 }, 300);
 
             }
@@ -6218,14 +6259,6 @@ teamsContainer.innerHTML = "";
 
         if (!teamGroups[family][scope]) {
             teamGroups[family][scope] = [];
-        }
-console.log(
-    "ADD",
-    family,
-    scope,
-    member.name,
-    member.functionName
-);
         const exists =
     teamGroups[family][scope]
         .some(m =>
@@ -6376,9 +6409,6 @@ clubFunctions.forEach(member => {
     `;
 
 });
-console.log(teamGroups);
-
-
 
 Object.entries(teamGroups).forEach(([poleName, teams]) => {
 
@@ -7284,7 +7314,7 @@ function getNiveauIcon(niveau) {
 
 function generateBalancedTeams() {
 
-    alert("Génération lancée");
+    showToast("Génération lancée");
 
     const session = state.trainings[currentTrainingId];
     if (!session) return;
