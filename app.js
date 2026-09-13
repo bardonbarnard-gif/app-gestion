@@ -251,6 +251,7 @@ if (pinScreen) {
     events: {},
     carpoolResponses: {},
     settings: {},
+    exerciseTemplates: [],
 };
 
 // Variables d'interface uniquement
@@ -290,6 +291,8 @@ state.carpoolResponses =
     data.carpoolResponses || {};
 state.settings =
     data.settings || { trainingDays: [2, 5] };
+state.exerciseTemplates =
+    data.exerciseTemplates || [];
                     // Migration ancien format numérique → nouveau format objet
                     const rawTrainings = data.trainings || {};
                     if (Object.keys(rawTrainings).length > 0 && !isNaN(Object.keys(rawTrainings)[0])) {
@@ -342,6 +345,7 @@ function saveStateToFirebase() {
     teams: state.teams,
     events: state.events,
     carpoolResponses: state.carpoolResponses,
+    exerciseTemplates: state.exerciseTemplates,
     settings: state.settings
 };
 
@@ -7856,11 +7860,54 @@ const EXERCISE_FORMATS = {
     }
 };
 
+function makeExerciseTemplate(name) {
+
+    return {
+        id: 'e' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        name: name || 'Exo',
+        format: '8v8',
+        team: 'A',
+        byTeam: { A: {}, B: {} },
+        props: [],
+        area: 'full',
+        mode: 'users',
+        posOverrides: { full: {}, half: {} },
+        duration: 0,
+        series: '',
+        note: '',
+        done: false
+    };
+}
+
+function getCurrentExerciseIndex(session) {
+
+    if (!session.exercises || !session.exercises.length) return 0;
+
+    const i = (session.currentEx === undefined || session.currentEx === null) ? 0 : session.currentEx;
+
+    return Math.max(0, Math.min(i, session.exercises.length - 1));
+}
+
 function getExerciseSetup(session) {
 
-    session.exerciseSetup = session.exerciseSetup || {};
+    session.exercises = session.exercises || [];
 
-    const s = session.exerciseSetup;
+    if (session.exerciseSetup && !session.exercises.length) {
+
+        const legacy = JSON.parse(JSON.stringify(session.exerciseSetup));
+
+        session.exercises.push(Object.assign(makeExerciseTemplate('Exo 1'), legacy));
+
+        delete session.exerciseSetup;
+
+        session.currentEx = 0;
+    }
+
+    if (!session.exercises.length) session.exercises.push(makeExerciseTemplate('Exo 1'));
+
+    session.currentEx = getCurrentExerciseIndex(session);
+
+    const s = session.exercises[session.currentEx];
 
     s.format = s.format || '8v8';
 
@@ -7907,12 +7954,25 @@ function openExerciseBoard() {
 
     container.innerHTML = `
 
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
-            <h3 class="font-bold text-slate-800">
-                ⚽ Exercices
-            </h3>
+        <style>
+            #exercise-timer-overlay.done { animation: timerFlash 0.8s 3; }
+            @keyframes timerFlash { 0%,100% { background: rgba(220,38,38,.93); } 50% { background: rgba(220,38,38,.5); } }
+        </style>
+
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+            <div class="flex items-center gap-2">
+                <h3 class="font-bold text-slate-800">⚽ Exercices</h3>
+                <button onclick="toggleExerciseTemplates()"
+                    class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-violet-600 hover:bg-violet-700 text-white">
+                    💾 Modèles
+                </button>
+            </div>
             <span id="exercise-info" class="text-xs font-semibold text-slate-500"></span>
         </div>
+
+        <div id="exercise-templates-panel" class="hidden mb-3 bg-violet-50 border border-violet-200 rounded-xl p-3"></div>
+
+        <div id="exercise-strip" class="flex gap-1.5 overflow-x-auto pb-1 mb-3"></div>
 
         <div id="exercise-board-options" class="flex flex-wrap items-center gap-2 mb-3">
             <button data-area="full" onclick="setExerciseArea('full')"
@@ -7933,6 +7993,8 @@ function openExerciseBoard() {
                     ${EXERCISE_FORMATS[k].label}
                 </button>`).join('')}
         </div>
+
+        <div id="exercise-fiche" class="mb-2"></div>
 
         <div id="exercise-team-toggle" class="flex flex-wrap items-center gap-2 mb-2"></div>
 
@@ -7956,6 +8018,17 @@ function openExerciseBoard() {
         <p id="exercise-hint" class="text-[11px] text-slate-400 mt-1.5"></p>
 
         <div id="exercise-bench" class="mt-3"></div>
+
+        <div id="exercise-timer-overlay" class="hidden fixed inset-0 z-[100] bg-slate-900/85 flex-col flex items-center justify-center gap-5" style="display:none;">
+            <div id="exercise-timer-name" class="text-white font-bold text-lg px-6 text-center"></div>
+            <div id="exercise-timer-time" class="text-white text-7xl font-black tabular-nums"></div>
+            <div class="flex gap-3">
+                <button onclick="pauseExerciseTimer()" id="exercise-timer-pause"
+                    class="px-5 py-3 rounded-xl bg-white text-slate-800 text-sm font-bold">⏸ Pause</button>
+                <button onclick="stopExerciseTimer()"
+                    class="px-5 py-3 rounded-xl bg-red-500 text-white text-sm font-bold">✋ Stop</button>
+            </div>
+        </div>
 
     `;
 
@@ -8101,7 +8174,11 @@ function renderExercise() {
     const isHalf = setup.area === 'half';
     const isEdit = setup.mode === 'edit';
 
-    info.innerHTML = `📋 ${fmt.label} · 🔵 Équipe A (${exerciseTeamSize('A')}) · 🔴 Équipe B (${exerciseTeamSize('B')})${isHalf ? ' · ✂️ Demi-terrain' : ''}`;
+    const exIdx = getCurrentExerciseIndex(session);
+    const exCount = (session.exercises || []).length;
+    const exName = setup.name || fmt.label;
+
+    info.innerHTML = `⚽ ${exIdx + 1}/${exCount} — ${exName} · ${fmt.label} · 🔵 A (${exerciseTeamSize('A')}) · 🔴 B (${exerciseTeamSize('B')})${isHalf ? ' · ✂️' : ''}`;
 
     tgl.innerHTML = `
         <button onclick="selectExerciseTeam('A')"
@@ -8166,6 +8243,10 @@ function renderExercise() {
     bench.innerHTML = '';
 
     if (!isEdit) renderExerciseBench(setup);
+
+    renderExerciseStrip();
+
+    renderExerciseFiche();
 }
 
 function renderExerciseBench(setup) {
@@ -8886,6 +8967,475 @@ function renderExerciseTools(setup) {
         <div class="text-[11px] text-slate-500 font-medium mb-2">
             ${toolHint(exerciseUI.tool)}
         </div>`;
+}
+
+function escapeExerciseValue(str) {
+
+    return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function exerciseFmtLabel(key) {
+
+    return (EXERCISE_FORMATS[key] || EXERCISE_FORMATS['8v8']).label;
+}
+
+function exerciseFullReset() {
+
+    exerciseUI.selected = null;
+    exerciseUI.holdSlot = null;
+    exerciseUI.drag = null;
+    exerciseUI.slotMove = false;
+    exerciseUI.tool = 'move';
+    exerciseUI.selProp = null;
+    exerciseUI.zoneP1 = null;
+}
+
+function setCurrentExercise(i) {
+
+    const session = state.trainings[currentTrainingId];
+    session.exercises = session.exercises || [];
+
+    if (i < 0 || i >= session.exercises.length) return;
+
+    session.currentEx = i;
+
+    exerciseFullReset();
+
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function addExercise() {
+
+    const session = state.trainings[currentTrainingId];
+    session.exercises = session.exercises || [];
+
+    const ex = makeExerciseTemplate('Exo ' + (session.exercises.length + 1));
+
+    session.exercises.push(ex);
+    session.currentEx = session.exercises.length - 1;
+
+    exerciseFullReset();
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function duplicateExercise() {
+
+    const session = state.trainings[currentTrainingId];
+    const i = getCurrentExerciseIndex(session);
+
+    if (!session.exercises || !session.exercises.length) return;
+
+    const copy = JSON.parse(JSON.stringify(session.exercises[i]));
+
+    copy.id = 'e' + Date.now() + Math.random().toString(36).slice(2, 6);
+    copy.name = (copy.name || 'Exo') + ' (copie)';
+    copy.done = false;
+
+    session.exercises.splice(i + 1, 0, copy);
+    session.currentEx = i + 1;
+
+    exerciseFullReset();
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function deleteExercise() {
+
+    const session = state.trainings[currentTrainingId];
+    const i = getCurrentExerciseIndex(session);
+
+    if (!session.exercises || !session.exercises.length) return;
+
+    const ex = session.exercises[i];
+
+    const hasPlayers = (ex.byTeam || {}).A && Object.keys(ex.byTeam.A).length > 0 || (ex.byTeam || {}).B && Object.keys(ex.byTeam.B).length > 0;
+
+    if (hasPlayers && !confirm('Supprimer cet exercice ? Les joueurs placés seront perdus.')) return;
+
+    if (exerciseTimer.active && exerciseTimer.exId === ex.id) stopExerciseTimer();
+
+    session.exercises.splice(i, 1);
+
+    if (!session.exercises.length) session.exercises.push(makeExerciseTemplate('Exo 1'));
+
+    session.currentEx = getCurrentExerciseIndex(session);
+
+    exerciseFullReset();
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function moveExercise(i, dir) {
+
+    const session = state.trainings[currentTrainingId];
+    const j = i + dir;
+
+    if (!session.exercises || j < 0 || j >= session.exercises.length) return;
+
+    const tmp = session.exercises[i];
+
+    session.exercises[i] = session.exercises[j];
+    session.exercises[j] = tmp;
+    session.currentEx = j;
+
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function toggleExerciseDone() {
+
+    const session = state.trainings[currentTrainingId];
+    const ex = getExerciseSetup(session);
+    ex.done = !ex.done;
+
+    saveStateToFirebase();
+    renderExerciseStrip();
+    renderExerciseFiche();
+}
+
+function updateExerciseMeta(field, value) {
+
+    const session = state.trainings[currentTrainingId];
+    const ex = getExerciseSetup(session);
+
+    if (field === 'duration') {
+
+        const v = parseInt(value, 10);
+        ex.duration = isNaN(v) ? 0 : v;
+
+    } else if (field === 'note') {
+
+        ex.note = value || '';
+
+    } else {
+
+        ex[field] = value;
+    }
+
+    saveStateToFirebase();
+
+    if (field === 'name') renderExerciseStrip();
+}
+
+function renderExerciseStrip() {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session) return;
+
+    const el = document.getElementById('exercise-strip');
+
+    if (!el) return;
+
+    const idx = getCurrentExerciseIndex(session);
+
+    el.innerHTML = (session.exercises || []).map((ex, i) => `
+        <button onclick="setCurrentExercise(${i})"
+            class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border whitespace-nowrap transition ${i === idx ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'}">
+            ${i + 1}. ${ex.done ? '✅ ' : ''}${escapeExerciseValue(ex.name || exerciseFmtLabel(ex.format))}
+        </button>`).join('')
+        + `<button onclick="addExercise()"
+            class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white whitespace-nowrap">
+            + Exo
+        </button>`;
+}
+
+function renderExerciseFiche() {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session) return;
+
+    const el = document.getElementById('exercise-fiche');
+
+    if (!el) return;
+
+    const ex = getExerciseSetup(session);
+    const idx = getCurrentExerciseIndex(session);
+    const n = (session.exercises || []).length;
+
+    el.innerHTML = `
+        <div class="flex flex-wrap items-center gap-1.5 mb-1.5">
+            <input id="ex-name" value="${escapeExerciseValue(ex.name || '')}"
+                oninput="updateExerciseMeta('name', this.value)"
+                onchange="renderExerciseStrip()"
+                placeholder="Nom de l'exercice"
+                class="flex-1 min-w-[140px] px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700" />
+            <input id="ex-duration" type="number" min="0" step="1" value="${parseInt(ex.duration, 10) || ''}"
+                oninput="updateExerciseMeta('duration', this.value)"
+                placeholder="Durée (min)"
+                class="w-[95px] px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700" />
+            <input id="ex-series" value="${escapeExerciseValue(ex.series || '')}"
+                oninput="updateExerciseMeta('series', this.value)"
+                placeholder="Séries (3×10 min)"
+                class="flex-1 min-w-[120px] px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700" />
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5 mb-1.5">
+            <button onclick="toggleExerciseDone()"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition ${ex.done ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'}">
+                ${ex.done ? '✅ Fait' : '◻️ À faire'}
+            </button>
+            <button onclick="startExerciseTimer()"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white">
+                ▶️ Lancer le chrono
+            </button>
+            ${n > 1 ? `
+            <button onclick="moveExercise(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}
+                class="px-2 py-1.5 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600 ${idx === 0 ? 'opacity-40' : ''}">▲</button>
+            <button onclick="moveExercise(${idx}, 1)" ${idx === n - 1 ? 'disabled' : ''}
+                class="px-2 py-1.5 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600 ${idx === n - 1 ? 'opacity-40' : ''}">▼</button>` : ''}
+            <button onclick="duplicateExercise()"
+                class="px-2 py-1.5 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600">⧉ Dupliquer</button>
+            <button onclick="deleteExercise()"
+                class="px-2 py-1.5 rounded-lg text-[11px] font-bold bg-red-50 text-red-600 border border-red-200">🗑</button>
+        </div>
+        <textarea id="ex-note" rows="2"
+            oninput="updateExerciseMeta('note', this.value)"
+            placeholder="Consignes de l'exercice…"
+            class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700"></textarea>
+    `;
+
+    document.getElementById('ex-note').value = ex.note || '';
+    document.getElementById('ex-series').value = ex.series || '';
+}
+
+var exerciseTimer = { int: null, endAt: 0, exId: null, paused: false, left: 0, active: false };
+
+var exerciseAudioCtx = null;
+
+function ensureExerciseAudio() {
+
+    if (!exerciseAudioCtx) exerciseAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (exerciseAudioCtx.state === 'suspended') exerciseAudioCtx.resume();
+}
+
+function exerciseBeep() {
+
+    try {
+
+        ensureExerciseAudio();
+
+        const o = exerciseAudioCtx.createOscillator();
+        const g = exerciseAudioCtx.createGain();
+
+        o.connect(g);
+        g.connect(exerciseAudioCtx.destination);
+
+        o.frequency.value = 880;
+        g.gain.value = 0.35;
+
+        o.start();
+        setTimeout(function () { try { o.stop(); } catch (e) { } }, 800);
+
+    } catch (e) { }
+}
+
+function fmtTimer(ms) {
+
+    const m = Math.floor(ms / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+
+    return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function startExerciseTimer() {
+
+    const session = state.trainings[currentTrainingId];
+    const ex = getExerciseSetup(session);
+
+    const dur = parseInt(ex.duration, 10) || 0;
+
+    if (dur <= 0) { showToast('Renseigne une durée en minutes'); return; }
+
+    stopExerciseTimer();
+
+    try { ensureExerciseAudio(); } catch (e) { }
+
+    exerciseTimer.exId = ex.id;
+    exerciseTimer.endAt = Date.now() + dur * 60000;
+    exerciseTimer.paused = false;
+    exerciseTimer.active = true;
+
+    const ov = document.getElementById('exercise-timer-overlay');
+    const nm = document.getElementById('exercise-timer-name');
+    const tm = document.getElementById('exercise-timer-time');
+    const pb = document.getElementById('exercise-timer-pause');
+
+    ov.style.display = 'flex';
+    ov.classList.remove('done');
+    nm.textContent = ex.name || exerciseFmtLabel(ex.format);
+    tm.classList.remove('over');
+    pb.textContent = '⏸ Pause';
+
+    exerciseTimer.int = setInterval(tickExerciseTimer, 300);
+
+    tickExerciseTimer();
+}
+
+function tickExerciseTimer() {
+
+    if (!exerciseTimer.active || exerciseTimer.paused) return;
+
+    const left = exerciseTimer.endAt - Date.now();
+    const tm = document.getElementById('exercise-timer-time');
+
+    if (left <= 0) { finishExerciseTimer(); return; }
+
+    tm.textContent = fmtTimer(left);
+    tm.classList.toggle('over', left <= 15000);
+}
+
+function pauseExerciseTimer() {
+
+    if (!exerciseTimer.active) return;
+
+    const pb = document.getElementById('exercise-timer-pause');
+
+    if (exerciseTimer.paused) {
+
+        exerciseTimer.endAt = Date.now() + exerciseTimer.left;
+        exerciseTimer.paused = false;
+        pb.textContent = '⏸ Pause';
+
+    } else {
+
+        exerciseTimer.left = Math.max(0, exerciseTimer.endAt - Date.now());
+        exerciseTimer.paused = true;
+        pb.textContent = '▶ Reprendre';
+    }
+}
+
+function stopExerciseTimer() {
+
+    exerciseTimer.active = false;
+
+    if (exerciseTimer.int) { clearInterval(exerciseTimer.int); exerciseTimer.int = null; }
+
+    const ov = document.getElementById('exercise-timer-overlay');
+
+    if (ov) { ov.style.display = 'none'; }
+}
+
+function finishExerciseTimer() {
+
+    stopExerciseTimer();
+
+    const ov = document.getElementById('exercise-timer-overlay');
+    const tm = document.getElementById('exercise-timer-time');
+
+    ov.style.display = 'flex';
+    ov.classList.add('done');
+    tm.textContent = '0:00';
+    tm.classList.add('over');
+
+    exerciseBeep();
+    if (navigator.vibrate) navigator.vibrate([500, 250, 500, 250, 500]);
+
+    setTimeout(function () { if (ov) ov.style.display = 'none'; }, 3000);
+}
+
+function toggleExerciseTemplates() {
+
+    const panel = document.getElementById('exercise-templates-panel');
+
+    if (!panel) return;
+
+    panel.classList.toggle('hidden');
+    renderExerciseTemplates();
+}
+
+function renderExerciseTemplates() {
+
+    const panel = document.getElementById('exercise-templates-panel');
+
+    if (!panel) return;
+
+    const tpls = state.exerciseTemplates || [];
+
+    panel.innerHTML = `
+        <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-bold text-violet-700">💾 Modèles (${tpls.length})</span>
+            <button onclick="saveExerciseTemplate()"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-violet-600 hover:bg-violet-700 text-white">
+                💾 Sauvegarder
+            </button>
+        </div>
+        ${tpls.length ? tpls.map(t => `
+            <div class="flex items-center gap-2 py-1.5 border-b border-violet-100 last:border-0">
+                <span class="flex-1 text-xs font-semibold text-slate-700">${escapeExerciseValue(t.name)}</span>
+                <button onclick="applyExerciseTemplate('${t.id}')"
+                    class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-violet-100 hover:bg-violet-200 text-violet-800">📥</button>
+                <button onclick="deleteExerciseTemplate('${t.id}')"
+                    class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-red-50 text-red-600">🗑</button>
+            </div>`).join('')
+            : '<div class="text-[11px] text-violet-400">Aucun modèle pour l\'instant : sauvegarde la disposition actuelle pour la réutiliser.</div>'}
+    `;
+}
+
+function saveExerciseTemplate() {
+
+    const session = state.trainings[currentTrainingId];
+    const ex = getExerciseSetup(session);
+
+    const name = prompt('Nom du modèle :', (ex.name || exerciseFmtLabel(ex.format)) + ' (' + exerciseFmtLabel(ex.format) + ')');
+
+    if (!name) return;
+
+    state.exerciseTemplates = state.exerciseTemplates || [];
+
+    state.exerciseTemplates.push({
+        id: 't' + Date.now(),
+        name: name,
+        format: ex.format,
+        area: ex.area,
+        props: JSON.parse(JSON.stringify(ex.props || [])),
+        posOverrides: JSON.parse(JSON.stringify((ex.posOverrides || {})[ex.area] || {}))
+    });
+
+    saveStateToFirebase();
+    renderExerciseTemplates();
+    showToast('Modèle sauvegardé');
+}
+
+function applyExerciseTemplate(id) {
+
+    const session = state.trainings[currentTrainingId];
+    const tpl = (state.exerciseTemplates || []).find(t => t.id === id);
+
+    if (!tpl) return;
+
+    const ex = makeExerciseTemplate(tpl.name);
+
+    ex.format = tpl.format;
+    ex.area = tpl.area;
+    ex.props = JSON.parse(JSON.stringify(tpl.props || []));
+    ex.posOverrides[tpl.area] = JSON.parse(JSON.stringify(tpl.posOverrides || {}));
+
+    session.exercises = session.exercises || [];
+    session.exercises.push(ex);
+    session.currentEx = session.exercises.length - 1;
+
+    exerciseFullReset();
+    saveStateToFirebase();
+    renderExercise();
+    showToast('Modèle « ' + tpl.name + ' » ajouté');
+}
+
+function deleteExerciseTemplate(id) {
+
+    if (!confirm('Supprimer ce modèle ?')) return;
+
+    state.exerciseTemplates = (state.exerciseTemplates || []).filter(t => t.id !== id);
+
+    saveStateToFirebase();
+    renderExerciseTemplates();
+    showToast('Modèle supprimé');
 }
 
 
