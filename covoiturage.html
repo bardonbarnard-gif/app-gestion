@@ -6,6 +6,7 @@
 
 <title>Covoiturage Rangueil FC</title>
 <script src= https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js></script>
+<script src= https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js></script>
 <script src= https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js></script>
 
 <script>
@@ -22,6 +23,10 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 
+firebase.auth().signInAnonymously().catch(function (err) {
+    console.error("Auth anonyme indisponible :", err);
+});
+
 const db = firebase.database();
 
 const params =
@@ -32,10 +37,12 @@ const params =
 const carpoolId =
     params.get('id');
 
-console.log(
-    "Carpool ID :",
-    carpoolId
-);
+function showMessage(text, isError) {
+    const el = document.getElementById('confirmation');
+    el.classList.remove('hidden');
+    el.innerHTML = (isError ? '⚠️ ' : '') + text;
+    el.style.color = isError ? '#dc2626' : '';
+}
 
 db.ref('rangueil_data/matches')
     .once('value')
@@ -303,8 +310,9 @@ document
 
         if (!playerId) {
 
-            alert(
-                "Merci de sélectionner un joueur."
+            showMessage(
+                'Merci de sélectionner un joueur.',
+                true
             );
 
             return;
@@ -312,8 +320,9 @@ document
 
         if (!transport) {
 
-            alert(
-                "Merci de choisir un mode de déplacement."
+            showMessage(
+                'Merci de choisir un mode de déplacement.',
+                true
             );
 
             return;
@@ -340,26 +349,17 @@ document
         .set(responseData)
         .then(() => {
 
-            document
-                .getElementById(
-                    'confirmation'
-                )
-                .classList.remove(
-                    'hidden'
-                );
-
-            document
-                .getElementById(
-                    'confirmation'
-                )
-                .innerHTML =
-                '✅ Réponse enregistrée. Merci !';
+            showMessage(
+                '✅ Réponse enregistrée. Merci !',
+                false
+            );
 
         })
         .catch(error => {
 
-            alert(
-                'Erreur : ' + error.message
+            showMessage(
+                'Erreur : ' + error.message,
+                true
             );
 
         });
