@@ -1927,17 +1927,28 @@ const nbTotal = playersForTraining.length;
 
     });
             const nbSessions = sessions.length;
-            const nbPlayers = state.players.length;
+
+            // Ne compter que les séances dont l'appel a réellement été rempli :
+            // une séance sans présence ({} ) ne doit pas faire baisser la moyenne.
+            const filledSessions = sessions.filter(s =>
+                (s.presence && Object.keys(s.presence).length > 0)
+            );
             let totalPresences = 0, totalPossible = 0;
-            sessions.forEach(s => {
-                const vals = Object.values(s.presence || {});
-                totalPresences += vals.filter(v =>
+            filledSessions.forEach(s => {
+                const playersForTraining = state.players.filter(p =>
+    (p.team || p.cat || '').toLowerCase() ===
+    (s.team || '').toLowerCase()
+);
+                    const possible = playersForTraining.length;
+                    if (possible === 0) return;
+                    const vals = Object.values(s.presence || {});
+                    totalPresences += vals.filter(v =>
     v === 'present' || v === 'retard'
 ).length;
-                totalPossible += nbPlayers;
-            });
-            const avgPct = totalPossible > 0 ? Math.round((totalPresences / totalPossible) * 100) : 0;
-            const avgColor = avgPct >= 75 ? 'text-emerald-600' : avgPct >= 50 ? 'text-amber-600' : 'text-red-500';
+                    totalPossible += possible;
+                });
+            const avgPct = totalPossible > 0 ? Math.round((totalPresences / totalPossible) * 100) : null;
+            const avgColor = avgPct === null ? 'text-slate-400' : avgPct >= 75 ? 'text-emerald-600' : avgPct >= 50 ? 'text-amber-600' : 'text-red-500';
 
             const bar = document.getElementById('training-stats-bar');
             if (!bar) return;
@@ -1947,7 +1958,7 @@ const nbTotal = playersForTraining.length;
                     <p class="text-[11px] text-slate-500 mt-0.5">Séances</p>
                 </div>
                 <div class="bg-white p-3 rounded-xl border border-slate-100 card-shadow text-center">
-                    <p class="text-2xl font-extrabold ${avgColor}">${avgPct}%</p>
+                    <p class="text-2xl font-extrabold ${avgColor}">${avgPct === null ? '—' : avgPct + '%'}</p>
                     <p class="text-[11px] text-slate-500 mt-0.5">Présence moy.</p>
                 </div>
                 <div class="bg-white p-3 rounded-xl border border-slate-100 card-shadow text-center">
@@ -1955,6 +1966,8 @@ const nbTotal = playersForTraining.length;
                     <p class="text-[11px] text-slate-500 mt-0.5">Présences tot.</p>
                 </div>`;
         }
+
+        window.renderTrainingStatsBar = renderTrainingStatsBar;
 
         function openTrainingDetail(tId) {
             currentTrainingId = tId;
