@@ -564,11 +564,17 @@
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                         <div>
                             <h2 class="text-base font-bold text-slate-800">📅 Entraînements</h2>
-                            <p class="text-xs text-slate-500">Mardi & Vendredi · 18h00 – 20h00</p>
+                            <p class="text-xs text-slate-500" id="training-days-label">Mardi · Vendredi · 18h00 – 20h00</p>
                         </div>
                         <div class="flex items-center space-x-2">
                             <button onclick="openModalTraining()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center space-x-1 whitespace-nowrap">
                                 <i class="fa-solid fa-plus"></i><span>Nouvelle séance</span>
+                            </button>
+                            <button onclick="openModalRecur()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center space-x-1 whitespace-nowrap">
+                                <i class="fa-solid fa-rotate"></i><span>Séance type</span>
+                            </button>
+                            <button onclick="openModalTrainingSettings()" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-xs" title="Jours d'entraînements">
+                                <i class="fa-solid fa-gear"></i>
                             </button>
                         </div>
                     </div>
@@ -1225,6 +1231,43 @@
                 <div class="flex justify-end space-x-2 pt-2">
                     <button type="button" onclick="toggleModal('modal-training', false)" class="px-3 py-2 bg-slate-100 text-slate-600 font-semibold rounded-lg">Annuler</button>
                     <button type="button" onclick="handleSaveTraining()" class="px-4 py-2 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700">Enregistrer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-recur" class="modal-overlay hidden">
+        <div class="modal-card max-w-md p-5 space-y-4 accent-amber">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-slate-800 text-sm">🔁 Créer une séance récurrente</h3>
+                <button onclick="toggleModal('modal-recur', false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-600 font-semibold mb-1">Reproduire la séance</label>
+                    <select id="recur-model" onchange="updateRecurPreview()" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400"></select>
+                </div>
+                <div id="recur-preview" class="p-3 bg-sky-50 rounded-xl text-slate-700"></div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="toggleModal('modal-recur', false)" class="px-3 py-2 bg-slate-100 text-slate-600 font-semibold rounded-lg">Annuler</button>
+                    <button type="button" onclick="handleSaveRecur()" class="px-4 py-2 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700">Créer la séance</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-settings-training" class="modal-overlay hidden">
+        <div class="modal-card max-w-md p-5 space-y-4 accent-sky">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-slate-800 text-sm">⚙️ Jours d'entraînements</h3>
+                <button onclick="toggleModal('modal-settings-training', false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <p class="text-slate-500">Choisissez les jours où l'équipe s'entraîne. La fonction « Séance type » proposera automatiquement ces jours.</p>
+                <div id="training-days-picker" class="grid grid-cols-7 gap-1.5"></div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="toggleModal('modal-settings-training', false)" class="px-3 py-2 bg-slate-100 text-slate-600 font-semibold rounded-lg">Annuler</button>
+                    <button type="button" onclick="handleSaveTrainingSettings()" class="px-4 py-2 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700">Enregistrer</button>
                 </div>
             </div>
         </div>

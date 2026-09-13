@@ -250,6 +250,7 @@ if (pinScreen) {
     teams: {},
     events: {},
     carpoolResponses: {},
+    settings: {},
 };
 
 // Variables d'interface uniquement
@@ -268,6 +269,7 @@ let currentCatFilter = 'all';
                     state.cards = (data && data.cards) || {};
                     state.stats = (data && data.stats) || {};
                     state.staff = (data && data.staff) || [];
+                    state.settings = (data && data.settings) || { trainingDays: [2, 5] };
                     saveStateToFirebase();
                 } else {
                     state.players = (data.players || []).map(p => {
@@ -286,6 +288,8 @@ let currentCatFilter = 'all';
 );
 state.carpoolResponses =
     data.carpoolResponses || {};
+state.settings =
+    data.settings || { trainingDays: [2, 5] };
                     // Migration ancien format numérique → nouveau format objet
                     const rawTrainings = data.trainings || {};
                     if (Object.keys(rawTrainings).length > 0 && !isNaN(Object.keys(rawTrainings)[0])) {
@@ -337,7 +341,8 @@ function saveStateToFirebase() {
     staff: state.staff,
     teams: state.teams,
     events: state.events,
-    carpoolResponses: state.carpoolResponses
+    carpoolResponses: state.carpoolResponses,
+    settings: state.settings
 };
 
     db.ref('rangueil_data').update(dataToSave);
@@ -1787,6 +1792,8 @@ renderMatchSummary(m);
 
         function renderEntrainements() {
             renderTrainingStatsBar();
+            const daysLabelEl = document.getElementById('training-days-label');
+            if (daysLabelEl) daysLabelEl.textContent = trainingDaysLabel() + ' · 18h00 – 20h00';
             const today = new Date(); today.setHours(0,0,0,0);
 
             const role = window.currentUserRole || 'public';
@@ -2267,6 +2274,125 @@ function duplicateTraining() {
                 showToast('Séance créée avec succès !');
             }
         }
+
+        function getTrainingDays() {
+            const d = state.settings && Array.isArray(state.settings.trainingDays) && state.settings.trainingDays.length
+                ? state.settings.trainingDays
+                : [2, 5];
+            return d;
+        }
+
+        function trainingDaysLabel() {
+            const names = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            const days = getTrainingDays().map(d => names[d]).filter(Boolean);
+            return days.length ? days.join(' · ') : 'Mardi · Vendredi';
+        }
+
+        function nextRecurringTrainingDate() {
+            const days = getTrainingDays();
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(today);
+                d.setDate(d.getDate() + i);
+                if (days.includes(d.getDay())) return d;
+            }
+            return today;
+        }
+
+        function openModalTrainingSettings() {
+            const days = getTrainingDays();
+            const picker = document.getElementById('training-days-picker');
+            const dayNames = [
+                { v: 1, label: 'Lu' }, { v: 2, label: 'Ma' }, { v: 3, label: 'Me' },
+                { v: 4, label: 'Je' }, { v: 5, label: 'Ve' }, { v: 6, label: 'Sa' }, { v: 0, label: 'Di' }
+            ];
+            picker.innerHTML = dayNames.map(d =>
+                `<label class="flex flex-col items-center p-2 rounded-xl cursor-pointer border transition ${days.includes(d.v) ? 'bg-sky-600 text-white border-sky-600' : 'bg-slate-50 text-slate-600 border-slate-200'}">
+                    <input type="checkbox" class="hidden day-check" value="${d.v}" ${days.includes(d.v) ? 'checked' : ''}>
+                    <span class="font-bold text-xs">${d.label}</span>
+                </label>`
+            ).join('');
+            toggleModal('modal-settings-training', true);
+        }
+
+        function handleSaveTrainingSettings() {
+            const checks = document.querySelectorAll('.day-check:checked');
+            const days = Array.from(checks).map(c => parseInt(c.value));
+            if (!days.length) {
+                showToast('Sélectionnez au moins un jour', 'error');
+                return;
+            }
+            if (!state.settings) state.settings = {};
+            state.settings.trainingDays = days;
+            saveStateToFirebase();
+            toggleModal('modal-settings-training', false);
+            renderEntrainements();
+            showToast("Jours d'entraînement enregistrés !");
+        }
+
+        function openModalRecur() {
+            const select = document.getElementById('recur-model');
+            const options = Object.values(state.trainings || {})
+                .filter(s => s.title || s.theme)
+                .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            select.innerHTML = options.length
+                ? options.map(s =>
+                    `<option value="${s.id}">${s.title || 'Séance'} — ${s.date ? new Date(s.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }) : 'sans date'} — ${s.theme || 'thème non défini'}</option>`
+                  ).join('')
+                : '<option value="">Aucune séance existante — créez-en une d\'abord</option>';
+            updateRecurPreview();
+            toggleModal('modal-recur', true);
+        }
+
+        function updateRecurPreview() {
+            const id = document.getElementById('recur-model').value;
+            const s = state.trainings[id];
+            const preview = document.getElementById('recur-preview');
+            if (!s) {
+                preview.innerHTML = '<i class="fa-solid fa-circle-info text-sky-500 mr-1"></i>Choisissez une séance à reproduire.';
+                return;
+            }
+            const d = nextRecurringTrainingDate();
+            const heure = s.heure || '18:00';
+            preview.innerHTML =
+                `🗓 <b>${d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</b> à <b>${heure}</b>` +
+                `<div class="mt-1 text-slate-600">${s.title || 'Séance'} · ${state.teams?.[s.team]?.name || s.team || 'Équipe'}<br>🎯 ${s.theme || 'Thème non défini'}${s.pdfName ? '<br>📎 ' + s.pdfName : ''}</div>` +
+                `<div class="mt-1 text-[10px] text-slate-500">Les présences seront remises à zéro.</div>`;
+        }
+
+        function handleSaveRecur() {
+            const id = document.getElementById('recur-model').value;
+            const source = state.trainings[id];
+            if (!source) {
+                showToast('Choisissez une séance à reproduire', 'error');
+                return;
+            }
+            const dateObj = nextRecurringTrainingDate();
+            const dateStr = dateObj.toISOString().split('T')[0];
+            const newId = 'T_' + Date.now();
+            state.trainings[newId] = {
+                id: newId,
+                title: source.title || 'Séance type',
+                date: dateStr,
+                heure: source.heure || '18:00',
+                theme: source.theme || '',
+                team: source.team || '',
+                presence: {},
+                pdfData: source.pdfData || null,
+                pdfName: source.pdfName || null
+            };
+            saveStateToFirebase();
+            toggleModal('modal-recur', false);
+            renderEntrainements();
+            showToast(`Séance du ${dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} créée`);
+        }
+
+        window.openModalRecur = openModalRecur;
+        window.handleSaveRecur = handleSaveRecur;
+        window.updateRecurPreview = updateRecurPreview;
+        window.openModalTrainingSettings = openModalTrainingSettings;
+        window.handleSaveTrainingSettings = handleSaveTrainingSettings;
 
         function editCurrentTraining() {
             if (currentTrainingId) openModalTraining(currentTrainingId);
@@ -7577,6 +7703,190 @@ function renderGeneratedTeams() {
     container.innerHTML = html;
 }
 
+var exerciseUI = {
+    selected: null,
+    tool: 'move',
+    selProp: null,
+    zoneP1: null,
+    slotMove: false,
+    holdSlot: null,
+    drag: null,
+    suppressClickUntil: 0
+};
+
+const EXERCISE_FORMATS = {
+    '4v4': {
+        label: '4 vs 4',
+        positions: [
+            { name: 'DC', x: 50, y: 28 },
+            { name: 'MC', x: 35, y: 42 },
+            { name: 'MC', x: 65, y: 42 },
+            { name: 'BU', x: 50, y: 50 }
+        ]
+    },
+    '5v5': {
+        label: '5 vs 5',
+        positions: [
+            { name: 'GB', x: 50, y: 12 },
+            { name: 'DC', x: 50, y: 26 },
+            { name: 'MC', x: 35, y: 40 },
+            { name: 'MC', x: 65, y: 40 },
+            { name: 'BU', x: 50, y: 50 }
+        ]
+    },
+    '6v6': {
+        label: '6 vs 6',
+        positions: [
+            { name: 'GB', x: 50, y: 12 },
+            { name: 'DC', x: 30, y: 24 },
+            { name: 'DC', x: 70, y: 24 },
+            { name: 'MC', x: 40, y: 38 },
+            { name: 'MC', x: 60, y: 38 },
+            { name: 'BU', x: 50, y: 48 }
+        ]
+    },
+    '7v7': {
+        label: '7 vs 7',
+        positions: [
+            { name: 'GB', x: 50, y: 12 },
+            { name: 'DC', x: 33, y: 24 },
+            { name: 'DC', x: 67, y: 24 },
+            { name: 'MC', x: 25, y: 38 },
+            { name: 'MC', x: 50, y: 38 },
+            { name: 'MC', x: 75, y: 38 },
+            { name: 'BU', x: 50, y: 50 }
+        ]
+    },
+    '8v8': {
+        label: '8 vs 8',
+        positions: [
+            { name: 'GB', x: 50, y: 12 },
+            { name: 'DG', x: 25, y: 24 },
+            { name: 'DC', x: 50, y: 24 },
+            { name: 'DD', x: 75, y: 24 },
+            { name: 'MC', x: 35, y: 37 },
+            { name: 'MC', x: 65, y: 37 },
+            { name: 'AG', x: 30, y: 48 },
+            { name: 'BU', x: 70, y: 50 }
+        ]
+    },
+    '8v8_232': {
+        label: '8v8 2-3-2',
+        positions: [
+            { name: 'GB', x: 50, y: 12 },
+            { name: 'DC', x: 35, y: 25 },
+            { name: 'DC', x: 65, y: 25 },
+            { name: 'MC', x: 25, y: 38 },
+            { name: 'MC', x: 50, y: 38 },
+            { name: 'MC', x: 75, y: 38 },
+            { name: 'BU', x: 35, y: 48 },
+            { name: 'BU', x: 65, y: 50 }
+        ]
+    },
+    '8v8_331': {
+        label: '8v8 3-3-1',
+        positions: [
+            { name: 'GB', x: 50, y: 12 },
+            { name: 'DC', x: 25, y: 24 },
+            { name: 'DC', x: 50, y: 24 },
+            { name: 'DC', x: 75, y: 24 },
+            { name: 'MC', x: 30, y: 37 },
+            { name: 'MC', x: 50, y: 37 },
+            { name: 'MC', x: 70, y: 37 },
+            { name: 'BU', x: 50, y: 49 }
+        ]
+    },
+    '8v8_241': {
+        label: '8v8 2-4-1',
+        positions: [
+            { name: 'GB', x: 50, y: 12 },
+            { name: 'DC', x: 35, y: 24 },
+            { name: 'DC', x: 65, y: 24 },
+            { name: 'MC', x: 20, y: 36 },
+            { name: 'MC', x: 40, y: 36 },
+            { name: 'MC', x: 60, y: 36 },
+            { name: 'MC', x: 80, y: 36 },
+            { name: 'BU', x: 50, y: 48 }
+        ]
+    },
+    '9v9': {
+        label: '9 vs 9',
+        positions: [
+            { name: 'GB', x: 50, y: 12 },
+            { name: 'DC', x: 35, y: 24 },
+            { name: 'DC', x: 65, y: 24 },
+            { name: 'MC', x: 20, y: 36 },
+            { name: 'MC', x: 40, y: 36 },
+            { name: 'MC', x: 60, y: 36 },
+            { name: 'MC', x: 80, y: 36 },
+            { name: 'AG', x: 35, y: 48 },
+            { name: 'BU', x: 65, y: 48 }
+        ]
+    },
+    '10v10': {
+        label: '10 vs 10',
+        positions: [
+            { name: 'GB', x: 50, y: 10 },
+            { name: 'DC', x: 32, y: 22 },
+            { name: 'DC', x: 68, y: 22 },
+            { name: 'MC', x: 18, y: 34 },
+            { name: 'MC', x: 40, y: 34 },
+            { name: 'MC', x: 60, y: 34 },
+            { name: 'MC', x: 82, y: 34 },
+            { name: 'AG', x: 28, y: 46 },
+            { name: 'MOC', x: 50, y: 46 },
+            { name: 'BU', x: 72, y: 46 }
+        ]
+    },
+    '11v11': {
+        label: '11 vs 11',
+        positions: [
+            { name: 'GB', x: 50, y: 10 },
+            { name: 'DG', x: 15, y: 22 },
+            { name: 'DC', x: 38, y: 22 },
+            { name: 'DC', x: 62, y: 22 },
+            { name: 'DD', x: 85, y: 22 },
+            { name: 'MC', x: 28, y: 36 },
+            { name: 'MC', x: 50, y: 36 },
+            { name: 'MC', x: 72, y: 36 },
+            { name: 'MOC', x: 50, y: 44 },
+            { name: 'AG', x: 30, y: 50 },
+            { name: 'BU', x: 70, y: 50 }
+        ]
+    }
+};
+
+function getExerciseSetup(session) {
+
+    session.exerciseSetup = session.exerciseSetup || {};
+
+    const s = session.exerciseSetup;
+
+    s.format = s.format || '8v8';
+
+    s.team = s.team || 'A';
+
+    s.byTeam = s.byTeam || { A: {}, B: {} };
+
+    s.byTeam.A = s.byTeam.A || {};
+
+    s.byTeam.B = s.byTeam.B || {};
+
+    s.props = s.props || [];
+
+    s.area = s.area || 'full';
+
+    s.mode = s.mode || 'users';
+
+    s.posOverrides = s.posOverrides || { full: {}, half: {} };
+
+    s.posOverrides.full = s.posOverrides.full || {};
+
+    s.posOverrides.half = s.posOverrides.half || {};
+
+    return s;
+}
+
 function openExerciseBoard() {
 
     const session =
@@ -7591,436 +7901,1003 @@ function openExerciseBoard() {
 
     container.classList.remove("hidden");
 
+    const setup = getExerciseSetup(session);
+
+    const fmtKeys = Object.keys(EXERCISE_FORMATS);
+
     container.innerHTML = `
 
-        <h3 class="font-bold text-slate-800 mb-4">
-            ⚽ Exercices
-        </h3>
-
-        <div class="flex flex-wrap gap-2 mb-4">
-
-            <button
-                onclick="renderExercise4v4()"
-                class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
-                4 vs 4
-            </button>
-
-            <button
-                onclick="renderExercise6v6()"
-                class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
-                6 vs 6
-            </button>
-
-            <button
-    onclick="renderExercise8v8_242()"
-    class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
-    8v8 2-4-2
-</button>
-
-<button
-    onclick="renderExercise8v8_332()"
-    class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
-    8v8 3-3-2
-</button>
-
-<button
-    onclick="renderExercise8v8_251()"
-    class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
-    8v8 2-5-1
-</button>
-
-            <button
-                onclick="renderExercise10v10()"
-                class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">
-                10 vs 10
-            </button>
-
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
+            <h3 class="font-bold text-slate-800">
+                ⚽ Exercices
+            </h3>
+            <span id="exercise-info" class="text-xs font-semibold text-slate-500"></span>
         </div>
+
+        <div id="exercise-board-options" class="flex flex-wrap items-center gap-2 mb-3">
+            <button data-area="full" onclick="setExerciseArea('full')"
+                class="px-3 py-1.5 rounded-lg text-[11px] font-bold border">⛹️ Terrain complet</button>
+            <button data-area="half" onclick="setExerciseArea('half')"
+                class="px-3 py-1.5 rounded-lg text-[11px] font-bold border">✂️ Demi-terrain</button>
+            <span class="flex-1"></span>
+            <button data-mode="users" onclick="setExerciseMode('users')"
+                class="px-3 py-1.5 rounded-lg text-[11px] font-bold border">👥 Joueurs</button>
+            <button data-mode="edit" onclick="setExerciseMode('edit')"
+                class="px-3 py-1.5 rounded-lg text-[11px] font-bold border">✏️ Édition</button>
+        </div>
+
+        <div id="exercise-formats" class="flex flex-wrap gap-1.5 mb-3">
+            ${fmtKeys.map(k => `
+                <button data-format="${k}" onclick="chooseExercise('${k}')"
+                    class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold ${setup.format === k ? 'ring-2 ring-amber-300' : ''}">
+                    ${EXERCISE_FORMATS[k].label}
+                </button>`).join('')}
+        </div>
+
+        <div id="exercise-team-toggle" class="flex flex-wrap items-center gap-2 mb-2"></div>
+
+        <div id="exercise-edit-tools" class="hidden"></div>
 
         <div
             id="exercise-field"
             style="
                 position:relative;
                 width:100%;
-                height:700px;
+                height:clamp(440px, 105vw, 680px);
                 background:#2E7D32;
-                border:4px solid white;
+                border:1px solid rgba(255,255,255,.25);
                 border-radius:12px;
                 overflow:hidden;
+                box-shadow:0 8px 20px rgba(0,0,0,.18);
+                touch-action:manipulation;
             ">
         </div>
 
+        <p id="exercise-hint" class="text-[11px] text-slate-400 mt-1.5"></p>
+
+        <div id="exercise-bench" class="mt-3"></div>
+
     `;
 
-    renderExercise8v8();
+    renderExercise();
 }
 
-function createPosition(
-    label,
-    x,
-    y,
-    color
-) {
+function buildFieldLinesHTML() {
 
     return `
-        <div
-            style="
-                position:absolute;
-                left:${x}%;
-                top:${y}%;
+        <div style="position:absolute;inset:6px;border:3px solid rgba(255,255,255,.85);border-radius:12px;pointer-events:none;"></div>
+        <div style="position:absolute;left:0;right:0;top:50%;height:3px;background:rgba(255,255,255,.7);pointer-events:none;"></div>
+        <div style="position:absolute;left:50%;top:50%;width:80px;height:80px;border:2px solid rgba(255,255,255,.55);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;"></div>
+        <div style="position:absolute;left:50%;top:50%;width:9px;height:9px;background:rgba(255,255,255,.8);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;"></div>
+        <div style="position:absolute;left:20%;right:20%;top:0;height:22%;border-left:3px solid rgba(255,255,255,.7);border-right:3px solid rgba(255,255,255,.7);border-bottom:3px solid rgba(255,255,255,.7);border-radius:0 0 10px 10px;pointer-events:none;"></div>
+        <div style="position:absolute;left:34%;right:34%;top:0;height:10%;border-left:2px solid rgba(255,255,255,.6);border-right:2px solid rgba(255,255,255,.6);border-bottom:2px solid rgba(255,255,255,.6);border-radius:0 0 8px 8px;pointer-events:none;"></div>
+        <div style="position:absolute;left:20%;right:20%;bottom:0;height:22%;border-left:3px solid rgba(255,255,255,.7);border-right:3px solid rgba(255,255,255,.7);border-top:3px solid rgba(255,255,255,.7);border-radius:10px 10px 0 0;pointer-events:none;"></div>
+        <div style="position:absolute;left:34%;right:34%;bottom:0;height:10%;border-left:2px solid rgba(255,255,255,.6);border-right:2px solid rgba(255,255,255,.6);border-top:2px solid rgba(255,255,255,.6);border-radius:8px 8px 0 0;pointer-events:none;"></div>
+        <div style="position:absolute;left:50%;top:15%;width:7px;height:7px;background:rgba(255,255,255,.75);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;"></div>
+        <div style="position:absolute;left:50%;bottom:15%;width:7px;height:7px;background:rgba(255,255,255,.75);border-radius:50%;transform:translate(-50%,50%);pointer-events:none;"></div>
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 26px,rgba(0,0,0,.045) 26px 52px);pointer-events:none;border-radius:12px;"></div>
+    `;
+}
+
+function renderExerciseSlot(teamKey, key, playerId, pos, editable) {
+
+    const player = state.players.find(p => p.id === playerId);
+
+    const selected = exerciseUI.selected === key;
+
+    const held = exerciseUI.holdSlot === key;
+
+    const color = teamKey === 'A' ? '#2563eb' : '#dc2626';
+
+    const filled = !!player;
+
+    const inner = filled
+        ? `<span style="font-size:10px;font-weight:700;line-height:1.1;text-align:center;padding:4px 2px;display:block;">${(player.name || '?').split(' ').pop()}</span>`
+        : `<span style="font-size:9px;opacity:.8;text-align:center;display:block;">${pos.name}</span>`;
+
+    const dragHandlers = editable && exerciseUI.slotMove
+        ? ` onpointerdown="slotDragStart(event,'${key}')" onpointermove="slotDragMove(event,'${key}')" onpointerup="slotDragEnd(event,'${key}')"`
+        : '';
+
+    return `
+        <div ${editable ? `onclick="pickExerciseSlot('${key}')"` : ''}
+            ${dragHandlers}
+            data-key="${key}"
+            style="position:absolute;left:${pos.x}%;top:${pos.y}%;
+                width:46px;height:46px;
+                ${selected ? 'z-index:3;' : ''}
+                ${editable ? '' : 'pointer-events:none;'}
+                touch-action:${editable && exerciseUI.slotMove ? 'none' : 'auto'};
                 transform:translate(-50%,-50%);
-                width:60px;
-                height:60px;
                 border-radius:50%;
-                background:${color};
+                background:${filled ? color : 'rgba(255,255,255,.09)'};
+                border:${filled ? '2px solid rgba(255,255,255,.9)' : '2px dashed rgba(255,255,255,.6)'};
+                box-shadow:${held ? '0 0 0 4px #22d3ee, 0 0 18px rgba(34,211,238,.85), 0 2px 5px rgba(0,0,0,.25)' : (selected ? '0 0 0 4px #fbbf24' : '0 2px 5px rgba(0,0,0,.25)')};
                 color:white;
                 display:flex;
                 align-items:center;
                 justify-content:center;
-                font-size:11px;
-                font-weight:bold;
-                border:2px solid white;
-                box-shadow:0 2px 5px rgba(0,0,0,.3);
-            "
-        >
-            ${label}
+                ${editable ? 'cursor:grab;' : ''}">
+            ${inner}
         </div>
     `;
 }
 
-function renderExercise8v8() {
+function effPos(setup, idx, pos) {
 
-    const field =
-        document.getElementById(
-            "exercise-field"
-        );
+    const ov = (setup.posOverrides || {})[setup.area] || {};
 
-    if (!field) return;
+    const o = ov[setup.format + ':' + idx];
 
-    field.innerHTML = `
+    return o ? { x: o.x, y: o.y } : pos;
+}
 
-        <div
-            style="
-                position:absolute;
-                left:0;
-                right:0;
-                top:50%;
-                height:4px;
-                background:white;
-            ">
+function exerciseTeamSize(teamKey) {
+
+    const s = state.trainings[currentTrainingId];
+
+    if (!s || !s.generatedTeams) return 0;
+
+    return (teamKey === 'A' ? s.generatedTeams.teamA : s.generatedTeams.teamB || []).length;
+}
+
+function posteCategory(name) {
+
+    if (name === 'GB') return 'GB';
+
+    if (['DC', 'DG', 'DD'].includes(name)) return 'DEF';
+
+    if (['MC', 'MOC'].includes(name)) return 'MIL';
+
+    if (['AD', 'AG', 'BU'].includes(name)) return 'ATT';
+
+    return 'AUTRE';
+}
+
+function renderExercise() {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session || !session.generatedTeams) return;
+
+    const setup = getExerciseSetup(session);
+
+    const fmt = EXERCISE_FORMATS[setup.format] || EXERCISE_FORMATS['8v8'];
+
+    const field = document.getElementById('exercise-field');
+    const bench = document.getElementById('exercise-bench');
+    const info = document.getElementById('exercise-info');
+    const tgl = document.getElementById('exercise-team-toggle');
+    const tools = document.getElementById('exercise-edit-tools');
+    const hint = document.getElementById('exercise-hint');
+
+    if (!field || !bench || !info || !tgl || !tools || !hint) return;
+
+    document.querySelectorAll('#exercise-formats button').forEach(b => {
+        b.classList.toggle('ring-2', b.dataset.format === setup.format);
+        b.classList.toggle('ring-amber-300', b.dataset.format === setup.format);
+    });
+
+    document.querySelectorAll('#exercise-board-options [data-area]').forEach(b => {
+        const active = b.dataset.area === setup.area;
+        b.classList.toggle('bg-sky-600', active);
+        b.classList.toggle('text-white', active);
+        b.classList.toggle('border-sky-600', active);
+        b.classList.toggle('bg-white', !active);
+        b.classList.toggle('text-slate-600', !active);
+        b.classList.toggle('border-slate-200', !active);
+    });
+
+    document.querySelectorAll('#exercise-board-options [data-mode]').forEach(b => {
+        const active = b.dataset.mode === setup.mode;
+        b.classList.toggle('bg-amber-400', active);
+        b.classList.toggle('text-amber-900', active);
+        b.classList.toggle('border-amber-400', active);
+        b.classList.toggle('bg-white', !active);
+        b.classList.toggle('text-slate-600', !active);
+        b.classList.toggle('border-slate-200', !active);
+    });
+
+    const isHalf = setup.area === 'half';
+    const isEdit = setup.mode === 'edit';
+
+    info.innerHTML = `📋 ${fmt.label} · 🔵 Équipe A (${exerciseTeamSize('A')}) · 🔴 Équipe B (${exerciseTeamSize('B')})${isHalf ? ' · ✂️ Demi-terrain' : ''}`;
+
+    tgl.innerHTML = `
+        <button onclick="selectExerciseTeam('A')"
+            class="px-3 py-2 rounded-lg text-xs font-bold transition
+                ${setup.team === 'A' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'}">
+            🔵 Équipe A
+        </button>
+        <button onclick="selectExerciseTeam('B')"
+            class="px-3 py-2 rounded-lg text-xs font-bold transition
+                ${setup.team === 'B' ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700'}">
+            🔴 Équipe B
+        </button>
+        ${isEdit ? '' : `
+        <button onclick="toggleSlotMove()"
+            class="px-3 py-2 rounded-lg text-xs font-bold transition
+                ${exerciseUI.slotMove ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-cyan-100 hover:bg-cyan-200 text-cyan-700'}">
+            📍 Déplacer postes
+        </button>
+        <button onclick="resetExercisePositions()"
+            class="px-3 py-2 rounded-lg text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-600">
+            ↺
+        </button>`}
+        <button onclick="autoAssignExerciseTeam()"
+            class="px-3 py-2 rounded-lg text-xs font-bold bg-amber-400 hover:bg-amber-500 text-amber-900">
+            🎲 Auto
+        </button>
+        <button onclick="resetExerciseTeam()"
+            class="px-3 py-2 rounded-lg text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-600">
+            ♻️ Reset
+        </button>`;
+
+    let slotsHTML = '';
+
+    if (isHalf) {
+
+        const teamKey = setup.team;
+        const map = setup.byTeam[teamKey] || {};
+
+        slotsHTML = fmt.positions.map((pos, idx) => {
+            const key = teamKey + ':' + idx;
+            return renderExerciseSlot(teamKey, key, map[key], effPos(setup, idx, { ...pos, y: Math.max(4, (50 - pos.y) * 2) }), !isEdit);
+        }).join('');
+
+    } else {
+
+        const byA = setup.byTeam.A || {};
+        const byB = setup.byTeam.B || {};
+
+        slotsHTML = fmt.positions.map((pos, idx) => renderExerciseSlot('A', 'A:' + idx, byA['A:' + idx], effPos(setup, idx, pos), !isEdit)).join('')
+            + fmt.positions.map((pos, idx) => renderExerciseSlot('B', 'B:' + idx, byB['B:' + idx], effPos(setup, idx, { ...pos, y: 100 - pos.y }), !isEdit)).join('');
+    }
+
+    field.innerHTML = (isHalf ? buildHalfFieldLinesHTML() : buildFieldLinesHTML())
+        + renderZonesAndProps(setup)
+        + renderZoneMarker()
+        + slotsHTML;
+
+    field.onclick = isEdit ? exerciseFieldClick : (exerciseUI.slotMove ? placeHeldSlot : null);
+
+    renderExerciseTools(setup);
+
+    bench.innerHTML = '';
+
+    if (!isEdit) renderExerciseBench(setup);
+}
+
+function renderExerciseBench(setup) {
+
+    const session = state.trainings[currentTrainingId];
+    const gen = session.generatedTeams || {};
+    const team = setup.team;
+    const map = setup.byTeam[team] || {};
+    const assigned = Object.values(map);
+
+    const ids = team === 'A' ? (gen.teamA || []) : (gen.teamB || []);
+
+    const players = ids.map(id => state.players.find(p => p.id === id)).filter(Boolean);
+
+    const onBench = players.filter(p => !assigned.includes(p.id));
+
+    const el = document.getElementById('exercise-bench');
+
+    if (!el) return;
+
+    if (!onBench.length) {
+
+        el.innerHTML = `<div class="text-xs text-slate-400 text-center py-2">
+            ✅ Tous les joueurs de l'équipe ${team} sont placés sur le terrain
+        </div>`;
+
+        return;
+    }
+
+    el.innerHTML = `
+        <div class="text-[11px] font-bold text-slate-500 mb-1.5">
+            🪑 Banc — Équipe ${team} (${onBench.length})
         </div>
+        <div class="flex flex-wrap gap-1.5">
+            ${onBench.map(p => `
+                <button onclick="assignExercisePlayer('${p.id}')"
+                    class="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold ${team === 'A' ? 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100' : 'bg-red-50 text-red-800 border border-red-200 hover:bg-red-100'}">
+                    ${getNiveauIcon(p.niveau)} ${p.name}
+                </button>`).join('')}
+        </div>`;
+}
 
-        ${createPosition("GB",50,12,"#2563eb")}
+function chooseExercise(formatKey) {
 
-        ${createPosition("DG",30,24,"#2563eb")}
-        ${createPosition("DC",50,24,"#2563eb")}
-        ${createPosition("DD",70,24,"#2563eb")}
+    if (!EXERCISE_FORMATS[formatKey]) return;
 
-        ${createPosition("MC",40,36,"#2563eb")}
-        ${createPosition("MC",60,36,"#2563eb")}
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
 
-        ${createPosition("AG",30,46,"#2563eb")}
-        ${createPosition("BU",50,46,"#2563eb")}
-        ${createPosition("AD",70,46,"#2563eb")}
+    if (setup.format !== formatKey) {
 
-        ${createPosition("AG",30,54,"#dc2626")}
-        ${createPosition("BU",50,54,"#dc2626")}
-        ${createPosition("AD",70,54,"#dc2626")}
+        const hasPlayers = Object.keys(setup.byTeam.A).length + Object.keys(setup.byTeam.B).length > 0;
 
-        ${createPosition("MC",40,64,"#dc2626")}
-        ${createPosition("MC",60,64,"#dc2626")}
+        if (hasPlayers && !confirm('Changer de dispositif remettra tous les joueurs au banc. Continuer ?')) return;
 
-        ${createPosition("DG",30,76,"#dc2626")}
-        ${createPosition("DC",50,76,"#dc2626")}
-        ${createPosition("DD",70,76,"#dc2626")}
+        setup.format = formatKey;
+        setup.byTeam = { A: {}, B: {} };
+        exerciseUI.selected = null;
+        saveStateToFirebase();
+    }
 
-        ${createPosition("GB",50,88,"#dc2626")}
+    renderExercise();
+}
 
+function selectExerciseTeam(team) {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    setup.team = team;
+    exerciseUI.selected = null;
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function pickExerciseSlot(key) {
+
+    if (exerciseUI.suppressClickUntil && Date.now() < exerciseUI.suppressClickUntil) return;
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    const team = key.split(':')[0];
+    const map = setup.byTeam[team] = setup.byTeam[team] || {};
+
+    if (exerciseUI.slotMove) {
+
+        exerciseUI.holdSlot = (exerciseUI.holdSlot === key) ? null : key;
+        exerciseUI.selected = null;
+        renderExercise();
+        return;
+    }
+
+    if (map[key]) {
+
+        delete map[key];
+        saveStateToFirebase();
+
+    } else {
+
+        exerciseUI.selected = (exerciseUI.selected === key) ? null : key;
+    }
+
+    renderExercise();
+}
+
+function toggleSlotMove() {
+
+    exerciseUI.slotMove = !exerciseUI.slotMove;
+    exerciseUI.holdSlot = null;
+    exerciseUI.drag = null;
+    exerciseUI.selected = null;
+    renderExercise();
+}
+
+function slotDragStart(e, key) {
+
+    if (!exerciseUI.slotMove) return;
+
+    if (e.cancelable) e.preventDefault();
+
+    exerciseUI.suppressClickUntil = Date.now() + 400;
+
+    try { if (e.currentTarget.setPointerCapture) e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { }
+
+    exerciseUI.drag = { key: key, active: true, moved: false, el: e.currentTarget, lastX: e.clientX, lastY: e.clientY };
+
+    if (exerciseUI.holdSlot === key) {
+
+        exerciseUI.holdSlot = null;
+        renderExercise();
+        return;
+    }
+
+    exerciseUI.holdSlot = key;
+    e.currentTarget.style.boxShadow = '0 0 0 4px #22d3ee, 0 0 18px rgba(34,211,238,.85), 0 2px 5px rgba(0,0,0,.25)';
+}
+
+function slotDragMove(e, key) {
+
+    const d = exerciseUI.drag;
+    if (!d || !d.active) return;
+
+    if (e.cancelable) e.preventDefault();
+
+    d.moved = true;
+    d.lastX = e.clientX;
+    d.lastY = e.clientY;
+}
+
+function slotDragEnd(e, key) {
+
+    const d = exerciseUI.drag;
+    if (!d || !d.active) return;
+
+    if (e.cancelable) e.preventDefault();
+
+    const rect = document.getElementById('exercise-field').getBoundingClientRect();
+
+    const x = Math.max(4, Math.min(96, ((d.lastX - rect.left) / rect.width) * 100));
+    const y = Math.max(4, Math.min(96, ((d.lastY - rect.top) / rect.height) * 100));
+
+    exerciseUI.drag = null;
+
+    if (d.moved) {
+
+        exerciseUI.holdSlot = null;
+        commitSlotPos(key, x, y);
+        return;
+    }
+
+    exerciseUI.holdSlot = key;
+    renderExercise();
+}
+
+function placeHeldSlot(e) {
+
+    if (!exerciseUI.holdSlot) return;
+
+    if (e.target && e.target.closest && e.target.closest('[data-key]')) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+
+    const x = Math.max(4, Math.min(96, ((e.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(4, Math.min(96, ((e.clientY - rect.top) / rect.height) * 100));
+
+    commitSlotPos(exerciseUI.holdSlot, x, y);
+    exerciseUI.holdSlot = null;
+}
+
+function commitSlotPos(key, x, y) {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+
+    const idx = key.split(':')[1];
+
+    setup.posOverrides[setup.area][setup.format + ':' + idx] = { x: x, y: y };
+
+    saveStateToFirebase();
+    showToast('Poste déplacé');
+    renderExercise();
+}
+
+function resetExercisePositions() {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+
+    setup.posOverrides[setup.area] = {};
+
+    exerciseUI.holdSlot = null;
+    saveStateToFirebase();
+    showToast('Postes réinitialisés');
+    renderExercise();
+}
+
+function assignExercisePlayer(playerId) {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+
+    let team = setup.team;
+    let target = exerciseUI.selected || exerciseUI.holdSlot;
+
+    if (target) {
+
+        const heldTeam = target.split(':')[0];
+
+        if (heldTeam === 'A' || heldTeam === 'B') team = heldTeam;
+    }
+
+    exerciseUI.selected = null;
+    exerciseUI.holdSlot = null;
+
+    const map = setup.byTeam[team] = setup.byTeam[team] || {};
+
+    Object.keys(map).forEach(k => { if (map[k] === playerId) delete map[k]; });
+
+    if (target && map[target] !== undefined) {
+
+        delete map[target];
+    }
+
+    if (!target) {
+
+        const num = (EXERCISE_FORMATS[setup.format] || EXERCISE_FORMATS['8v8']).positions.length;
+
+        for (let i = 0; i < num; i++) {
+            const k = team + ':' + i;
+            if (map[k] === undefined) { target = k; break; }
+        }
+    }
+
+    if (target) map[target] = playerId;
+
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function autoAssignExerciseTeam() {
+
+    const session = state.trainings[currentTrainingId];
+    if (!session || !session.generatedTeams) return;
+
+    const setup = getExerciseSetup(session);
+    const team = setup.team;
+    const ids = team === 'A' ? (session.generatedTeams.teamA || []) : (session.generatedTeams.teamB || []);
+
+    const players = ids.map(id => state.players.find(p => p.id === id)).filter(Boolean);
+
+    const buckets = { GB: [], DEF: [], MIL: [], ATT: [], AUTRE: [] };
+
+    players.forEach(p => {
+        const cat = posteCategory((p.poste1 || '').toUpperCase());
+        buckets[cat].push(p);
+    });
+
+    Object.keys(buckets).forEach(k => buckets[k].sort((a, b) => (b.niveau || 2) - (a.niveau || 2)));
+
+    const fmt = EXERCISE_FORMATS[setup.format] || EXERCISE_FORMATS['8v8'];
+    const map = {};
+    const free = [];
+
+    fmt.positions.forEach((pos, idx) => {
+
+        const key = team + ':' + idx;
+        const pick = buckets[posteCategory(pos.name)].shift();
+
+        if (pick) map[key] = pick.id;
+        else free.push(key);
+    });
+
+    const rest = buckets.GB.concat(buckets.DEF, buckets.MIL, buckets.ATT, buckets.AUTRE);
+
+    free.forEach(key => {
+        const p = rest.shift();
+        if (p) map[key] = p.id;
+    });
+
+    setup.byTeam[team] = map;
+    saveStateToFirebase();
+    renderExercise();
+    showToast('Dispositif auto généré pour l\'équipe ' + team);
+}
+
+function resetExerciseTeam() {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    setup.byTeam[setup.team] = {};
+    saveStateToFirebase();
+    renderExercise();
+}
+
+const PROP_STYLES = {
+    plot: { size: 20 },
+    piquet: { emoji: '🚩', size: 15 },
+    mannequin: { emoji: '🗿', size: 24 },
+    cible: { emoji: '🎯', size: 18 }
+};
+
+const ZONE_COLORS = ['#f59e0b', '#10b981', '#8b5cf6', '#0ea5e9', '#f43f5e', '#84cc16'];
+
+function buildHalfFieldLinesHTML() {
+
+    return `
+        <div style="position:absolute;inset:6px;border:3px solid rgba(255,255,255,.85);border-radius:12px;pointer-events:none;"></div>
+        <div style="position:absolute;left:0;right:0;top:2%;height:3px;background:rgba(255,255,255,.7);pointer-events:none;"></div>
+        <div style="position:absolute;left:20%;right:20%;bottom:0;height:26%;border-left:3px solid rgba(255,255,255,.7);border-right:3px solid rgba(255,255,255,.7);border-top:3px solid rgba(255,255,255,.7);border-radius:10px 10px 0 0;pointer-events:none;"></div>
+        <div style="position:absolute;left:34%;right:34%;bottom:0;height:12%;border-left:2px solid rgba(255,255,255,.6);border-right:2px solid rgba(255,255,255,.6);border-top:2px solid rgba(255,255,255,.6);border-radius:8px 8px 0 0;pointer-events:none;"></div>
+        <div style="position:absolute;left:50%;bottom:28%;width:7px;height:7px;background:rgba(255,255,255,.75);border-radius:50%;transform:translate(-50%,50%);pointer-events:none;"></div>
+        <div style="position:absolute;left:50%;bottom:0;width:16%;height:6px;border:2px solid rgba(255,255,255,.95);background:rgba(255,255,255,.15);transform:translateX(-50%);border-radius:3px 3px 0 0;pointer-events:none;"></div>
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 26px,rgba(0,0,0,.045) 26px 52px);pointer-events:none;border-radius:12px;"></div>
     `;
 }
 
-function renderExercise4v4() {
+function renderZonesAndProps(setup) {
 
-    const field =
-        document.getElementById(
-            "exercise-field"
-        );
+    const parts = [];
 
-    if (!field) return;
+    (setup.props || []).forEach(p => {
 
-    field.innerHTML = `
+        if (p.type === 'zone') {
 
-        <div
-            style="
-                position:absolute;
-                left:0;
-                right:0;
-                top:50%;
-                height:4px;
-                background:white;
-            ">
-        </div>
+            const x1 = Math.min(p.x1, p.x2);
+            const x2 = Math.max(p.x1, p.x2);
+            const y1 = Math.min(p.y1, p.y2);
+            const y2 = Math.max(p.y1, p.y2);
+            const w = x2 - x1;
+            const h = y2 - y1;
+            const color = ZONE_COLORS[((p.label || 'A').charCodeAt(0) - 65) % ZONE_COLORS.length] || ZONE_COLORS[0];
+            const sel = exerciseUI.selProp === p.id ? 'box-shadow:0 0 0 3px #fbbf24;' : '';
 
-        ${createPosition("MC",50,30,"#2563eb")}
+            parts.push(`
+                <div data-prop="${p.id}" style="position:absolute;left:${x1}%;top:${y1}%;width:${w}%;height:${h}%;
+                    border:2px dashed ${color};background:${color}22;border-radius:8px;
+                    display:flex;align-items:center;justify-content:center;cursor:pointer;${sel}">
+                    <span style="font-size:10px;font-weight:700;color:${color};">${p.label}</span>
+                </div>`);
 
-        ${createPosition("AG",30,45,"#2563eb")}
-        ${createPosition("BU",50,45,"#2563eb")}
-        ${createPosition("AD",70,45,"#2563eb")}
+            return;
+        }
 
-        ${createPosition("AG",30,55,"#dc2626")}
-        ${createPosition("BU",50,55,"#dc2626")}
-        ${createPosition("AD",70,55,"#dc2626")}
+        const style = PROP_STYLES[p.type] || { emoji: '🧡', size: 16 };
+        const sel = exerciseUI.selProp === p.id ? 'filter:drop-shadow(0 0 4px #fbbf24);' : '';
 
-        ${createPosition("MC",50,70,"#dc2626")}
+        if (p.type === 'plot') {
 
-    `;
+            parts.push(`
+                <div data-prop="${p.id}" style="position:absolute;left:${p.x}%;top:${p.y}%;
+                    width:26px;height:16px;transform:translate(-50%,-50%);cursor:pointer;user-select:none;${sel}">
+                    <svg width="26" height="16" viewBox="0 0 26 16" style="display:block;">
+                        <polygon points="1,15 25,15 18,5 8,5" fill="#ff8c00" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
+                        <polygon points="9,5 17,5 15,8 11,8" fill="#ffffff"/>
+                    </svg>
+                </div>`);
+
+            return;
+        }
+
+        if (p.type && p.type.indexOf('goal_') === 0) {
+
+            const isV = p.type.indexOf('_v') > -1;
+            const isLarge = p.type.indexOf('goal_l_') === 0;
+
+            const fieldEl = document.getElementById('exercise-field');
+            const fw = (fieldEl && fieldEl.getBoundingClientRect) ? (fieldEl.getBoundingClientRect().width || 400) : 400;
+
+            const gw = isLarge ? fw * 0.15 : fw * 0.06;
+            const gh = gw * (isLarge ? (2.44 / 7.32) : 0.4);
+
+            const w = Math.round(isV ? gh : gw);
+            const h = Math.round(isV ? gw : gh);
+            const post = Math.max(3, Math.round(gw / 16));
+
+            const inner = isV ? `
+                <div style="position:absolute;top:0;left:0;right:0;height:${post}px;background:rgba(255,255,255,.95);border-radius:2px;"></div>
+                <div style="position:absolute;bottom:0;left:0;right:0;height:${post}px;background:rgba(255,255,255,.95);border-radius:2px;"></div>
+                <div style="position:absolute;top:0;bottom:0;left:0;width:${post}px;background:rgba(255,255,255,.95);border-radius:2px;"></div>`
+                : `
+                <div style="position:absolute;left:0;top:0;bottom:0;width:${post}px;background:rgba(255,255,255,.95);border-radius:2px;"></div>
+                <div style="position:absolute;right:0;top:0;bottom:0;width:${post}px;background:rgba(255,255,255,.95);border-radius:2px;"></div>
+                <div style="position:absolute;left:0;right:0;top:0;height:${post}px;background:rgba(255,255,255,.95);border-radius:2px;"></div>`;
+
+            parts.push(`
+                <div data-prop="${p.id}" style="position:absolute;left:${p.x}%;top:${p.y}%;
+                    width:${w}px;height:${h}px;transform:translate(-50%,-50%);cursor:pointer;${sel}">
+                    ${inner}
+                </div>`);
+
+            return;
+        }
+
+        parts.push(`
+            <div data-prop="${p.id}" style="position:absolute;left:${p.x}%;top:${p.y}%;
+                font-size:${style.size}px;transform:translate(-50%,-50%);cursor:pointer;user-select:none;${sel}">
+                ${style.emoji}
+            </div>`);
+    });
+
+    return parts.join('');
 }
 
-function renderExercise6v6() {
+function renderZoneMarker() {
 
-    const field =
-        document.getElementById(
-            "exercise-field"
-        );
+    if (!exerciseUI.zoneP1) return '';
 
-    if (!field) return;
-
-    field.innerHTML = `
-
-        <div
-            style="
-                position:absolute;
-                left:0;
-                right:0;
-                top:50%;
-                height:4px;
-                background:white;
-            ">
-        </div>
-
-        ${createPosition("GB",50,15,"#2563eb")}
-
-        ${createPosition("DG",35,28,"#2563eb")}
-        ${createPosition("DD",65,28,"#2563eb")}
-
-        ${createPosition("MC",40,38,"#2563eb")}
-        ${createPosition("MC",60,38,"#2563eb")}
-
-        ${createPosition("AG",35,46,"#2563eb")}
-        ${createPosition("BU",50,46,"#2563eb")}
-        ${createPosition("AD",65,46,"#2563eb")}
-
-
-        ${createPosition("AG",35,54,"#dc2626")}
-        ${createPosition("BU",50,54,"#dc2626")}
-        ${createPosition("AD",65,54,"#dc2626")}
-
-        ${createPosition("MC",40,62,"#dc2626")}
-        ${createPosition("MC",60,62,"#dc2626")}
-
-        ${createPosition("DG",35,72,"#dc2626")}
-        ${createPosition("DD",65,72,"#dc2626")}
-
-        ${createPosition("GB",50,85,"#dc2626")}
-
-    `;
+    return `<div style="position:absolute;left:${exerciseUI.zoneP1.x}%;top:${exerciseUI.zoneP1.y}%;
+        width:14px;height:14px;border-radius:50%;background:#fbbf24;border:2px solid white;
+        transform:translate(-50%,-50%);box-shadow:0 0 0 3px rgba(251,191,36,.4);"></div>`;
 }
 
-function renderExercise10v10() {
+function exerciseFieldClick(e) {
 
-    const field =
-        document.getElementById(
-            "exercise-field"
-        );
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
 
-    if (!field) return;
+    if (!setup || setup.mode !== 'edit') return;
 
-    field.innerHTML = `
+    const tool = exerciseUI.tool || 'move';
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
 
-        <div
-            style="
-                position:absolute;
-                left:0;
-                right:0;
-                top:50%;
-                height:4px;
-                background:white;
-            ">
-        </div>
+    const propEl = e.target && e.target.closest ? e.target.closest('[data-prop]') : null;
+    const propId = propEl ? propEl.dataset.prop : null;
 
-        ${createPosition("GB",50,10,"#2563eb")}
+    if (tool === 'remove') {
 
-        ${createPosition("DG",20,22,"#2563eb")}
-        ${createPosition("DC",40,22,"#2563eb")}
-        ${createPosition("DC",60,22,"#2563eb")}
-        ${createPosition("DD",80,22,"#2563eb")}
+        if (propId) removeProp(propId);
+        return;
+    }
 
-        ${createPosition("MC",40,35,"#2563eb")}
-        ${createPosition("MC",60,35,"#2563eb")}
+    if (tool === 'move') {
 
-        ${createPosition("AG",25,45,"#2563eb")}
-        ${createPosition("MOC",50,45,"#2563eb")}
-        ${createPosition("AD",75,45,"#2563eb")}
+        if (propId) {
 
-        ${createPosition("BU",50,49,"#2563eb")}
+            exerciseUI.selProp = (exerciseUI.selProp === propId) ? null : propId;
+            renderExercise();
 
+        } else if (exerciseUI.selProp) {
 
-        ${createPosition("BU",50,51,"#dc2626")}
+            moveProp(exerciseUI.selProp, x, y);
+            exerciseUI.selProp = null;
+            renderExercise();
+        }
 
-        ${createPosition("AG",25,55,"#dc2626")}
-        ${createPosition("MOC",50,55,"#dc2626")}
-        ${createPosition("AD",75,55,"#dc2626")}
+        return;
+    }
 
-        ${createPosition("MC",40,65,"#dc2626")}
-        ${createPosition("MC",60,65,"#dc2626")}
+    if (tool === 'zone') {
 
-                ${createPosition("DG",20,78,"#dc2626")}
-        ${createPosition("DC",40,78,"#dc2626")}
-        ${createPosition("DC",60,78,"#dc2626")}
-        ${createPosition("DD",80,78,"#dc2626")}
+        if (exerciseUI.zoneP1) {
 
-        ${createPosition("GB",50,90,"#dc2626")}
+            addZone(exerciseUI.zoneP1, { x, y });
+            exerciseUI.zoneP1 = null;
+            exerciseUI.tool = 'move';
+            renderExercise();
 
-    `;
+        } else {
+
+            exerciseUI.zoneP1 = { x, y };
+            renderExercise();
+        }
+
+        return;
+    }
+
+    addProp(tool, x, y);
 }
 
-function renderExercise8v8_242() {
+function addProp(type, x, y) {
 
-    const field =
-        document.getElementById("exercise-field");
-
-    if (!field) return;
-
-    field.innerHTML = `
-
-        <div style="
-            position:absolute;
-            left:0;
-            right:0;
-            top:50%;
-            height:4px;
-            background:white;">
-        </div>
-
-        ${createPosition("GB",50,12,"#2563eb")}
-
-        ${createPosition("DC",40,25,"#2563eb")}
-        ${createPosition("DC",60,25,"#2563eb")}
-
-        ${createPosition("MG",20,37,"#2563eb")}
-        ${createPosition("MC",40,37,"#2563eb")}
-        ${createPosition("MC",60,37,"#2563eb")}
-        ${createPosition("MD",80,37,"#2563eb")}
-
-        ${createPosition("BU",40,47,"#2563eb")}
-        ${createPosition("BU",60,47,"#2563eb")}
-
-        ${createPosition("BU",40,53,"#dc2626")}
-        ${createPosition("BU",60,53,"#dc2626")}
-
-        ${createPosition("MG",20,63,"#dc2626")}
-        ${createPosition("MC",40,63,"#dc2626")}
-        ${createPosition("MC",60,63,"#dc2626")}
-        ${createPosition("MD",80,63,"#dc2626")}
-
-        ${createPosition("DC",40,75,"#dc2626")}
-        ${createPosition("DC",60,75,"#dc2626")}
-
-        ${createPosition("GB",50,88,"#dc2626")}
-
-    `;
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    setup.props.push({ id: 'p' + Date.now(), type, x, y });
+    saveStateToFirebase();
+    renderExercise();
 }
 
-function renderExercise8v8_332() {
+function moveProp(id, x, y) {
 
-    const field =
-        document.getElementById("exercise-field");
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    const p = (setup.props || []).find(pr => pr.id === id);
 
-    if (!field) return;
+    if (!p) return;
 
-    field.innerHTML = `
-
-        <div style="
-            position:absolute;
-            left:0;
-            right:0;
-            top:50%;
-            height:4px;
-            background:white;">
-        </div>
-
-        ${createPosition("GB",50,12,"#2563eb")}
-
-        ${createPosition("DG",25,25,"#2563eb")}
-        ${createPosition("DC",50,25,"#2563eb")}
-        ${createPosition("DD",75,25,"#2563eb")}
-
-        ${createPosition("MC",30,37,"#2563eb")}
-        ${createPosition("MC",50,37,"#2563eb")}
-        ${createPosition("MC",70,37,"#2563eb")}
-
-        ${createPosition("BU",40,47,"#2563eb")}
-        ${createPosition("BU",60,47,"#2563eb")}
-
-        ${createPosition("BU",40,53,"#dc2626")}
-        ${createPosition("BU",60,53,"#dc2626")}
-
-        ${createPosition("MC",30,63,"#dc2626")}
-        ${createPosition("MC",50,63,"#dc2626")}
-        ${createPosition("MC",70,63,"#dc2626")}
-
-        ${createPosition("DG",25,75,"#dc2626")}
-        ${createPosition("DC",50,75,"#dc2626")}
-        ${createPosition("DD",75,75,"#dc2626")}
-
-        ${createPosition("GB",50,88,"#dc2626")}
-
-    `;
+    p.x = x;
+    p.y = y;
+    saveStateToFirebase();
+    renderExercise();
 }
 
-function renderExercise8v8_251() {
+function removeProp(id) {
 
-    const field =
-        document.getElementById("exercise-field");
-
-    if (!field) return;
-
-    field.innerHTML = `
-
-        <div style="
-            position:absolute;
-            left:0;
-            right:0;
-            top:50%;
-            height:4px;
-            background:white;">
-        </div>
-
-        ${createPosition("GB",50,12,"#2563eb")}
-
-        ${createPosition("DC",40,25,"#2563eb")}
-        ${createPosition("DC",60,25,"#2563eb")}
-
-        ${createPosition("MG",15,37,"#2563eb")}
-        ${createPosition("MC",32,37,"#2563eb")}
-        ${createPosition("MC",50,37,"#2563eb")}
-        ${createPosition("MC",68,37,"#2563eb")}
-        ${createPosition("MD",85,37,"#2563eb")}
-
-        ${createPosition("BU",50,47,"#2563eb")}
-
-        ${createPosition("BU",50,53,"#dc2626")}
-
-        ${createPosition("MG",15,63,"#dc2626")}
-        ${createPosition("MC",32,63,"#dc2626")}
-        ${createPosition("MC",50,63,"#dc2626")}
-        ${createPosition("MC",68,63,"#dc2626")}
-        ${createPosition("MD",85,63,"#dc2626")}
-
-        ${createPosition("DC",40,75,"#dc2626")}
-        ${createPosition("DC",60,75,"#dc2626")}
-
-        ${createPosition("GB",50,88,"#dc2626")}
-
-    `;
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    setup.props = (setup.props || []).filter(p => p.id !== id);
+    saveStateToFirebase();
+    renderExercise();
 }
+
+function addZone(p1, p2) {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    const count = (setup.props || []).filter(p => p.type === 'zone').length;
+    setup.props.push({
+        id: 'z' + Date.now(),
+        type: 'zone',
+        x1: p1.x,
+        y1: p1.y,
+        x2: p2.x,
+        y2: p2.y,
+        label: String.fromCharCode(65 + count)
+    });
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function clearExerciseProps() {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    setup.props = [];
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function setExerciseArea(area) {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+
+    if (area === setup.area) return;
+
+    setup.area = area;
+    exerciseUI.selected = null;
+    saveStateToFirebase();
+    renderExercise();
+    showToast(area === 'half' ? 'Demi-terrain actif' : 'Terrain complet actif');
+}
+
+function setExerciseMode(mode) {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    setup.mode = mode;
+    exerciseUI.selected = null;
+    exerciseUI.holdSlot = null;
+    exerciseUI.slotMove = false;
+    exerciseUI.drag = null;
+
+    if (mode === 'edit') {
+        exerciseUI.tool = 'move';
+        exerciseUI.selProp = null;
+        exerciseUI.zoneP1 = null;
+    }
+
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function setExerciseTool(tool) {
+
+    exerciseUI.tool = (exerciseUI.tool === tool) ? 'move' : tool;
+    exerciseUI.selProp = null;
+    exerciseUI.zoneP1 = null;
+    renderExercise();
+}
+
+function toolHint(tool) {
+
+    if (tool === 'move') return 'Touchez un accessoire ou une zone pour le choisir, puis touchez le terrain pour le déplacer.';
+    if (tool === 'zone') return 'Touchez le 1er coin de la zone, puis le 2ème coin pour la créer. Sinon utilisez les présélections ⊞ ‖ ≡.';
+    if (tool === 'remove') return 'Touchez l\'accessoire ou la zone à supprimer.';
+    if (tool === 'plot') return 'Touchez le terrain pour placer une coupelle.';
+    if (tool === 'piquet') return 'Touchez le terrain pour placer un piquet.';
+    if (tool === 'mannequin') return 'Touchez le terrain pour placer un mannequin.';
+    if (tool === 'cible') return 'Touchez le terrain pour placer une cible.';
+    if (tool === 'goal_s_h') return 'Touchez le terrain pour placer un petit but horizontal.';
+    if (tool === 'goal_s_v') return 'Touchez le terrain pour placer un petit but vertical.';
+    if (tool === 'goal_l_h') return 'Touchez le terrain pour placer un grand but horizontal.';
+    if (tool === 'goal_l_v') return 'Touchez le terrain pour placer un grand but vertical.';
+    return 'Touchez le terrain pour placer l\'objet.';
+}
+
+function applyZonePreset(kind) {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+
+    setup.props = (setup.props || []).filter(p => p.type !== 'zone');
+
+    const zones = [];
+
+    if (kind === 'quadrants') {
+
+        const cols = [{ x1: 0, x2: 50 }, { x1: 50, x2: 100 }];
+        const rows = [{ y1: 0, y2: 50 }, { y1: 50, y2: 100 }];
+        let n = 0;
+
+        cols.forEach(c => rows.forEach(r => {
+            zones.push({ x1: c.x1, y1: r.y1, x2: c.x2, y2: r.y2, label: String.fromCharCode(65 + n) });
+            n++;
+        }));
+
+    } else if (kind === 'lanes') {
+
+        [['Couloir G', 0, 12], ['Zone centrale', 12, 88], ['Couloir D', 88, 100]].forEach(zone => {
+            zones.push({ x1: zone[1], y1: 0, x2: zone[2], y2: 100, label: zone[0] });
+        });
+
+    } else if (kind === 'thirds') {
+
+        [['Défense', 0, 33], ['Milieu', 33, 66], ['Attaque', 66, 100]].forEach(zone => {
+            zones.push({ x1: 0, y1: zone[1], x2: 100, y2: zone[2], label: zone[0] });
+        });
+    }
+
+    let seq = 0;
+
+    zones.forEach(z => {
+        setup.props.push({
+            id: 'z' + Date.now() + '_' + (seq++),
+            type: 'zone',
+            x1: z.x1,
+            y1: z.y1,
+            x2: z.x2,
+            y2: z.y2,
+            label: z.label
+        });
+    });
+
+    saveStateToFirebase();
+    renderExercise();
+    showToast('Zones créées');
+}
+
+function renderExerciseTools(setup) {
+
+    const el = document.getElementById('exercise-edit-tools');
+    const hint = document.getElementById('exercise-hint');
+
+    if (!el || !hint) return;
+
+    const isEdit = setup.mode === 'edit';
+
+    el.classList.toggle('hidden', !isEdit);
+
+    if (!isEdit) {
+
+        hint.innerHTML = exerciseUI.slotMove
+            ? "📍 Postes : attrapez une pastille et glissez-la, ou touchez-la puis touchez l'endroit voulu. Touchez-la à nouveau pour décrocher. ↺ réinitialise."
+            : "👥 Mode joueurs : touchez une pastille vide (jaune) puis un joueur du banc pour l'ajouter. Touchez un joueur placé pour le remettre au banc. Bouton « 📍 Déplacer postes » pour repositionner les pastilles.";
+        return;
+    }
+
+    const tools = [
+        { t: 'move', label: '🖐️ Déplacer' },
+        { t: 'plot', label: '🥏 Coupelle' },
+        { t: 'goal_s_h', label: '🥅 Petit ⟷' },
+        { t: 'goal_s_v', label: '🥅 Petit ↕' },
+        { t: 'goal_l_h', label: '🏟️ Grand ⟷' },
+        { t: 'goal_l_v', label: '🏟️ Grand ↕' },
+        { t: 'piquet', label: '🚩 Piquet' },
+        { t: 'mannequin', label: '🗿 Mannequin' },
+        { t: 'cible', label: '🎯 Cible' },
+        { t: 'zone', label: '▭ Zone manuelle' },
+        { t: 'remove', label: '✕ Supprimer' }
+    ];
+
+    el.innerHTML = `
+        <div class="flex flex-wrap gap-1.5 mb-1.5">
+            ${tools.map(tt => `
+                <button onclick="setExerciseTool('${tt.t}')"
+                    class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition
+                        ${exerciseUI.tool === tt.t ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'}">
+                    ${tt.label}
+                </button>`).join('')}
+            <button onclick="applyZonePreset('quadrants')"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100">
+                ⊞ 4 zones
+            </button>
+            <button onclick="applyZonePreset('lanes')"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100">
+                ‖ 3 couloirs
+            </button>
+            <button onclick="applyZonePreset('thirds')"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100">
+                ≡ 3 tiers
+            </button>
+            <button onclick="clearExerciseProps()"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100">
+                🧹 Tout effacer
+            </button>
+        </div>
+        <div class="text-[11px] text-slate-500 font-medium mb-2">
+            ${toolHint(exerciseUI.tool)}
+        </div>`;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
