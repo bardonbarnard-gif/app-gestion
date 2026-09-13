@@ -6259,6 +6259,7 @@ teamsContainer.innerHTML = "";
 
         if (!teamGroups[family][scope]) {
             teamGroups[family][scope] = [];
+        }
         const exists =
     teamGroups[family][scope]
         .some(m =>
