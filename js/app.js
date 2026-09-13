@@ -1055,10 +1055,15 @@ if (role === 'responsable') {
 
 } else if (role === 'coach') {
 
+    const allowedTeams = userTeam
+        .split(',')
+        .map(t => t.trim().toLowerCase());
+
     playersToDisplay = state.players.filter(
         p =>
-            (p.team || p.cat || '').toLowerCase() ===
-            userTeam.toLowerCase()
+            allowedTeams.includes(
+                (p.team || p.cat || '').toLowerCase()
+            )
     );
 }
     
@@ -1108,9 +1113,14 @@ Object.values(state.trainings).forEach(session => {
         return;
     }
 
-    totalSessions++;
-
     const presence = session.presence || {};
+
+    // Ignorer les séances dont l'appel n'a pas été rempli
+    if (Object.keys(presence).length === 0) {
+        return;
+    }
+
+    totalSessions++;
 
     if (
         presence[p.id] === 'present' ||
@@ -1164,6 +1174,8 @@ Object.values(state.trainings).forEach(session => {
                 </div>`;
             }).join('');
         }
+
+        window.renderEffectif = renderEffectif;
 
         // Rendu Matchs & Convocations
         function populateMatchSelector() {
@@ -1392,224 +1404,123 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             counterBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${convokedCount < targetConvoked ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`;
             counterBanner.innerHTML = `<div class="font-bold text-xs">Convocations : ${convokedCount} / ${targetConvoked}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${convokedCount < targetConvoked ? 'bg-amber-200' : 'bg-sky-200'}">${convokedCount < targetConvoked ? '⚠️ Incomplet' : '🔵 OK'}</span>`;
 
-    const carpoolResponses =
-    state.carpoolResponses?.[
-        m.carpoolId
-    ] || {};
+    const summary = buildCarpoolSummary(m, playersForMatch);
 
-const responses =
-    Object.keys(carpoolResponses).length;
-
-const totalConvoked =
-    playersForMatch.filter(
-        p => m.convocations[p.id] === 'convoke'
-    ).length;
-
-let drivers = 0;
-let passengers = 0;
-let directs = 0;
-let absents = 0;
-let seats = 0;
-
-const driverList = [];
-const driverNoSeatList = [];
-const passengerList = [];
-const directList = [];
-const absentList = [];
-
-Object.entries(carpoolResponses)
-    .forEach(([playerId, r]) => {
-
-        const player =
-            state.players.find(
-                p => p.id === playerId
-            );
-
-        const playerName =
-            player?.name || playerId;
-
-        if (r.status === 'driver') {
-
-            if ((r.seats || 0) > 0) {
-
-                drivers++;
-                seats += r.seats || 0;
-
-                driverList.push(
-                    `${playerName} (${r.seats || 0} places)`
-                );
-
-            } else {
-
-                driverNoSeatList.push(
-                    playerName
-                );
-
-            }
-
-        }
-
-        if (r.status === 'passenger') {
-
-            passengers++;
-            passengerList.push(playerName);
-
-        }
-
-        if (r.status === 'direct') {
-
-            directs++;
-            directList.push(playerName);
-
-        }
-
-        if (r.status === 'absent') {
-
-            absents++;
-            absentList.push(playerName);
-
-        }
-
-    });
-
-const pendingList = [];
-
-playersForMatch.forEach(p => {
-
-    if (
-        m.convocations[p.id] === 'convoke' &&
-        !carpoolResponses[p.id]
-    ) {
-
-        pendingList.push(
-            p.name
-        );
-
-    }
-
-});
-
-const pending =
-    totalConvoked - responses;
-
-const missingSeats =
-    passengers - seats;
-
-const transportStatus =
-    missingSeats > 0
-        ? `🔴 Il manque ${missingSeats} place(s)`
-        : `🟢 Transport assuré`;
-
-const transportClass =
-    missingSeats > 0
-        ? 'text-red-700'
-        : 'text-emerald-700';
+// (statuts et compteurs calculés par buildCarpoolSummary)
 
 if (carpoolBanner) {
 
     carpoolBanner.className =
-        "p-3 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-900";
+        `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${summary.closed ? 'bg-sky-50 border-sky-200 text-sky-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`;
 
     carpoolBanner.innerHTML = `
 <div class="w-full text-xs space-y-1">
 
+<div class="flex flex-wrap items-center gap-2">
+    <div class="font-bold">🚗 Covoiturage</div>
+    ${summary.closed ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-200 text-sky-900">🔒 Confirmé par le coach</span>' : '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-200 text-emerald-900">En cours</span>'}
+</div>
+
+<div>
+✅ Réponses : ${summary.responses}/${summary.totalConvoked}
+</div>
+
+<div>
+⏳ En attente : ${summary.pending}
+</div>
+
+<div>
+🚗 Conducteurs : ${summary.drivers}
+</div>
+
+<div>
+👤 Passagers : ${summary.passengers}
+</div>
+
+<div>
+📍 Direct : ${summary.directs}
+</div>
+
+<div>
+❌ Absents : ${summary.absents}
+</div>
+
 <div class="font-bold">
-🚗 Covoiturage
+🚘 Places proposées : ${summary.seats}
 </div>
 
-<div>
-✅ Réponses : ${responses}/${totalConvoked}
+<div class="font-bold ${summary.transportClass}">
+${summary.transportStatus}
 </div>
 
-<div>
-⏳ En attente : ${pending}
-</div>
-
-<div>
-🚗 Conducteurs : ${drivers}
-</div>
-
-<div>
-👤 Passagers : ${passengers}
-</div>
-
-<div>
-📍 Direct : ${directs}
-</div>
-
-<div>
-❌ Absents : ${absents}
-</div>
-
-<div class="font-bold">
-🚘 Places proposées : ${seats}
-</div>
-
-<div class="font-bold ${transportClass}">
-${transportStatus}
-</div>
-
-${driverList.length ? `
+${summary.driverList.length ? `
 <div class="mt-2">
 🚗 <strong>Conducteurs</strong><br>
-${driverList.join('<br>')}
+${summary.driverList.join('<br>')}
 </div>
 ` : ''}
 
-${driverNoSeatList.length ? `
+${summary.driverNoSeatList.length ? `
 <div class="mt-2">
 🚙 <strong>Conducteurs sans place</strong><br>
-${driverNoSeatList.join('<br>')}
+${summary.driverNoSeatList.join('<br>')}
 </div>
 ` : ''}
 
-${passengerList.length ? `
+${summary.driverAssignments.length ? `
+<div class="mt-2">
+🚗→👤 <strong>Attribution</strong><br>
+${summary.driverAssignments.map(a => `${a.name} : ${a.passengerNames.length ? a.passengerNames.join(', ') : '—'}`).join('<br>')}
+</div>
+` : ''}
+
+${summary.toPlaceList.length ? `
+<div class="mt-2">
+🚫 <strong>À placer</strong><br>
+${summary.toPlaceList.join('<br>')}
+</div>
+` : ''}
+
+${summary.passengerList.length ? `
 <div class="mt-2">
 👤 <strong>Passagers</strong><br>
-${passengerList.join('<br>')}
+${summary.passengerList.join('<br>')}
 </div>
 ` : ''}
 
-${directList.length ? `
+${summary.directList.length ? `
 <div class="mt-2">
 📍 <strong>Direct</strong><br>
-${directList.join('<br>')}
+${summary.directList.join('<br>')}
 </div>
 ` : ''}
 
-${absentList.length ? `
+${summary.absentList.length ? `
 <div class="mt-2">
 ❌ <strong>Absents</strong><br>
-${absentList.join('<br>')}
+${summary.absentList.join('<br>')}
 </div>
 ` : ''}
 
-${pendingList.length ? `
+${summary.pendingList.length ? `
 <div class="mt-2">
 ⏳ <strong>En attente</strong><br>
-${pendingList.join('<br>')}
+${summary.pendingList.join('<br>')}
+</div>
+` : ''}
+
+${m.carpoolId ? `
+<div class="mt-3 flex flex-wrap gap-2">
+    <button onclick="openCarpoolQR('${m.id}')" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold rounded-lg">🏷️ QR & lien</button>
+    ${(role === 'coach' || role === 'admin' || role === 'responsable') ? (summary.closed ? `<button onclick="setCarpoolClosed('${m.id}', false)" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold rounded-lg">🔓 Rouvrir</button>` : `<button onclick="setCarpoolClosed('${m.id}', true)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg"><i class="fa-solid fa-lock mr-1"></i>Clôturer le covoiturage</button>`) : ''}
+    <button onclick="copyCarpoolRecap('${m.id}')" class="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-[11px] font-bold rounded-lg">📤 Récap WhatsApp</button>
 </div>
 ` : ''}
 
 </div>
 `;
-
 }
-renderTransportTab({
-    drivers,
-    passengers,
-    directs,
-    absents,
-    responses,
-    pending,
-    seats,
-    driverList,
-    passengerList,
-    directList,
-    absentList,
-    pendingList,
-    transportStatus
-});
+renderTransportTab(summary);
 
 renderMatchSummary(m);
 
@@ -2030,11 +1941,18 @@ const nbTotal = playersForTraining.length;
             const role = window.currentUserRole || 'public';
             const userTeam = window.currentUserTeam || 'all';
             
-            // Filtrer les joueurs par équipe du coach
+            // Filtrer les joueurs par équipe du coach (multi-scopes possibles)
+            const userScopes = String(userTeam || '')
+                .split(',')
+                .map(t => t.trim().toLowerCase())
+                .filter(Boolean);
+
             let playersToShow = state.players;
             if (role === 'coach') {
                 playersToShow = state.players.filter(p =>
-                    (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase()
+                    userScopes.includes(
+                        (p.team || p.cat || '').toLowerCase()
+                    )
                 );
             }
             
@@ -2077,12 +1995,23 @@ const nbTotal = playersForTraining.length;
                 return d < today;
             });
             
-            // Filtrer les séances de l'équipe du coach
+            // Filtrer les séances de l'équipe du coach (multi-scopes possibles)
+            const userScopes = String(userTeam || '')
+                .split(',')
+                .map(t => t.trim().toLowerCase())
+                .filter(Boolean);
+
             if (role === 'coach') {
                 pastSessions = pastSessions.filter(s =>
-                    (s.team || '').toLowerCase() === userTeam.toLowerCase()
+                    userScopes.includes((s.team || '').toLowerCase())
                 );
             }
+
+            // Ignorer les séances dont l'appel n'a pas été rempli
+            pastSessions = pastSessions.filter(s => {
+                const presence = s.presence || {};
+                return Object.keys(presence).length > 0;
+            });
             
             const container = document.getElementById('training-attendance-bars');
             if (!container) return;
@@ -2091,26 +2020,35 @@ const nbTotal = playersForTraining.length;
                 return;
             }
             
-            // Filtrer les joueurs par équipe du coach
+            // Filtrer les joueurs par équipe du coach (multi-scopes possibles)
             let playersToShow = state.players;
             if (role === 'coach') {
                 playersToShow = state.players.filter(p =>
-                    (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase()
+                    userScopes.includes(
+                        (p.team || p.cat || '').toLowerCase()
+                    )
                 );
             }
             
             const rows = playersToShow.map(p => {
-                let present = 0, total = pastSessions.length;
+                let present = 0, total = 0;
                 pastSessions.forEach(s => {
-    const status = (s.presence || {})[p.id];
+                    if (
+                        (s.team || '').toLowerCase() !==
+                        (p.team || p.cat || '').toLowerCase()
+                    ) {
+                        return;
+                    }
+                    total++;
+                    const status = (s.presence || {})[p.id];
 
-    if (
-        status === 'present' ||
-        status === 'retard'
-    ) {
-        present++;
-    }
-});
+                    if (
+                        status === 'present' ||
+                        status === 'retard'
+                    ) {
+                        present++;
+                    }
+                });
                 const pct = total > 0 ? Math.round((present / total) * 100) : 0;
                 const barColor = pct >= 75 ? 'bg-emerald-400' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400';
                 const textColor = pct >= 75 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-red-500';
@@ -2124,6 +2062,8 @@ const nbTotal = playersForTraining.length;
             }).sort((a, b) => b.pct - a.pct);
             container.innerHTML = rows.map(r => r.html).join('');
         }
+
+        window.renderAttendanceBars = renderAttendanceBars;
 
         function setTrainingStatus(pId, status) {
             if (!currentTrainingId) return;
@@ -2232,6 +2172,7 @@ function duplicateTraining() {
         date: '',
         heure: source.heure || '18:00',
         theme: source.theme || '',
+        lieu: source.lieu || 'Complexe Sportif de Rangueil',
         presence: {},
         pdfData: source.pdfData || null,
         pdfName: source.pdfName || null
@@ -2255,13 +2196,27 @@ function duplicateTraining() {
                 document.getElementById('t-date').value = s.date || '';
                 document.getElementById('t-heure').value = s.heure || '18:00';
                 document.getElementById('t-theme').value = s.theme || '';
+                document.getElementById('t-lieu').value = (s.lieu === 'Stade Struxiano' || s.lieu === 'Complexe Sportif de Rangueil') ? s.lieu : tLieuForDay(s.date);
             } else {
                 document.getElementById('t-title').value = '';
                 document.getElementById('t-date').value = new Date().toISOString().split('T')[0];
                 document.getElementById('t-heure').value = '18:00';
                 document.getElementById('t-theme').value = '';
+                document.getElementById('t-lieu').value = tLieuForDay(document.getElementById('t-date').value);
             }
             toggleModal('modal-training', true);
+        }
+
+        function tLieuForDay(dateStr) {
+            if (!dateStr) return 'Complexe Sportif de Rangueil';
+            const wd = new Date(dateStr + 'T12:00:00').getDay();
+            return wd === 2 ? 'Stade Struxiano' : 'Complexe Sportif de Rangueil';
+        }
+
+        function autoFillTrainingLieu() {
+            const lieuEl = document.getElementById('t-lieu');
+            if (!lieuEl) return;
+            lieuEl.value = tLieuForDay(document.getElementById('t-date').value);
         }
 
         function handleSaveTraining() {
@@ -2278,6 +2233,7 @@ function duplicateTraining() {
                 heure: document.getElementById('t-heure').value || '18:00',
                 team: document.getElementById('t-team').value,
                 theme: theme,
+                lieu: document.getElementById('t-lieu').value || 'Complexe Sportif de Rangueil',
                 presence: existing.presence || {},
                 pdfData: existing.pdfData || null,
                 pdfName: existing.pdfName || null
@@ -2394,6 +2350,7 @@ function duplicateTraining() {
                 date: dateStr,
                 heure: source.heure || '18:00',
                 theme: source.theme || '',
+                lieu: source.lieu || 'Complexe Sportif de Rangueil',
                 team: source.team || '',
                 presence: {},
                 pdfData: source.pdfData || null,
@@ -2410,6 +2367,8 @@ function duplicateTraining() {
         window.updateRecurPreview = updateRecurPreview;
         window.openModalTrainingSettings = openModalTrainingSettings;
         window.handleSaveTrainingSettings = handleSaveTrainingSettings;
+        window.autoFillTrainingLieu = autoFillTrainingLieu;
+        window.tLieuForDay = tLieuForDay;
 
         function editCurrentTraining() {
             if (currentTrainingId) openModalTraining(currentTrainingId);
@@ -4131,6 +4090,181 @@ firebase.database().ref('teams').on('value', (snapshot) => {
     renderAdminTeams(data);
 });
 
+function buildCarpoolSummary(m, playersForMatch) {
+    const carpoolResponses = state.carpoolResponses?.[m.carpoolId] || {};
+    const responses = Object.keys(carpoolResponses).length;
+
+    const totalConvoked = playersForMatch.filter(p => m.convocations[p.id] === 'convoke').length;
+
+    let drivers = 0;
+    let passengers = 0;
+    let directs = 0;
+    let absents = 0;
+    let seats = 0;
+
+    const driverList = [];
+    const driverNoSeatList = [];
+    const passengerList = [];
+    const directList = [];
+    const absentList = [];
+    const driverAssignments = [];
+    const placedIds = new Set();
+
+    Object.entries(carpoolResponses)
+        .forEach(([playerId, r]) => {
+
+            const player = state.players.find(p => p.id === playerId);
+            const playerName = player?.name || playerId;
+
+            if (r.status === 'driver') {
+
+                if ((r.seats || 0) > 0) {
+
+                    drivers++;
+                    seats += r.seats || 0;
+
+                    const passengerIds = Array.isArray(r.passengers)
+                        ? r.passengers.slice(0, r.seats || 0)
+                        : [];
+
+                    passengerIds.forEach(id => placedIds.add(id));
+
+                    driverList.push(
+                        `${playerName} (${r.seats || 0} places)`
+                    );
+
+                    driverAssignments.push({
+                        id: playerId,
+                        name: playerName,
+                        seats: r.seats || 0,
+                        passengerIds,
+                        passengerNames: passengerIds.map(
+                            id => state.players.find(p => p.id === id)?.name || id
+                        )
+                    });
+
+                } else {
+
+                    driverNoSeatList.push(playerName);
+
+                }
+
+            }
+
+            if (r.status === 'passenger') {
+
+                passengers++;
+                passengerList.push(playerName);
+
+            }
+
+            if (r.status === 'direct') {
+
+                directs++;
+                directList.push(playerName);
+
+            }
+
+            if (r.status === 'absent') {
+
+                absents++;
+                absentList.push(playerName);
+
+            }
+
+        });
+
+    const toPlaceListIds = Object.entries(carpoolResponses)
+        .filter(([playerId, r]) => r.status === 'passenger' && !placedIds.has(playerId))
+        .map(([playerId]) => playerId);
+
+    const toPlaceList = toPlaceListIds.map(
+        id => state.players.find(p => p.id === id)?.name || id
+    );
+
+    const availablePassengers = toPlaceListIds
+        .map(id => state.players.find(p => p.id === id))
+        .filter(Boolean)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .map(p => ({ id: p.id, name: p.name }));
+
+    const pendingList = [];
+
+    playersForMatch.forEach(p => {
+
+        if (
+            m.convocations[p.id] === 'convoke' &&
+            !carpoolResponses[p.id]
+        ) {
+
+            pendingList.push(
+                p.name
+            );
+
+        }
+
+    });
+
+    const pending = totalConvoked - responses;
+    const missingSeats = passengers - seats;
+    const closed = !!m.carpoolClosed;
+
+    let transportStatus;
+    let transportClass;
+
+    if (closed) {
+
+        transportStatus = '🔒 Covoiturage confirmé par le coach';
+        transportClass = 'text-sky-700';
+
+    } else if (toPlaceList.length > 0) {
+
+        transportStatus = `🔴 ${toPlaceList.length} passager(s) à placer`;
+        transportClass = 'text-red-700';
+
+    } else if (missingSeats > 0) {
+
+        transportStatus = `🔴 Il manque ${missingSeats} place(s)`;
+        transportClass = 'text-red-700';
+
+    } else if (responses === 0) {
+
+        transportStatus = '⏳ Aucune réponse pour l\'instant';
+        transportClass = 'text-amber-700';
+
+    } else {
+
+        transportStatus = '🟢 Transport assuré';
+        transportClass = 'text-emerald-700';
+
+    }
+
+    return {
+        matchId: m.id,
+        drivers,
+        passengers,
+        directs,
+        absents,
+        responses,
+        pending,
+        seats,
+        totalConvoked,
+        driverList,
+        driverNoSeatList,
+        passengerList,
+        directList,
+        absentList,
+        pendingList,
+        toPlaceList,
+        driverAssignments,
+        availablePassengers,
+        missingSeats,
+        transportStatus,
+        transportClass,
+        closed
+    };
+}
+
 function renderTransportTab(data) {
 
     const container =
@@ -4242,6 +4376,56 @@ function renderTransportTab(data) {
 
         </div>
 
+        <div class="mt-4 border rounded-xl p-4">
+
+            <h3 class="font-bold mb-2">
+                🚗 → 👤 Répartition des passagers
+            </h3>
+
+            ${data.driverAssignments.length ? data.driverAssignments.map(a => `
+                <div class="border-b border-slate-100 py-2">
+
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div class="font-semibold">
+                            ${a.name}
+                            <span class="text-[10px] text-slate-400">
+                                (${a.seats} places)
+                            </span>
+                        </div>
+                        <div class="flex flex-wrap gap-1">
+                            ${a.passengerNames.map((pn, i) => `
+                                <span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold flex items-center gap-1">
+                                    ${pn}
+                                    <button onclick="carpoolRemovePassenger('${data.matchId}','${a.id}','${a.passengerIds[i]}')" class="text-sky-500 hover:text-red-600" title="Retirer">✕</button>
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <select
+                        onchange="carpoolAssignPassenger('${data.matchId}','${a.id}', this.value); this.value=''"
+                        class="mt-1 w-full p-1.5 text-xs border rounded-lg bg-white">
+                        <option value="">
+                            ➕ Ajouter un passager (${a.passengerNames.length}/${a.seats})
+                        </option>
+                        ${data.availablePassengers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                    </select>
+
+                </div>
+            `).join('') : '<p class="text-xs text-slate-400">Aucun conducteur avec places pour le moment.</p>'}
+
+            ${data.toPlaceList.length ? `
+                <div class="mt-3">
+                    <strong class="text-red-700">
+                        🚫 À placer (${data.toPlaceList.length})
+                    </strong>
+                    <br>
+                    ${data.toPlaceList.join('<br>')}
+                </div>
+            ` : '<div class="mt-3 text-xs text-slate-400">Tous les passagers sont placés ✅</div>'}
+
+        </div>
+
         <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
 
             <h3 class="font-bold mb-2">
@@ -4256,6 +4440,304 @@ function renderTransportTab(data) {
 
     `;
 }
+
+function carpoolAssignPassenger(matchId, driverId, passengerId) {
+
+    if (!passengerId) return;
+
+    const match = state.matches[matchId];
+
+    if (!match) return;
+
+    const responsesMap =
+        state.carpoolResponses[match.carpoolId] || {};
+
+    const driverResponse = responsesMap[driverId];
+
+    if (
+        !driverResponse ||
+        driverResponse.status !== 'driver' ||
+        (driverResponse.seats || 0) <= 0
+    ) {
+        showToast('Ce conducteur n\'a pas de place disponible');
+        return;
+    }
+
+    const passenger = state.players.find(p => p.id === passengerId);
+
+    if (!passenger) return;
+
+    const current = Array.isArray(driverResponse.passengers)
+        ? driverResponse.passengers.slice()
+        : [];
+
+    if (current.includes(passengerId)) {
+        showToast('Ce passager est déjà dans ce véhicule');
+        return;
+    }
+
+    if (current.length >= (driverResponse.seats || 0)) {
+
+        showToast('Plus de place dans ce véhicule');
+        return;
+
+    }
+
+    Object.entries(responsesMap).forEach(([id, r]) => {
+
+        if (r.status === 'driver' && Array.isArray(r.passengers)) {
+
+            r.passengers = r.passengers.filter(pid => pid !== passengerId);
+
+        }
+
+    });
+
+    current.push(passengerId);
+    driverResponse.passengers = current;
+
+    state.carpoolResponses[match.carpoolId] = responsesMap;
+
+    saveStateToFirebase();
+    showToast(`${passenger.name} placé ✅`);
+    renderMatchDetail();
+
+}
+
+function carpoolRemovePassenger(matchId, driverId, passengerId) {
+
+    const match = state.matches[matchId];
+
+    if (!match) return;
+
+    const responsesMap =
+        state.carpoolResponses[match.carpoolId] || {};
+
+    const driverResponse = responsesMap[driverId];
+
+    if (!driverResponse || !Array.isArray(driverResponse.passengers)) return;
+
+    driverResponse.passengers = driverResponse.passengers.filter(pid => pid !== passengerId);
+
+    state.carpoolResponses[match.carpoolId] = responsesMap;
+
+    saveStateToFirebase();
+    showToast('Passager retiré');
+    renderMatchDetail();
+
+}
+
+function setCarpoolClosed(matchId, closed) {
+
+    const match = state.matches[matchId];
+
+    if (!match) return;
+
+    match.carpoolClosed = !!closed;
+
+    saveStateToFirebase();
+
+    showToast(
+        closed
+            ? 'Covoiturage clôturé : la page publique passe en lecture seule 🔒'
+            : 'Covoiturage rouvert 🔓'
+    );
+
+    renderMatchDetail();
+
+}
+
+function buildCarpoolRecapText(matchId) {
+
+    const match = state.matches[matchId];
+
+    if (!match) return '';
+
+    const matchPlayers = (match.convocations
+        ? state.players.filter(p => match.convocations[p.id] === 'convoke')
+        : []
+    );
+
+    const s = buildCarpoolSummary(match, matchPlayers);
+
+    const matchLabel =
+        (match.opponent || 'Match') +
+        (match.date ? ` (${match.date})` : '');
+
+    const rows = [];
+    rows.push(`🚗 Covoiturage — ${matchLabel}`);
+    rows.push('');
+    rows.push(`✅ Réponses : ${s.responses}/${s.totalConvoked}`);
+    rows.push(`🚗 Conducteurs : ${s.drivers}  🚘 Places : ${s.seats}`);
+    rows.push(`👤 Passagers : ${s.passengers}  📍 Direct : ${s.directs}  ❌ Absents : ${s.absents}`);
+    rows.push(s.pending > 0 ? `⏳ En attente : ${s.pending}` : '⏳ Tout le monde a répondu ✅');
+    rows.push('');
+
+    if (s.driverAssignments.length) {
+
+        rows.push('👤 → 🚗 Attribution :');
+
+        s.driverAssignments.forEach(a => {
+            rows.push(`• ${a.name} → ${a.passengerNames.length ? a.passengerNames.join(', ') : 'pas encore de passager'}`);
+        });
+
+        if (s.toPlaceList.length) {
+
+            rows.push('');
+            rows.push(`🚫 À placer : ${s.toPlaceList.join(', ')}`);
+
+        }
+
+    }
+
+    if (s.closed) {
+        rows.push('');
+        rows.push('🔒 Covoiturage confirmé par le coach');
+    }
+
+    if (s.transportStatus && !s.closed) {
+        rows.push('');
+        rows.push(s.transportStatus);
+    }
+
+    if (match.carpoolId) {
+
+        rows.push('');
+        rows.push(`🔗 Répondre : https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${match.carpoolId}`);
+
+    }
+
+    return rows.join('\n');
+
+}
+
+function copyCarpoolRecap(matchId) {
+
+    const text = buildCarpoolRecapText(matchId);
+
+    if (!text) return;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+
+        navigator.clipboard.writeText(text)
+            .then(() => showToast('Récap copié 📋 à coller dans WhatsApp'))
+            .catch(() => fallbackCopy(text));
+
+    } else {
+
+        fallbackCopy(text);
+
+    }
+
+}
+
+function fallbackCopy(text) {
+
+    const ta = document.createElement('textarea');
+
+    ta.value = text;
+
+    ta.style.position = 'fixed';
+
+    ta.style.opacity = '0';
+
+    document.body.appendChild(ta);
+
+    ta.select();
+
+    try {
+
+        document.execCommand('copy');
+
+        showToast('Récap copié 📋 à coller dans WhatsApp');
+
+    } catch (e) {
+
+        showToast('Impossible de copier automatiquement');
+
+    }
+
+    document.body.removeChild(ta);
+
+}
+
+function openCarpoolQR(matchId) {
+
+    const match = state.matches[matchId];
+
+    if (!match || !match.carpoolId) return;
+
+    const url = `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${match.carpoolId}`;
+
+    window.__carpoolUrl = url;
+
+    const urlEl = document.getElementById('carpool-qr-url');
+
+    if (urlEl) urlEl.textContent = url;
+
+    const canvas = document.getElementById('carpool-qr-canvas');
+
+    if (canvas) {
+
+        canvas.innerHTML = '';
+
+        if (typeof QRCode !== 'undefined') {
+
+            new QRCode(canvas, {
+                text: url,
+                width: 180,
+                height: 180
+            });
+
+        } else {
+
+            canvas.innerHTML = '<span class="text-xs text-slate-500">QR Code : le lien reste disponible ci-dessus.</span>';
+
+        }
+
+    }
+
+    toggleModal('modal-carpool-qr', true);
+
+}
+
+function copyCarpoolUrl() {
+
+    let url = window.__carpoolUrl || '';
+
+    if (!url) {
+
+        const match = state.matches[state.selectedMatchId];
+
+        url = match?.carpoolId ? `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${match.carpoolId}` : '';
+
+    }
+
+    if (!url) return;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+
+        navigator.clipboard.writeText(url)
+            .then(() => showToast('Lien copié 📋'))
+            .catch(() => fallbackCopy(url));
+
+    } else {
+
+        fallbackCopy(url);
+
+    }
+
+}
+
+window.carpoolAssignPassenger = carpoolAssignPassenger;
+window.carpoolRemovePassenger = carpoolRemovePassenger;
+window.setCarpoolClosed = setCarpoolClosed;
+window.buildCarpoolRecapText = buildCarpoolRecapText;
+window.copyCarpoolRecap = copyCarpoolRecap;
+window.openCarpoolQR = openCarpoolQR;
+window.copyCarpoolUrl = copyCarpoolUrl;
+window.buildCarpoolSummary = buildCarpoolSummary;
+window.openMatchWorkspace = openMatchWorkspace;
 
 function openMatchWorkspace(matchId) {
 
@@ -4991,28 +5473,98 @@ function generateWeeklyPlanning() {
         today.getDate() - today.getDay() + 1
     );
 
+    start.setHours(0, 0, 0, 0);
+
     const end = new Date(start);
 
     end.setDate(
         start.getDate() + 6
     );
 
+    end.setHours(23, 59, 59, 999);
+
 const teamLabel =
     selectedTeam === "all"
         ? "TOUTES ÉQUIPES"
         : (
-            state.teams?.[selectedTeam]?.name ||
-            selectedTeam.toUpperCase()
+            (state.teams?.[selectedTeam]?.name ||
+            selectedTeam).toUpperCase()
         );
 
-let text =
-`🔵⚪ RANGUEIL FC ${teamLabel} ⚪🔵
+    const cap = (str) =>
+        str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
 
-📅 PLANNING DE LA SEMAINE
+    const teamName = (team) =>
+        state.teams?.[team]?.name || team || '';
+
+    const dayNum = (d) => d.getDate();
+
+    const monthUp = (d) =>
+        d.toLocaleDateString('fr-FR', { month: 'long' }).toUpperCase();
+
+    const accents = {
+        'Coupe': { emoji: '🏆', week: 'SEMAINE DE COUPE', phrase: 'Go pour la coupe !' },
+        'Championnat': { emoji: '🏅', week: 'SEMAINE CHAMPIONNAT', phrase: 'Retour au championnat !' },
+        'Amical': { emoji: '🤝', week: 'SEMAINE AMICAL', phrase: 'Match amical' }
+    };
+
+    const weekTypes = [];
+
+    Object.values(state.matches || {})
+        .forEach(match => {
+
+            if (!match.date || !match.type) return;
+
+            if (
+    selectedTeam !== "all" &&
+    match.team !== selectedTeam
+) {
+    return;
+}
+
+            const d =
+                new Date(
+                    match.date + "T12:00:00"
+                );
+
+            if (
+                d >= start &&
+                d <= end
+            ) {
+
+                if (weekTypes.indexOf(match.type) === -1) {
+                    weekTypes.push(match.type);
+                }
+
+            }
+
+        });
+
+    weekTypes.sort();
+
+    const matchBanner =
+        weekTypes.length === 1
+            ? `${accents[weekTypes[0]]?.emoji || '⚽'} ${accents[weekTypes[0]]?.week || `SEMAINE ${weekTypes[0].toUpperCase()}`}`
+            : weekTypes.length > 1
+                ? `📌 SEMAINE MIXTE : ${weekTypes.join(' + ').toUpperCase()}`
+                : '';
+
+let text =
+`👋 Bonjour à tous !
+
+${matchBanner ? `*${matchBanner}*\n\n` : ''}🔵⚪ RANGUEIL FC — ${teamLabel} ⚪🔵
+
+📅 SEMAINE DU ${dayNum(start)} AU ${dayNum(end)} ${monthUp(end)}
 
 `;
 
     const items = [];
+
+    const matchLocation = (m) => {
+        const loc = (m.location || '').trim();
+        if (!loc) return '';
+        return ` 📍 ${/domicile|home/i.test(loc) ? 'Domicile' : cap(loc)}`;
+    };
 
     Object.values(state.matches || {})
         .forEach(match => {
@@ -5036,12 +5588,33 @@ let text =
                 d <= end
             ) {
 
+                const teamRef =
+                    selectedTeam === "all" && teamName(match.team)
+                        ? ` (match ${teamName(match.team)})`
+                        : '';
+
+                const parts = [`🆚 *${match.opponent}*${teamRef}`];
+
+                const accents = {
+                    'Coupe': { emoji: '🏆', phrase: 'Go pour la coupe !' },
+                    'Championnat': { emoji: '🏅', phrase: 'Retour au championnat !' },
+                    'Amical': { emoji: '🤝', phrase: 'Match amical' }
+                };
+
+                const accent = match.type ? accents[match.type] : null;
+
+                if (accent) parts.push(`${accent.emoji} *${match.type}*`);
+                else if (match.type) parts.push(`*${match.type}*`);
+
+                if (match.heure) parts.push(match.heure);
+
+                const loc = matchLocation(match);
+
+                if (loc) parts.push(loc.trim());
+
                 items.push({
                     date: match.date,
-                    message:
-`⚽ ${match.opponent}
-${match.heure || ""}
-`
+                    message: parts.join(' · ') + (accent ? `\n_${accent.phrase}_` : '')
                 });
 
             }
@@ -5070,14 +5643,16 @@ ${match.heure || ""}
                 d <= end
             ) {
 
-                items.push({
-    date: training.date,
-    message:
-`🏃 *${training.title || "Entraînement"}*
-⚽ ${state.teams?.[training.team]?.name || training.team || "Équipe"}
-🕒 ${training.heure || "18:00"}`
+                const lieu =
+                    (training.lieu || '').trim()
+                        ? ` 📍 ${training.lieu.trim()}`
+                        : '';
 
-});
+                items.push({
+                    date: training.date,
+                    message:
+`🏃 ${training.title || "Entraînement"} · ${training.heure || "18:00"} – 20:00${lieu}`
+                });
 
             }
 
@@ -5112,12 +5687,20 @@ ${match.heure || ""}
                 d <= end
             ) {
 
+                const lieu =
+                    (event.lieu || '').trim()
+                        ? ` 📍 ${event.lieu.trim()}`
+                        : '';
+
+                const parts = [`👥 ${event.title}`];
+
+                if (event.heure) parts.push(event.heure);
+
+                if (lieu) parts.push(lieu.trim());
+
                 items.push({
                     date: event.date,
-                    message:
-`👥 ${event.title}
-${event.heure || ""}
-`
+                    message: parts.join(' · ')
                 });
 
             }
@@ -5128,38 +5711,36 @@ ${event.heure || ""}
         a.date.localeCompare(b.date)
     );
 
-let currentDate = "";
+    let currentDate = "";
 
-items.forEach(item => {
+    items.forEach(item => {
 
-    const dateFr =
-        new Date(item.date + "T12:00:00")
-        .toLocaleDateString(
-            "fr-FR",
-            {
-                weekday: "long",
-                day: "numeric",
-                month: "long"
-            }
-        );
+        const d =
+            new Date(item.date + "T12:00:00");
 
-    if (currentDate !== dateFr) {
+        const dateFr =
+            cap(
+                d.toLocaleDateString(
+                    "fr-FR",
+                    {
+                        weekday: "long"
+                    }
+                )
+            ) + " " + dayNum(d);
 
-        text += `📍 ${dateFr}\n\n`;
+        if (currentDate !== dateFr) {
 
-        currentDate = dateFr;
+            if (currentDate !== "") text += "\n";
 
-    }
+            text += `🗓 *${dateFr}*\n`;
 
-    const formattedMessage =
-        item.message.replace(
-            /(\d{2}:\d{2})/,
-            '🕒 $1'
-        );
+            currentDate = dateFr;
 
-    text += `${formattedMessage}\n`;
+        }
 
-});
+        text += `${item.message}\n`;
+
+    });
 
 text += `
 💙 Bonne semaine à tous !
@@ -5176,6 +5757,36 @@ text += `
 
 }
 
+let calendarTeamDefaultedFor = null;
+
+function getDefaultCalendarTeam() {
+
+    const userTeam =
+        window.currentUserTeam || 'all';
+
+    if (userTeam === 'all') return 'all';
+
+    const scopes =
+        String(userTeam)
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+
+    for (const scope of scopes) {
+
+        if (
+            state.teams &&
+            state.teams[scope]
+        ) {
+            return scope;
+        }
+
+    }
+
+    return 'all';
+
+}
+
 function populateCalendarTeamFilter() {
 
     const select =
@@ -5185,8 +5796,31 @@ function populateCalendarTeamFilter() {
 
     if (!select) return;
 
-    const current =
-        select.value || "all";
+    const hasTeams =
+        state.teams &&
+        Object.keys(state.teams).length > 0;
+
+    const userTeam =
+        window.currentUserTeam || 'all';
+
+    let current;
+
+    if (
+        hasTeams &&
+        calendarTeamDefaultedFor !== userTeam
+    ) {
+
+        current = getDefaultCalendarTeam();
+
+        calendarTeamDefaultedFor = userTeam;
+
+    } else {
+
+        current =
+            select.value ||
+            getDefaultCalendarTeam();
+
+    }
 
     select.innerHTML = `
         <option value="all">

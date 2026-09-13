@@ -37,6 +37,40 @@ const params =
 const carpoolId =
     params.get('id');
 
+let match = null;
+let matchKey = null;
+let players = [];
+let responses = {};
+let closed = false;
+let me = '';
+let chosenStatus = '';
+let chosenSeats = 0;
+
+function shortName(n) {
+
+    if (!n) return '?';
+
+    const words =
+        String(n).trim().split(/\s+/);
+
+    if (words.length === 1) return words[0];
+
+    return (
+        words[0] + ' ' +
+        (words[words.length - 1][0] || '').toUpperCase() + '.'
+    );
+
+}
+
+function playerShort(id) {
+
+    const p =
+        players.find(x => x.id === id);
+
+    return p ? shortName(p.name) : id;
+
+}
+
 function showMessage(text, isError) {
     const el = document.getElementById('confirmation');
     el.classList.remove('hidden');
@@ -44,21 +78,106 @@ function showMessage(text, isError) {
     el.style.color = isError ? '#dc2626' : '';
 }
 
-db.ref('rangueil_data/matches')
-    .once('value')
-    .then(snapshot => {
+function convokedPlayers() {
 
-        const matches =
-            snapshot.val() || {};
+    if (!match || !players) return [];
 
-        const match =
-            Object.values(matches)
-                .find(
-                    m => m.carpoolId === carpoolId
-                );
-if (match) {
+    const convocations = match.convocations || {};
 
-    document.getElementById('match-info').innerHTML = `
+    return players.filter(
+        p => convocations[p.id] === 'convoke'
+    );
+
+}
+
+function myResponse() {
+
+    return me ? (responses[me] || null) : null;
+
+}
+
+function liveData() {
+
+    let drivers = 0;
+    let passengers = 0;
+    let directs = 0;
+    let absents = 0;
+    let seats = 0;
+    let pending = 0;
+
+    const attr = [];
+    const placed = new Set();
+
+    Object.entries(responses).forEach(([id, r]) => {
+
+        if (r.status === 'driver') {
+
+            if ((r.seats || 0) > 0) {
+
+                drivers++;
+                seats += r.seats || 0;
+
+                const passengerIds = Array.isArray(r.passengers)
+                    ? r.passengers.slice(0, r.seats || 0)
+                    : [];
+
+                passengerIds.forEach(pid => placed.add(pid));
+
+                attr.push({
+                    name: playerShort(id),
+                    seats: r.seats || 0,
+                    passengers: passengerIds.map(playerShort)
+                });
+
+            }
+
+        } else if (r.status === 'passenger') {
+
+            passengers++;
+
+        } else if (r.status === 'direct') {
+
+            directs++;
+
+        } else if (r.status === 'absent') {
+
+            absents++;
+
+        }
+
+    });
+
+    convokedPlayers().forEach(p => {
+
+        if (!responses[p.id]) pending++;
+
+    });
+
+    const toPlace = Object.entries(responses)
+        .filter(([id, r]) => r.status === 'passenger' && !placed.has(id))
+        .map(([id]) => playerShort(id));
+
+    return {
+        drivers,
+        passengers,
+        directs,
+        absents,
+        seats,
+        pending,
+        total: convokedPlayers().length,
+        attr,
+        toPlace
+    };
+
+}
+
+function renderMatchInfo() {
+
+    const el = document.getElementById('match-info');
+
+    if (!el || !match) return;
+
+    el.innerHTML = `
         <div class="font-bold text-sky-900 text-lg">
             🏆 ${match.type || ''}
         </div>
@@ -80,40 +199,657 @@ if (match) {
         </div>
     `;
 
-    db.ref('rangueil_data/players')
-        .once('value')
-        .then(playerSnapshot => {
+}
 
-            const players =
-                playerSnapshot.val() || [];
+function renderLockBanner() {
 
-            const playerSelect =
-                document.getElementById(
-                    'player-select'
-                );
+    const el = document.getElementById('lock-warning');
 
-            players.forEach(player => {
+    const formSection =
+        document.getElementById('form-section');
 
-                if (
-                    match.convocations &&
-                    match.convocations[player.id] === 'convoke'
-                ) {
+    if (!el) return;
 
-                    playerSelect.innerHTML += `
-                        <option value="${player.id}">
-                            ${player.name}
-                        </option>
-                    `;
+    if (closed) {
 
-                }
+        el.classList.remove('hidden');
 
-            });
+        if (formSection) formSection.classList.add('hidden');
 
-        });
+    } else {
+
+        el.classList.add('hidden');
+
+        if (formSection) formSection.classList.remove('hidden');
+
+    }
 
 }
 
-});
+function renderLive() {
+
+    const bannerEl =
+        document.getElementById('carpool-status-banner');
+
+    const liveEl =
+        document.getElementById('carpool-live');
+
+    if (!match) return;
+
+    if (bannerEl) {
+
+        let status, cls;
+
+        if (closed) {
+
+            status = '🔒 Covoiturage confirmé par le coach';
+            cls = 'bg-sky-100 text-sky-800 border-sky-200';
+
+        } else if (data_().toPlace.length > 0) {
+
+            status = '🔴 Passagers à placer';
+            cls = 'bg-red-100 text-red-700 border-red-200';
+
+        } else if (data_().missing > 0) {
+
+            status = `🔴 Il manque ${data_().missing} place(s)`;
+            cls = 'bg-red-100 text-red-700 border-red-200';
+
+        } else if (data_().total === 0) {
+
+            status = '⏳ Aucune réponse pour l\u2019instant';
+            cls = 'bg-amber-100 text-amber-700 border-amber-200';
+
+        } else {
+
+            status = '🟢 Transport assuré';
+            cls = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+
+        }
+
+        bannerEl.innerHTML = `
+            <div class="font-bold text-sm ${cls} p-3 rounded-xl border">
+                ${status}
+            </div>
+        `;
+
+    }
+
+    if (!liveEl) return;
+
+    const d = data_();
+
+    const missing = (d.passengers - d.seats) > 0
+        ? d.passengers - d.seats
+        : 0;
+
+    liveEl.innerHTML = `
+        <div class="text-xs bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+
+            <div class="flex flex-wrap gap-2 font-bold text-slate-700">
+                <span>✅ ${d.total ? d.total - d.pending + '/' + d.total : '0/0'}</span>
+                <span>🚗 ${d.drivers}</span>
+                <span>🚘 ${d.seats} pl.</span>
+                <span>👤 ${d.passengers}</span>
+                <span>📍 ${d.directs}</span>
+                <span>❌ ${d.absents}</span>
+                <span>⏳ ${d.pending}</span>
+            </div>
+
+            ${d.attr.length ? `
+                <div>
+                    <strong class="text-[11px] text-slate-500 uppercase">Qui conduit qui</strong>
+                    <div class="mt-1 space-y-0.5">
+                        ${d.attr.map(a => `
+                            <div class="text-sm">
+                                🚗 <strong>${a.name}</strong> → ${a.passengers.length ? a.passengers.join(', ') : '<span class="text-slate-400">—</span>'}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${d.toPlace.length ? `
+                <div>
+                    <strong class="text-[11px] text-slate-500 uppercase">Passagers à placer</strong>
+                    <div class="mt-1 text-sm">
+                        ${d.toPlace.join(', ')}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${d.pending > 0 ? `
+                <div>
+                    <strong class="text-[11px] text-slate-500 uppercase">En attente</strong>
+                    <div class="mt-1 text-sm text-slate-500">
+                        ${convokedPlayers().filter(p => !responses[p.id]).map(p => shortName(p.name)).join(', ')}
+                    </div>
+                </div>
+            ` : ''}
+
+        </div>
+    `;
+
+}
+
+function data_() {
+
+    const d = liveData();
+
+    d.missing = (d.passengers - d.seats) > 0
+        ? d.passengers - d.seats
+        : 0;
+
+    return d;
+
+}
+
+function renderAll() {
+
+    renderMatchInfo();
+    renderLockBanner();
+    renderLive();
+    renderMyAssignment();
+
+}
+
+function toggleDriverZone(show) {
+
+    const zone =
+        document.getElementById('driver-zone');
+
+    if (!zone) return;
+
+    if (show) {
+
+        zone.classList.remove('hidden');
+
+    } else {
+
+        zone.classList.add('hidden');
+
+    }
+
+}
+
+function prefillForm() {
+
+    const r = myResponse();
+
+    document.querySelectorAll('input[name="transport"]').forEach(x => {
+
+        x.checked = false;
+
+    });
+
+    chosenStatus = '';
+    chosenSeats = 0;
+
+    const seatsSelect =
+        document.getElementById('available-seats');
+
+    if (seatsSelect) seatsSelect.value = '0';
+
+    if (r) {
+
+        const rb = document.querySelector(
+            'input[name="transport"][value="' + r.status + '"]'
+        );
+
+        if (rb) {
+
+            rb.checked = true;
+            chosenStatus = r.status;
+
+        }
+
+        if (r.status === 'driver') {
+
+            chosenSeats = parseInt(r.seats) || 0;
+
+            if (seatsSelect) seatsSelect.value = String(chosenSeats);
+
+        }
+
+    }
+
+    toggleDriverZone(chosenStatus === 'driver');
+
+    renderMyAssignment();
+
+}
+
+function enableForm() {
+
+    const select =
+        document.getElementById('player-select');
+
+    if (!select) return;
+
+    const convoked = convokedPlayers();
+
+    select.innerHTML = '<option value="">Choisir un joueur</option>';
+
+    convoked.forEach(p => {
+
+        select.innerHTML += `
+            <option value="${p.id}">
+                ${p.name}
+            </option>
+        `;
+
+    });
+
+    select.addEventListener('change', () => {
+
+        me = select.value;
+
+        const confirmEl =
+            document.getElementById('confirmation');
+
+        const anotherBtn =
+            document.getElementById('respond-another');
+
+        if (confirmEl) confirmEl.classList.add('hidden');
+
+        if (anotherBtn) anotherBtn.classList.add('hidden');
+
+        prefillForm();
+
+    });
+
+    document.querySelectorAll('input[name="transport"]').forEach(radio => {
+
+        radio.addEventListener('change', () => {
+
+            if (radio.checked) {
+
+                chosenStatus = radio.value;
+
+                toggleDriverZone(chosenStatus === 'driver');
+
+                renderMyAssignment();
+
+            }
+
+        });
+
+    });
+
+    const seatsSelect =
+        document.getElementById('available-seats');
+
+    if (seatsSelect) {
+
+        seatsSelect.addEventListener('change', () => {
+
+            chosenSeats = parseInt(seatsSelect.value) || 0;
+
+            renderMyAssignment();
+
+        });
+
+    }
+
+    const saveBtn =
+        document.getElementById('save-btn');
+
+    if (saveBtn) {
+
+        saveBtn.addEventListener('click', saveResponse);
+
+    }
+
+}
+
+function guestPassengerIds() {
+
+    const placed = new Set();
+
+    Object.values(responses).forEach(r => {
+
+        if (
+            r.status === 'driver' &&
+            Array.isArray(r.passengers)
+        ) {
+
+            r.passengers.forEach(pid => placed.add(pid));
+
+        }
+
+    });
+
+    return Object.entries(responses)
+        .filter(([id, r]) =>
+            r.status === 'passenger' &&
+            id !== me &&
+            !placed.has(id)
+        )
+        .map(([id]) => id)
+        .map(id => players.find(p => p.id === id))
+        .filter(Boolean)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .map(p => ({ id: p.id, name: p.name }));
+
+}
+
+function renderMyAssignment() {
+
+    const container =
+        document.getElementById('my-assignment');
+
+    if (!container) return;
+
+    const r = myResponse();
+
+    if (
+        !me ||
+        !r ||
+        r.status !== 'driver' ||
+        (r.seats || 0) <= 0 ||
+        closed
+    ) {
+
+        container.innerHTML = '';
+        return;
+
+    }
+
+    const seats = r.seats || 0;
+
+    const available =
+        guestPassengerIds();
+
+    const current =
+        Array.isArray(r.passengers) ? r.passengers : [];
+
+    const remain =
+        seats - current.length;
+
+    let html = `
+        <div class="p-4 mb-5 rounded-xl bg-sky-50 border border-sky-200">
+
+            <div class="flex items-center justify-between gap-2 mb-2">
+
+                <label class="font-bold text-slate-700 text-sm">
+                    🚗 Mes passagers
+                </label>
+
+                <span class="text-xs font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full">
+                    ${current.length} / ${seats} places
+                </span>
+
+            </div>
+    `;
+
+    if (available.length === 0 && current.length === 0) {
+
+        html += `
+            <p class="text-xs text-slate-400">
+                Aucun passager à placer pour le moment.
+            </p>
+        `;
+
+    } else {
+
+        available.forEach(p => {
+
+            const checked = current.includes(p.id);
+
+            const disabled = !checked && remain <= 0;
+
+            html += `
+                <label class="flex items-center gap-2 py-1 text-sm ${disabled ? 'opacity-50' : ''}">
+                    <input
+                        type="checkbox"
+                        data-pid="${p.id}"
+                        ${checked ? 'checked' : ''}
+                        ${disabled ? 'disabled' : ''}>
+                    ${p.name}
+                </label>
+            `;
+
+        });
+
+        html += `
+            <button
+                onclick="saveAssignment()"
+                class="mt-3 w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-2.5 rounded-xl text-sm">
+                Enregistrer mes passagers
+            </button>
+        `;
+
+        if (remain > 0) {
+
+            html += `
+                <p class="mt-2 text-[11px] text-slate-500">
+                    ${remain} place(s) encore disponible(s).
+                </p>
+            `;
+
+        }
+
+    }
+
+    html += '</div>';
+
+    container.innerHTML = html;
+
+}
+
+function saveResponse() {
+
+    if (!me) {
+
+        showMessage('Merci de sélectionner un joueur.', true);
+
+        return;
+
+    }
+
+    if (!chosenStatus) {
+
+        showMessage('Merci de choisir un mode de déplacement.', true);
+
+        return;
+    }
+
+    const payload = {
+
+        status: chosenStatus,
+
+        seats:
+            chosenStatus === 'driver'
+                ? parseInt(chosenSeats) || 0
+                : 0,
+
+        updatedAt: Date.now()
+
+    };
+
+    if (chosenStatus === 'driver') {
+
+        const prev = responses[me];
+
+        payload.passengers =
+            prev &&
+            prev.status === 'driver' &&
+            Array.isArray(prev.passengers)
+                ? prev.passengers.slice()
+                : [];
+
+        if (payload.passengers.length > payload.seats) {
+
+            payload.passengers =
+                payload.passengers.slice(0, payload.seats);
+
+        }
+
+    }
+
+    db.ref(
+        'rangueil_data/carpoolResponses/'
+        + carpoolId + '/'
+        + me
+    )
+    .set(payload)
+    .then(() => {
+
+        showMessage('✅ Réponse enregistrée. Merci !', false);
+
+        const anotherBtn =
+            document.getElementById('respond-another');
+
+        if (anotherBtn) anotherBtn.classList.remove('hidden');
+
+        renderMyAssignment();
+
+    })
+    .catch(error => {
+
+        showMessage('Erreur : ' + error.message, true);
+
+    });
+
+}
+
+function saveAssignment() {
+
+    const r = myResponse();
+
+    if (!r) return;
+
+    const checks = document.querySelectorAll(
+        '#my-assignment input[type="checkbox"][data-pid]:checked'
+    );
+
+    const ids = Array.from(checks)
+        .map(x => x.getAttribute('data-pid'))
+        .slice(0, r.seats || 0);
+
+    db.ref(
+        'rangueil_data/carpoolResponses/'
+        + carpoolId + '/'
+        + me
+    )
+    .update({
+        passengers: ids,
+        updatedAt: Date.now()
+    })
+    .then(() => {
+
+        showMessage('✅ Passagers enregistrés. Merci !', false);
+
+    })
+    .catch(error => {
+
+        showMessage('Erreur : ' + error.message, true);
+
+    });
+
+}
+
+function respondForAnother() {
+
+    me = '';
+    chosenStatus = '';
+    chosenSeats = 0;
+
+    const select =
+        document.getElementById('player-select');
+
+    if (select) select.value = '';
+
+    document.querySelectorAll('input[name="transport"]').forEach(x => {
+
+        x.checked = false;
+
+    });
+
+    toggleDriverZone(false);
+
+    const confirmEl =
+        document.getElementById('confirmation');
+
+    const anotherBtn =
+        document.getElementById('respond-another');
+
+    if (confirmEl) confirmEl.classList.add('hidden');
+
+    if (anotherBtn) anotherBtn.classList.add('hidden');
+
+    renderMyAssignment();
+
+}
+
+function afterInit() {
+
+    const key =
+        'rangueil_data/matches/' + matchKey;
+
+    db.ref(key)
+        .on('value', snapshot => {
+
+            match = snapshot.val() || match;
+
+            closed = !!(match && match.carpoolClosed);
+
+            renderAll();
+
+        });
+
+    db.ref(
+        'rangueil_data/carpoolResponses/' + carpoolId
+    )
+    .on('value', snapshot => {
+
+        responses = snapshot.val() || {};
+
+        renderAll();
+
+    });
+
+}
+
+db.ref('rangueil_data/matches')
+    .once('value')
+    .then(snapshot => {
+
+        const matches =
+            snapshot.val() || {};
+
+        const entry =
+            Object.entries(matches)
+                .find(
+                    ([k, m]) => m && m.carpoolId === carpoolId
+                );
+
+        if (!entry) {
+
+            showMessage('Lien invalide : ce covoiturage n\u2019existe pas.', true);
+
+            return;
+
+        }
+
+        matchKey = entry[0];
+        match = entry[1];
+
+        db.ref('rangueil_data/players')
+            .once('value')
+            .then(playerSnapshot => {
+
+                players = playerSnapshot.val() || [];
+
+                renderMatchInfo();
+
+                enableForm();
+
+                afterInit();
+
+            });
+
+    });
 
 </script>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -138,6 +874,13 @@ if (match) {
         </div>
     </div>
 
+    <div
+        id="lock-warning"
+        class="hidden mb-5 p-4 rounded-xl bg-sky-100 border border-sky-300 text-sky-900 font-bold text-sm">
+        🔒 Le covoiturage a été confirmé par le coach.
+        Vous pouvez consulter le récapitulatif ci-dessus.
+    </div>
+
     <!-- Infos match -->
     <div
         id="match-info"
@@ -149,223 +892,122 @@ if (match) {
 
     </div>
 
-    <!-- Joueur -->
-    <div class="mb-5">
+    <div id="carpool-status-banner" class="mb-4"></div>
 
-        <label class="block font-bold text-slate-700 mb-2">
-            Je réponds pour :
-        </label>
+    <div id="carpool-live" class="mb-6"></div>
 
-        <select
-            id="player-select"
-            class="w-full p-3 border rounded-xl">
+    <div id="form-section">
 
-            <option value="">
-                Choisir un joueur
-            </option>
+        <!-- Joueur -->
+        <div class="mb-5">
 
-        </select>
+            <label class="block font-bold text-slate-700 mb-2">
+                Je réponds pour :
+            </label>
 
-    </div>
+            <select
+                id="player-select"
+                class="w-full p-3 border rounded-xl">
 
-    <!-- Mode de déplacement -->
-    <div class="space-y-3 mb-5">
+                <option value="">
+                    Choisir un joueur
+                </option>
 
-        <label class="flex items-center gap-3 text-xl">
-            <input
-                type="radio"
-                name="transport"
-                value="driver">
+            </select>
 
-            🚗 Je conduis
-        </label>
+        </div>
 
-        <label class="flex items-center gap-3 text-xl">
-            <input
-                type="radio"
-                name="transport"
-                value="passenger">
+        <div id="my-assignment"></div>
 
-            👤 Je suis passager
-        </label>
+        <!-- Mode de déplacement -->
+        <div class="space-y-3 mb-5">
 
-        <label class="flex items-center gap-3 text-xl">
-            <input
-                type="radio"
-                name="transport"
-                value="direct">
+            <label class="flex items-center gap-3 text-xl">
+                <input
+                    type="radio"
+                    name="transport"
+                    value="driver">
 
-               📍 J'y vais directement
-        </label>
+                🚗 Je conduis
+            </label>
 
-        <label class="flex items-center gap-3 text-xl">
-            <input
-                type="radio"
-                name="transport"
-                value="absent">
+            <label class="flex items-center gap-3 text-xl">
+                <input
+                    type="radio"
+                    name="transport"
+                    value="passenger">
 
-            ❌ Absent
-        </label>
+                👤 Je suis passager
+            </label>
 
-    </div>
+            <label class="flex items-center gap-3 text-xl">
+                <input
+                    type="radio"
+                    name="transport"
+                    value="direct">
 
-    <div
-        id="driver-zone"
-        class="hidden mb-5">
+                   📍 J'y vais directement
+            </label>
 
-        <label class="block font-bold text-slate-700 mb-2">
-            Nombre de places disponibles
-        </label>
+            <label class="flex items-center gap-3 text-xl">
+                <input
+                    type="radio"
+                    name="transport"
+                    value="absent">
 
-        <select
-            id="available-seats"
-            class="w-full p-3 border rounded-xl">
+                ❌ Absent
+            </label>
 
-            <option value="0">0</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
+        </div>
 
-        </select>
+        <div
+            id="driver-zone"
+            class="hidden mb-5">
 
-    </div>
+            <label class="block font-bold text-slate-700 mb-2">
+                Nombre de places disponibles
+            </label>
 
-    <button
-        id="save-btn"
-        class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-4 rounded-xl">
+            <select
+                id="available-seats"
+                class="w-full p-3 border rounded-xl">
 
-        ✅ Valider ma réponse
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
 
-    </button>
+            </select>
 
-    <div
-        id="confirmation"
-        class="hidden mt-4 p-4 rounded-xl bg-emerald-100 text-emerald-800 font-bold">
+        </div>
+
+        <button
+            id="save-btn"
+            class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-4 rounded-xl">
+
+            ✅ Valider ma réponse
+
+        </button>
+
+        <div
+            id="confirmation"
+            class="hidden mt-4 p-4 rounded-xl bg-emerald-100 text-emerald-800 font-bold">
+        </div>
+
+        <button
+            id="respond-another"
+            onclick="respondForAnother()"
+            class="hidden mt-3 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm">
+
+            👨‍👩‍👧‍👦 Répondre pour un autre joueur
+
+        </button>
+
     </div>
 
 </div>
 
-<script>
-
-document
-    .querySelectorAll(
-        'input[name="transport"]'
-    )
-    .forEach(radio => {
-
-        radio.addEventListener(
-            'change',
-            () => {
-
-                const driverZone =
-                    document.getElementById(
-                        'driver-zone'
-                    );
-
-                if (
-                    radio.value === 'driver' &&
-                    radio.checked
-                ) {
-
-                    driverZone.classList.remove(
-                        'hidden'
-                    );
-
-                } else {
-
-                    driverZone.classList.add(
-                        'hidden'
-                    );
-
-                }
-
-            }
-        );
-
-    });
-
-</script>
-<script>
-
-document
-    .getElementById('save-btn')
-    .addEventListener('click', () => {
-
-        const playerId =
-            document.getElementById(
-                'player-select'
-            ).value;
-
-        const transport =
-            document.querySelector(
-                'input[name="transport"]:checked'
-            )?.value;
-
-        const seats =
-            document.getElementById(
-                'available-seats'
-            )?.value || 0;
-
-        if (!playerId) {
-
-            showMessage(
-                'Merci de sélectionner un joueur.',
-                true
-            );
-
-            return;
-        }
-
-        if (!transport) {
-
-            showMessage(
-                'Merci de choisir un mode de déplacement.',
-                true
-            );
-
-            return;
-        }
-
-        const responseData = {
-
-            status: transport,
-
-            seats:
-                transport === 'driver'
-                    ? parseInt(seats)
-                    : 0,
-
-            updatedAt: Date.now()
-
-        };
-
-        db.ref(
-            'rangueil_data/carpoolResponses/'
-            + carpoolId + '/'
-            + playerId
-        )
-        .set(responseData)
-        .then(() => {
-
-            showMessage(
-                '✅ Réponse enregistrée. Merci !',
-                false
-            );
-
-        })
-        .catch(error => {
-
-            showMessage(
-                'Erreur : ' + error.message,
-                true
-            );
-
-        });
-
-    });
-
-</script>
 </body>
 </html>
