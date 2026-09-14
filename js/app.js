@@ -252,6 +252,12 @@ if (pinScreen) {
     carpoolResponses: {},
     settings: {},
     exerciseTemplates: [],
+    fffClubNo: 18707,
+    fffApiBase: "https://api-dofa.fff.fr/api",
+    fffLinks: {},
+    fffLastSync: null,
+    fffAutoSync: true,
+    fffProxyUrl: "",
 };
 
 // Variables d'interface uniquement
@@ -271,6 +277,12 @@ let currentCatFilter = 'all';
                     state.stats = (data && data.stats) || {};
                     state.staff = (data && data.staff) || [];
                     state.settings = (data && data.settings) || { trainingDays: [2, 5] };
+                    state.fffClubNo = (data && data.fffClubNo) || 18707;
+                    state.fffApiBase = (data && data.fffApiBase) || "https://api-dofa.fff.fr/api";
+                    state.fffLinks = (data && data.fffLinks) || {};
+                    state.fffLastSync = (data && data.fffLastSync) || null;
+                    state.fffAutoSync = (data && data.fffAutoSync) !== false;
+                    state.fffProxyUrl = (data && data.fffProxyUrl) || "";
                     saveStateToFirebase();
                 } else {
                     state.players = (data.players || []).map(p => {
@@ -293,6 +305,18 @@ state.settings =
     data.settings || { trainingDays: [2, 5] };
 state.exerciseTemplates =
     data.exerciseTemplates || [];
+state.fffClubNo =
+    data.fffClubNo || 18707;
+state.fffApiBase =
+    data.fffApiBase || "https://api-dofa.fff.fr/api";
+state.fffLinks =
+    data.fffLinks || {};
+state.fffLastSync =
+    data.fffLastSync || null;
+state.fffAutoSync =
+    data.fffAutoSync !== false;
+state.fffProxyUrl =
+    data.fffProxyUrl || "";
                     // Migration ancien format numérique → nouveau format objet
                     const rawTrainings = data.trainings || {};
                     if (Object.keys(rawTrainings).length > 0 && !isNaN(Object.keys(rawTrainings)[0])) {
@@ -326,6 +350,7 @@ if (
 } 
 
                 renderAll();
+                maybeAutoSyncFFF();
             } catch(err) {
                 console.error("Erreur de synchronisation :", err);
             }
@@ -346,7 +371,13 @@ function saveStateToFirebase() {
     events: state.events,
     carpoolResponses: state.carpoolResponses,
     exerciseTemplates: state.exerciseTemplates,
-    settings: state.settings
+    settings: state.settings,
+    fffClubNo: state.fffClubNo,
+    fffApiBase: state.fffApiBase,
+    fffLinks: state.fffLinks,
+    fffLastSync: state.fffLastSync,
+    fffAutoSync: state.fffAutoSync,
+    fffProxyUrl: state.fffProxyUrl
 };
 
     db.ref('rangueil_data').update(dataToSave);
@@ -6242,6 +6273,14 @@ function openAdminModule(module) {
     renderAdminTeamsModule();
 
 }
+
+if (module === "fff") {
+
+    renderAdminFFFModule();
+
+    if (!window.__fffCalendar) refreshFFFCompetitions();
+
+}
 }
 
 function renderAdminTeamsModule() {
@@ -6517,6 +6556,535 @@ function closeAdminModule() {
     container.classList.add("hidden");
 
     container.innerHTML = "";
+}
+
+
+// ============================================================
+//  MODULE : SYNCHRONISATION FFF (api-dofa.fff.fr)
+//  Importe automatiquement les matchs officiels du club
+//  (calendrier FFF de Rangueil FC) et les scores.
+// ============================================================
+
+function fffNormalize(s) {
+    return String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+}
+
+function fffApiUrl(path) {
+    let base = (state.fffApiBase || "https://api-dofa.fff.fr/api").replace(/\/+$/, "");
+    if (String(path).startsWith("http")) return path;
+    let p = String(path);
+    if (base.endsWith("/api") && p.startsWith("/api/")) p = p.slice(4);
+    return base + (p.startsWith("/") ? "" : "/") + p;
+}
+
+async function fffFetchJsonRaw(url, timeoutMs = 20000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, {
+            headers: { "Accept": "application/json" },
+            signal: controller.signal
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const text = await res.text();
+        if (!text || !text.trim().startsWith("{")) {
+            throw new Error("Réponse bloquée (page HTML reçue)");
+        }
+        return JSON.parse(text);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function fffTryRoutes() {
+    const url = state.fffApiBaseLastUrl || "";
+    const routes = [];
+    routes.push({ id: "direct", url: url });
+    if (state.fffProxyUrl) {
+        routes.push({ id: "proxy", url: state.fffProxyUrl + encodeURIComponent(url) });
+    }
+    routes.push({ id: "allorigins", url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(url) });
+    routes.push({ id: "codetabs", url: "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) });
+    return routes;
+}
+
+async function fffFetchJson(path) {
+    const url = fffApiUrl(path);
+    state.fffApiBaseLastUrl = url;
+
+    const routes = fffTryRoutes();
+    const bestId = window.__fffBestRoute;
+    if (bestId) {
+        routes.sort((a, b) => {
+            if (a.id === bestId) return -1;
+            if (b.id === bestId) return 1;
+            return 0;
+        });
+    }
+
+    let lastErr = null;
+    for (const route of routes) {
+        try {
+            const data = await fffFetchJsonRaw(route.url);
+            if (route.id !== "direct") window.__fffBestRoute = route.id;
+            return data;
+        } catch (err) {
+            lastErr = err;
+            console.warn("FFF route '" + route.id + "' inaccessible :", err.message);
+        }
+    }
+    throw new Error("API FFF injoignable depuis le navigateur. " + (lastErr ? lastErr.message : ""));
+}
+
+async function fetchFFFCalendar() {
+    const clubNo = state.fffClubNo || 18707;
+    const now = new Date();
+    const seasonYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const seasonStart = seasonYear + "-06-01";
+
+    const params = new URLSearchParams();
+    params.set("ma_dat[after]", seasonStart);
+
+    let currentPath = "/api/clubs/" + clubNo + "/calendrier?" + params.toString();
+    let matches = [];
+    let guard = 0;
+
+    while (currentPath && guard < 20) {
+        guard++;
+        const data = await fffFetchJson(currentPath);
+        matches = matches.concat(data["hydra:member"] || []);
+        const view = data["hydra:view"] || {};
+        currentPath = view["hydra:next"] || null;
+    }
+
+    return matches;
+}
+
+function fffGroupCompetitions(matches) {
+    const clubNo = state.fffClubNo || 18707;
+    const map = new Map();
+    (matches || []).forEach(m => {
+        const comp = m.competition;
+        if (!comp) return;
+        const cpNo = comp.cp_no;
+        if (!map.has(cpNo)) {
+            map.set(cpNo, {
+                cp_no: cpNo,
+                name: comp.name,
+                tipo: comp.type,
+                level: comp.level,
+                season: comp.season || null,
+                matches: 0,
+                poule: "",
+                categories: []
+            });
+        }
+        const row = map.get(cpNo);
+        row.matches++;
+        if (!row.poule && m.poule && m.poule.name) row.poule = m.poule.name;
+        [m.home, m.away].forEach(side => {
+            if (side && side.club && side.club.cl_no === clubNo && side.category_label) {
+                if (!row.categories.includes(side.category_label)) {
+                    row.categories.push(side.category_label);
+                }
+            }
+        });
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "fr"));
+}
+
+function parseFFFTime(t) {
+    if (!t) return "";
+    const m = String(t).match(/(\d{1,2})H(\d{2})?/);
+    if (!m) return "";
+    const hh = String(parseInt(m[1], 10)).padStart(2, "0");
+    const mm = (m[2] || "00").padStart(2, "0");
+    return hh + ":" + mm;
+}
+
+function fffPelouseLabel(surface) {
+    const s = String(surface || "").toLowerCase();
+    if (s.includes("synth")) return "Synthétique";
+    if (s.includes("herbe")) return "Herbe";
+    if (s.includes("stabilis")) return "Stabilisé";
+    return surface || "";
+}
+
+function fffTypeLabel(compType) {
+    if (compType === "CP") return "Coupe";
+    if (compType === "CH") return "Championnat";
+    if (compType === "AC") return "Amical";
+    return "Coupe";
+}
+
+function fffOpponentName(side) {
+    if (!side) return "";
+    return side.short_name
+        || side.short_name_federation
+        || side.short_name_ligue
+        || "";
+}
+
+function fffFormatDate(ts) {
+    return new Date(ts).toLocaleString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+}
+
+function buildFFFMatch(evt) {
+    const clubNo = state.fffClubNo || 18707;
+    const isHome = evt.home && evt.home.club && evt.home.club.cl_no === clubNo;
+    const oppSide = isHome ? evt.away : evt.home;
+    const link = state.fffLinks && state.fffLinks[evt.competition.cp_no];
+    const teamKey = link ? link.team : "";
+    const homeScore = (evt.home_score !== null && evt.home_score !== undefined) ? String(evt.home_score) : "";
+    const awayScore = (evt.away_score !== null && evt.away_score !== undefined) ? String(evt.away_score) : "";
+    const scoreHome = isHome ? homeScore : awayScore;
+    const scoreAway = isHome ? awayScore : homeScore;
+
+    return {
+        id: "fff-" + evt.ma_no,
+        opponent: fffOpponentName(oppSide),
+        adresse: [
+            evt.terrain && evt.terrain.address,
+            [evt.terrain && evt.terrain.zip_code, evt.terrain && evt.terrain.city].filter(Boolean).join(" ")
+        ].filter(Boolean).join(", "),
+        date: (evt.date || "").slice(0, 10),
+        heure: parseFFFTime(evt.time),
+        type: fffTypeLabel(evt.competition && evt.competition.type),
+        location: isHome ? "Domicile" : "Extérieur",
+        pelouse: fffPelouseLabel(evt.terrain && evt.terrain.libelle_surface),
+        team: teamKey,
+        carpoolId: "CP_FFF_" + evt.ma_no,
+        meetingPlace: "",
+        travelTime: 25,
+        arrivalMargin: 60,
+        securityMargin: 10,
+        scoreHome: scoreHome,
+        scoreAway: scoreAway,
+        convocations: {},
+        positions: {},
+        jerseys: {},
+        carpool: {},
+        matchStats: {},
+        debrief: "",
+        composition: {},
+        slotAssignments: {},
+        isValidated: false,
+        fff: {
+            ma_no: evt.ma_no,
+            cp_no: evt.competition ? evt.competition.cp_no : null,
+            competitionName: evt.competition ? evt.competition.name : "",
+            competitionType: evt.competition ? evt.competition.type : "",
+            poule: evt.poule ? evt.poule.name : "",
+            journee: evt.poule_journee ? ("Journée " + evt.poule_journee.number) : "",
+            phase: evt.phase ? evt.phase.name : "",
+            isHome: isHome
+        }
+    };
+}
+
+function applyFFFToExisting(existing, fffMatch) {
+    existing.opponent = fffMatch.opponent;
+    existing.adresse = fffMatch.adresse;
+    existing.date = fffMatch.date;
+    existing.heure = fffMatch.heure;
+    existing.type = fffMatch.type;
+    existing.location = fffMatch.location;
+    existing.pelouse = fffMatch.pelouse;
+    existing.team = fffMatch.team;
+    if (fffMatch.scoreHome !== "" && fffMatch.scoreAway !== "") {
+        existing.scoreHome = fffMatch.scoreHome;
+        existing.scoreAway = fffMatch.scoreAway;
+    }
+    existing.fff = fffMatch.fff;
+    existing.carpoolId = existing.carpoolId || fffMatch.carpoolId;
+    existing.convocations = existing.convocations || {};
+    existing.positions = existing.positions || {};
+    existing.jerseys = existing.jerseys || {};
+    existing.carpool = existing.carpool || {};
+    existing.matchStats = existing.matchStats || {};
+    existing.slotAssignments = existing.slotAssignments || {};
+    existing.composition = existing.composition || {};
+    existing.debrief = existing.debrief || "";
+}
+
+function findLinkedManualMatch(evt, teamKey) {
+    const clubNo = state.fffClubNo || 18707;
+    const isHome = evt.home && evt.home.club && evt.home.club.cl_no === clubNo;
+    const fffDate = (evt.date || "").slice(0, 10);
+    const fffOpp = fffNormalize(fffOpponentName(isHome ? evt.away : evt.home));
+    if (!fffOpp) return null;
+    return Object.values(state.matches).find(m =>
+        !m.fff
+        && m.team === teamKey
+        && (m.date || "") === fffDate
+        && fffNormalize(m.opponent) === fffOpp
+    );
+}
+
+async function refreshFFFCompetitions() {
+    const btn = document.getElementById("fff-scan-btn");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyse en cours...';
+    }
+    try {
+        const calendar = await fetchFFFCalendar();
+        window.__fffCalendar = calendar;
+        window.__fffCompetitions = fffGroupCompetitions(calendar);
+        renderAdminFFFModule();
+    } catch (err) {
+        console.error("FFF analyse error:", err);
+        showToast("❌ Analyse FFF impossible : " + err.message, "error");
+        const statusEl = document.getElementById("fff-sync-status");
+        if (statusEl) statusEl.textContent = "❌ " + err.message;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Analyser le calendrier';
+        }
+    }
+}
+
+function syncFFFMatches(opts) {
+    opts = opts || {};
+    return (async () => {
+        if (window.__fffSyncing) return;
+        window.__fffSyncing = true;
+        const isManual = !!opts.manual;
+
+        const setSyncBtn = (html, disabled) => {
+            const b = document.getElementById("fff-sync-btn");
+            if (b) {
+                b.disabled = !!disabled;
+                if (html) b.innerHTML = html;
+            }
+        };
+
+        try {
+            if (isManual) setSyncBtn('<i class="fa-solid fa-spinner fa-spin"></i> Synchronisation en cours...', true);
+
+            const links = state.fffLinks || {};
+            const linkedCpNos = Object.keys(links).map(Number);
+            if (linkedCpNos.length === 0) {
+                if (isManual) showToast("ℹ️ Liez d'abord vos équipes aux compétitions FFF", "info");
+                return;
+            }
+
+            const calendar = await fetchFFFCalendar();
+            window.__fffCalendar = calendar;
+
+            let created = 0;
+            let updated = 0;
+
+            calendar.forEach(evt => {
+                const cpNo = evt.competition ? evt.competition.cp_no : null;
+                if (!linkedCpNos.some(c => c === Number(cpNo))) return;
+
+                const link = links[cpNo];
+                const teamKey = link && link.team;
+                const maNo = evt.ma_no;
+                const fffMatch = buildFFFMatch(evt);
+
+                let existing = Object.values(state.matches).find(m => m.fff && m.fff.ma_no === maNo);
+                if (!existing && teamKey) existing = findLinkedManualMatch(evt, teamKey);
+
+                if (existing) {
+                    applyFFFToExisting(existing, fffMatch);
+                    updated++;
+                } else if (teamKey) {
+                    state.matches[fffMatch.id] = fffMatch;
+                    created++;
+                }
+            });
+
+            state.fffLastSync = Date.now();
+            saveStateToFirebase();
+            renderAll();
+
+            if (isManual) showToast("✅ " + created + " match(s) ajouté(s), " + updated + " mis à jour");
+            const statusEl = document.getElementById("fff-sync-status");
+            if (statusEl) statusEl.textContent = "Dernière synchro : " + fffFormatDate(new Date()) + " · " + created + " nouveau(x) · " + updated + " mis à jour";
+            renderAdminFFFModule();
+        } catch (err) {
+            console.error("FFF sync error:", err);
+            if (isManual) showToast("❌ Sync FFF impossible : " + err.message, "error");
+            const statusEl = document.getElementById("fff-sync-status");
+            if (statusEl) statusEl.textContent = "❌ " + err.message;
+        } finally {
+            window.__fffSyncing = false;
+            if (isManual) setSyncBtn('<i class="fa-solid fa-arrows-rotate"></i> Synchroniser maintenant', false);
+        }
+    })();
+}
+
+function onFFFLinkChange(cpNo, teamKey) {
+    const compInfo = (window.__fffCompetitions || []).find(c => String(c.cp_no) === String(cpNo));
+    if (teamKey) {
+        state.fffLinks[cpNo] = {
+            team: teamKey,
+            competitionName: compInfo ? compInfo.name : "",
+            competitionType: compInfo ? compInfo.tipo : ""
+        };
+        showToast("🔗 Compétition liée à l'équipe");
+    } else {
+        delete state.fffLinks[cpNo];
+        showToast("🔓 Lien supprimé");
+    }
+    saveStateToFirebase();
+    renderAdminFFFModule();
+}
+
+function onFFFAutoSyncToggle(checked) {
+    state.fffAutoSync = !!checked;
+    saveStateToFirebase();
+    showToast(checked ? "✅ Synchronisation automatique activée" : "🛑 Synchronisation automatique désactivée");
+}
+
+function onFFFSaveProxy() {
+    const input = document.getElementById("fff-proxy-url");
+    const value = (input && input.value || "").trim();
+    state.fffProxyUrl = value;
+    window.__fffBestRoute = null;
+    saveStateToFirebase();
+    showToast(value ? "✅ Proxy enregistré" : "ℹ️ Proxy retiré, retour à l'accès direct");
+    renderAdminFFFModule();
+}
+
+function renderAdminFFFModule() {
+    const container = document.getElementById("admin-module-container");
+    if (!container) return;
+    if (container.classList.contains("hidden")) return;
+    container.classList.remove("hidden");
+
+    const comps = window.__fffCompetitions || [];
+    const linkedCount = Object.keys(state.fffLinks || {}).length;
+    const lastSync = state.fffLastSync ? fffFormatDate(state.fffLastSync) : "Jamais";
+    const emptyTeamRow = Object.entries(state.teams || {}).length === 0;
+
+    let html = `
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-lg font-bold text-slate-800">🌐 Synchronisation FFF</h2>
+            <p class="text-xs text-slate-500 mt-1">Importe automatiquement les matchs officiels du club (n° ${state.fffClubNo || 18707}) depuis la Fédération Française de Football.</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="refreshFFFCompetitions()" id="fff-scan-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold">
+                <i class="fa-solid fa-magnifying-glass"></i> Analyser le calendrier
+            </button>
+            <button onclick="closeAdminModule()" class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold">← Retour</button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div class="bg-sky-50 border border-sky-200 rounded-xl p-3">
+            <div class="text-[11px] text-slate-500 font-semibold">Dernière synchro</div>
+            <div id="fff-sync-status" class="text-sm font-bold text-sky-800 mt-0.5">${lastSync}</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+            <div class="text-[11px] text-slate-500 font-semibold">Compétitions détectées</div>
+            <div class="text-sm font-bold text-emerald-800 mt-0.5">${comps.length}</div>
+        </div>
+        <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
+            <div class="text-[11px] text-slate-500 font-semibold">Liens équipe ↔ compétition</div>
+            <div class="text-sm font-bold text-violet-800 mt-0.5">${linkedCount}</div>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+        <button onclick="syncFFFMatches({manual:true})" id="fff-sync-btn" class="bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow">
+            <i class="fa-solid fa-arrows-rotate"></i> Synchroniser maintenant
+        </button>
+        <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" id="fff-auto-sync-toggle" ${state.fffAutoSync !== false ? "checked" : ""} onchange="onFFFAutoSyncToggle(this.checked)" class="w-4 h-4 accent-sky-600">
+            Synchronisation automatique au chargement
+        </label>
+    </div>
+
+    <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4">
+        <div class="flex flex-wrap items-center gap-2">
+            <div class="flex-1 min-w-[220px]">
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">URL du petit proxy (optionnel, en cas d'accès bloqué)</label>
+                <input type="text" id="fff-proxy-url" value="${state.fffProxyUrl || ""}" placeholder="https://script.google.com/macros/s/.../exec?url=" class="w-full border rounded-lg p-2 text-xs">
+            </div>
+            <div class="pt-4">
+                <button onclick="onFFFSaveProxy()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold">Enregistrer</button>
+            </div>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-2">
+            💡 L'API FFF bloque parfois les navigateurs (Akamai). Sans proxy, l'appli essaie 4 itinéraires automatiquement. Si tout échoue, collez ici l'URL d'un mini-proxy Google Apps Script (instructions à la demande) pour garantir l'accès.
+        </div>
+    </div>
+`;
+
+    if (comps.length === 0) {
+        html += `
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+            <i class="fa-solid fa-circle-info mr-1"></i>
+            Aucune compétition chargée pour le moment. Cliquez sur <b>« Analyser le calendrier »</b> pour détecter les compétitions officielles du club. Aucune donnée ne sera importée tant qu'aucun lien n'est créé.
+        </div>
+        `;
+    } else {
+        html += `<div class="text-xs font-bold text-slate-600 mb-2">🎯 Liez une compétition FFF à votre équipe :</div>`;
+        if (emptyTeamRow) {
+            html += `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-800 mb-3">
+                ⚠️ Créez d'abord vos équipes dans le module <b>Équipes</b> avant de les lier.
+            </div>
+            `;
+        }
+        comps.forEach(c => {
+            const link = state.fffLinks && state.fffLinks[c.cp_no];
+            const linked = link ? link.team : "";
+            const teamName = linked && state.teams && state.teams[linked] ? state.teams[linked].name : (linked || "");
+            const catLabel = c.categories.length ? c.categories[0] : "";
+            const typeBadge = c.tipo === "CH" ? "bg-blue-100 text-blue-700"
+                : c.tipo === "CP" ? "bg-fuchsia-100 text-fuchsia-700"
+                : "bg-amber-100 text-amber-700";
+
+            html += `
+            <div class="bg-slate-50 border ${linked ? "border-emerald-300 bg-emerald-50/40" : "border-slate-200"} rounded-xl p-3 mb-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="font-bold text-sm text-slate-800">
+                            <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold mr-1.5 ${typeBadge}">${fffTypeLabel(c.tipo)}</span>
+                            ${c.name}
+                        </div>
+                        <div class="text-[11px] text-slate-500 mt-0.5">${catLabel} · ${c.matches} match(s)${c.poule ? " · " + c.poule : ""}</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        ${linked ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold">✓ ${teamName}</span>` : ""}
+                        <select onchange="onFFFLinkChange('${c.cp_no}', this.value)" class="border rounded-lg p-2 text-xs ${linked ? "border-emerald-300" : "border-slate-200"}">
+                            <option value="">— Ne pas lier —</option>
+                            ${Object.entries(state.teams || {}).map(([k, t]) => `<option value="${k}" ${linked === k ? "selected" : ""}>${t.name || k.toUpperCase()}</option>`).join("")}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+    }
+
+    container.innerHTML = html;
+}
+
+function maybeAutoSyncFFF() {
+    if (window.__fffSyncing) return;
+    if (window.__fffAutoSynced) return;
+    if (state.fffAutoSync === false) return;
+    if (!state.fffLinks || Object.keys(state.fffLinks).length === 0) return;
+    window.__fffAutoSynced = true;
+    setTimeout(() => {
+        syncFFFMatches({ manual: false });
+    }, 2000);
 }
 
 
@@ -7288,6 +7856,29 @@ teamsHtml += `
 });
 
 }
+const POSTE_LIBELLES = {
+    AD: 'Ailier droit',
+    AG: 'Ailier gauche',
+    BU: 'Buteur',
+    DC: 'Défenseur central',
+    DD: 'Défenseur droit',
+    DG: 'Défenseur gauche',
+    MC: 'Milieu central',
+    MDC: 'Milieu défensif',
+    MD: 'Milieu défensif',
+    MO: 'Milieu offensif',
+    MOC: 'Milieu offensif central',
+    GB: 'Gardien',
+    Gardien: 'Gardien',
+    Remplaçant: 'Remplaçant'
+};
+
+function getPosteLabel(code) {
+    if (!code) return '';
+    const key = String(code).trim();
+    return POSTE_LIBELLES[key] || key;
+}
+
 function renderMatchComposition() {
 
     const container =
@@ -7574,6 +8165,10 @@ ${terrainPlayers.map(player => {
                                     ${player.name}
                                 </div>
 
+                                <div class="text-[10px] text-sky-700 font-semibold">
+                                    ${getPosteLabel(player.poste1)}
+                                </div>
+
                                 <button
                                     onclick="removePlayerFromComposition('${player.id}')"
                                     class="text-red-500 text-[10px] mt-1">
@@ -7607,7 +8202,11 @@ ${terrainPlayers.map(player => {
 
                             class="w-full bg-white border rounded-xl p-3 text-left hover:bg-sky-50">
 
-                            ${player.name}
+                            <span class="font-bold">${player.name}</span>
+
+                            <span class="ml-2 text-[10px] font-semibold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded">
+                                ${getPosteLabel(player.poste1)}
+                            </span>
 
                         </button>
 
