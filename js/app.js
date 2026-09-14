@@ -6575,6 +6575,9 @@ function fffNormalize(s) {
 
 function fffApiUrl(path) {
     let base = (state.fffApiBase || "https://api-dofa.fff.fr/api").replace(/\/+$/, "");
+    if (typeof location !== "undefined" && location.hostname.indexOf("vercel.app") !== -1) {
+        base = "/fff";
+    }
     if (String(path).startsWith("http")) return path;
     let p = String(path);
     if (base.endsWith("/api") && p.startsWith("/api/")) p = p.slice(4);
@@ -6600,12 +6603,20 @@ async function fffFetchJsonRaw(url, timeoutMs = 20000) {
     }
 }
 
+function fffProxyRouteFor(url) {
+    const base = (state.fffProxyUrl || "").trim();
+    if (!base) return "";
+    const sep = base.includes("?") ? "&" : "?";
+    return base + sep + "url=" + encodeURIComponent(url);
+}
+
 function fffTryRoutes() {
     const url = state.fffApiBaseLastUrl || "";
     const routes = [];
     routes.push({ id: "direct", url: url });
-    if (state.fffProxyUrl) {
-        routes.push({ id: "proxy", url: state.fffProxyUrl + encodeURIComponent(url) });
+    const proxyUrl = fffProxyRouteFor(url);
+    if (proxyUrl) {
+        routes.push({ id: "proxy", url: proxyUrl });
     }
     routes.push({ id: "allorigins", url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(url) });
     routes.push({ id: "codetabs", url: "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) });
@@ -6637,7 +6648,7 @@ async function fffFetchJson(path) {
             console.warn("FFF route '" + route.id + "' inaccessible :", err.message);
         }
     }
-    throw new Error("API FFF injoignable depuis le navigateur. " + (lastErr ? lastErr.message : ""));
+    throw new Error("API FFF injoignable depuis le navigateur (CORS). Utilisez le petit proxy Google Apps Script dans le champ ci-dessous.");
 }
 
 async function fetchFFFCalendar() {
