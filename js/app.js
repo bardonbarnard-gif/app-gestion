@@ -6603,6 +6603,36 @@ async function fffFetchJsonRaw(url, timeoutMs = 20000) {
     }
 }
 
+function fffJsonp(url, callbackName, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+        const cbName = callbackName || "__fffJsonp_" + Date.now();
+        const script = document.createElement("script");
+        let done = false;
+        function cleanup() {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
+            if (script.parentNode) script.parentNode.removeChild(script);
+        }
+        const timer = setTimeout(function () {
+            cleanup();
+            reject(new Error("Timeout JSONP"));
+        }, timeoutMs || 25000);
+        window[cbName] = function (data) {
+            cleanup();
+            resolve(data);
+        };
+        script.onerror = function () {
+            cleanup();
+            reject(new Error("Erreur de chargement du script proxy"));
+        };
+        const sep = url.indexOf("?") === -1 ? "?" : "&";
+        script.src = url + sep + "callback=" + cbName;
+        document.head.appendChild(script);
+    });
+}
+
 function fffProxyRouteFor(url) {
     const base = (state.fffProxyUrl || "").trim();
     if (!base) return "";
@@ -6613,11 +6643,9 @@ function fffProxyRouteFor(url) {
 function fffTryRoutes() {
     const url = state.fffApiBaseLastUrl || "";
     const routes = [];
-    routes.push({ id: "direct", url: url });
     const proxyUrl = fffProxyRouteFor(url);
-    if (proxyUrl) {
-        routes.push({ id: "proxy", url: proxyUrl });
-    }
+    if (proxyUrl) routes.push({ id: "proxy", url: proxyUrl, jsonp: true });
+    routes.push({ id: "direct", url: url });
     routes.push({ id: "allorigins", url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(url) });
     routes.push({ id: "codetabs", url: "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) });
     return routes;
@@ -6640,7 +6668,7 @@ async function fffFetchJson(path) {
     let lastErr = null;
     for (const route of routes) {
         try {
-            const data = await fffFetchJsonRaw(route.url);
+            const data = route.jsonp ? await fffJsonp(route.url) : await fffFetchJsonRaw(route.url);
             if (route.id !== "direct") window.__fffBestRoute = route.id;
             return data;
         } catch (err) {
@@ -6648,7 +6676,7 @@ async function fffFetchJson(path) {
             console.warn("FFF route '" + route.id + "' inaccessible :", err.message);
         }
     }
-    throw new Error("API FFF injoignable depuis le navigateur (CORS). Utilisez le petit proxy Google Apps Script dans le champ ci-dessous.");
+    throw new Error("API FFF injoignable depuis le navigateur. Vérifiez l'URL du petit proxy (script Google déployé). " + (lastErr ? lastErr.message : ""));
 }
 
 async function fetchFFFCalendar() {
