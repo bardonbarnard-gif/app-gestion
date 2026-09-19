@@ -1,3 +1,108 @@
+// Ajouter les styles CSS pour la feuille de match
+const feuilleStyles = `
+    .feuille-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        overflow: auto;
+    }
+    
+    .feuille-modal.open {
+        opacity: 1;
+    }
+    
+    .feuille-toolbar {
+        position: sticky;
+        top: 0;
+        background: white;
+        padding: 10px;
+        display: flex;
+        gap: 10px;
+        border-bottom: 1px solid #ccc;
+        z-index: 10000;
+    }
+    
+    .feuille-toolbar button {
+        padding: 8px 15px;
+        background: #0284c7;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 13px;
+    }
+    
+    .feuille-toolbar button:hover {
+        background: #0369a1;
+    }
+    
+    .feuille-toolbar .btn-print {
+        background: #16a34a;
+    }
+    
+    .feuille-toolbar .btn-print:hover {
+        background: #15803d;
+    }
+    
+    .a4-sheet {
+        width: 210mm;
+        height: 297mm;
+        padding: 10mm;
+        margin: 20px auto;
+        background: white;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    @media print {
+        body, html {
+            margin: 0;
+            padding: 0;
+            background: white;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .feuille-modal {
+            position: static;
+            background: white;
+            display: block;
+            opacity: 1;
+            overflow: visible;
+        }
+        
+        .feuille-toolbar {
+            display: none;
+        }
+        
+        .a4-sheet {
+            width: 100%;
+            height: auto;
+            margin: 0;
+            padding: 0;
+            box-shadow: none;
+            page-break-after: always;
+        }
+        
+        #feuille-print {
+            width: 100%;
+            height: auto;
+        }
+    }
+`;
+
+const styleElement = document.createElement('style');
+styleElement.textContent = feuilleStyles;
+document.head.appendChild(styleElement);
+
 document.addEventListener("DOMContentLoaded", () => {
     const pinScreen = document.getElementById("pin-screen");
     const pinInput = document.getElementById("pin-input");
@@ -213,15 +318,7 @@ if (pinScreen) {
             });
         }
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyBVdcpzLr_VxfLTvN8kpkNv69Hc4xdzct0",
-            authDomain: "ai-studio-applet-webapp-1b612.firebaseapp.com",
-            databaseURL: "https://ai-studio-applet-webapp-1b612-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "ai-studio-applet-webapp-1b612",
-            storageBucket: "ai-studio-applet-webapp-1b612.firebasestorage.app",
-            messagingSenderId: "279839540206",
-            appId: "1:279839540206:web:a5d82ea7b4d9a9cf9d84ff"
-        };
+        const firebaseConfig = window.firebaseConfig;
 
         try { firebase.initializeApp(firebaseConfig); } catch(e) {}
         window.authReady = firebase.auth().signInAnonymously().catch(function (err) {
@@ -230,12 +327,12 @@ if (pinScreen) {
         const db = firebase.database();
 
         // Données initiales par défaut (Effectif de base)
-        const defaultPlayers = [
-            { id: "J001", name: "BAILLARIN Theo", licence: "9603227294", phonePere: "06 76 16 72 65", team: "u14", poste1: "AD", poste2: "BU", poste3: "MC" },
-            { id: "J002", name: "BAZABAS Mael", licence: "9604869553", phonePere: "06 48 62 75 80", team: "u14", poste1: "BU", poste2: "AG", poste3: "-" },
-            { id: "J003", name: "BEAULIEU Barthelemy", licence: "9602804942", phonePere: "06 61 53 24 85", team: "u14", poste1: "DC", poste2: "MDC", poste3: "-" },
-            { id: "J018", name: "BONNEFIS Antoine", licence: "9603191094", phonePere: "06 22 34 04 20", team: "u13", poste1: "AD", poste2: "DD", poste3: "-" },
-            { id: "J004", name: "BOUAJAJ Ibrahim", licence: "9605352704", phonePere: "06 95 84 64 94", team: "u14", poste1: "DC", poste2: "MDC", poste3: "-" },
+const defaultPlayers = [
+            { id: "J001", name: "BAILLARIN Theo", licence: "9603227294", phonePere: "06 76 16 72 65", team: "u14", poste1: "AD", poste2: "BU", poste3: "MC", blessure: false, blessureDateDebut: null, blessureRetour: null },
+            { id: "J002", name: "BAZABAS Mael", licence: "9604869553", phonePere: "06 48 62 75 80", team: "u14", poste1: "BU", poste2: "AG", poste3: "-", blessure: false, blessureDateDebut: null, blessureRetour: null },
+            { id: "J003", name: "BEAULIEU Barthelemy", licence: "9602804942", phonePere: "06 61 53 24 85", team: "u14", poste1: "DC", poste2: "MDC", poste3: "-", blessure: false, blessureDateDebut: null, blessureRetour: null },
+            { id: "J018", name: "BONNEFIS Antoine", licence: "9603191094", phonePere: "06 22 34 04 20", team: "u13", poste1: "AD", poste2: "DD", poste3: "-", blessure: false, blessureDateDebut: null, blessureRetour: null },
+            { id: "J004", name: "BOUAJAJ Ibrahim", licence: "9605352704", phonePere: "06 95 84 64 94", team: "u14", poste1: "DC", poste2: "MDC", poste3: "-", blessure: false, blessureDateDebut: null, blessureRetour: null },
             { id: "J019", name: "FRESQUET Jules", licence: "9603971174", phonePere: "-", team: "u13", poste1: "MC", poste2: "MO", poste3: "-" }
         ];
 
@@ -258,12 +355,15 @@ if (pinScreen) {
     fffLastSync: null,
     fffAutoSync: true,
     fffProxyUrl: "",
+    fffManualJson: "",
+    fffCompJson: {},
 };
 
 // Variables d'interface uniquement
-let currentSession = 1;
 let selectedMatchId = null;
 let currentCatFilter = 'all';
+let currentEffectifTab = 'joueurs';
+let activeSection = 'dashboard';
 
         // --- 3. SYNCHRONISATION FIREBASE ---
         db.ref('rangueil_data').on('value', (snapshot) => {
@@ -283,6 +383,8 @@ let currentCatFilter = 'all';
                     state.fffLastSync = (data && data.fffLastSync) || null;
                     state.fffAutoSync = (data && data.fffAutoSync) !== false;
                     state.fffProxyUrl = (data && data.fffProxyUrl) || "";
+                    state.fffManualJson = (data && data.fffManualJson) || "";
+                    state.fffCompJson = (data && data.fffCompJson) || {};
                     saveStateToFirebase();
                 } else {
                     state.players = (data.players || []).map(p => {
@@ -317,6 +419,10 @@ state.fffAutoSync =
     data.fffAutoSync !== false;
 state.fffProxyUrl =
     data.fffProxyUrl || "";
+state.fffManualJson =
+    data.fffManualJson || "";
+state.fffCompJson =
+    data.fffCompJson || {};
                     // Migration ancien format numérique → nouveau format objet
                     const rawTrainings = data.trainings || {};
                     if (Object.keys(rawTrainings).length > 0 && !isNaN(Object.keys(rawTrainings)[0])) {
@@ -349,7 +455,7 @@ if (
     state.selectedMatchId = null;
 } 
 
-                renderAll();
+                renderSection(activeSection);
                 maybeAutoSyncFFF();
             } catch(err) {
                 console.error("Erreur de synchronisation :", err);
@@ -377,12 +483,13 @@ function saveStateToFirebase() {
     fffLinks: state.fffLinks,
     fffLastSync: state.fffLastSync,
     fffAutoSync: state.fffAutoSync,
-    fffProxyUrl: state.fffProxyUrl
+    fffProxyUrl: state.fffProxyUrl,
+    fffManualJson: state.fffManualJson,
+    fffCompJson: state.fffCompJson
 };
 
-    db.ref('rangueil_data').update(dataToSave);
-}
-``
+db.ref('rangueil_data').update(dataToSave);
+        }
 
         // --- 4. NAVIGATION & ONGLETS ---
 
@@ -412,6 +519,36 @@ function saveStateToFirebase() {
             renderStaffV2();
             renderCalendar();
             
+        }
+
+        function renderSection(tabId) {
+            switch (tabId) {
+                case 'dashboard':
+                    renderDashboard();
+                    break;
+                case 'effectif':
+                    renderTeamFilters();
+                    renderEffectif();
+                    break;
+                case 'matchs':
+                    renderTeamFilters();
+                    populateMatchSelector();
+                    renderMatchesResultsList();
+                    renderMatchDetail();
+                    break;
+                case 'entrainements':
+                    renderTeamFilters();
+                    renderEntrainements();
+                    break;
+                case 'calendrier':
+                    renderCalendar();
+                    break;
+                case 'staff':
+                    renderStaffV2();
+                    break;
+                case 'admin':
+                    break;
+            }
         }
 
         // === FONCTION GLOBALE : Couleurs d'équipe ===
@@ -610,13 +747,12 @@ return colorMap[colorName] || colorMap.slate;
 
             const targetSec = document.getElementById(`sec-${tabId}`);
             if(targetSec) targetSec.classList.remove('hidden');
-            if (tabId === 'matchs') {
-    renderMatchDetail();
-}
             const activeBtn = document.getElementById(`tab-${tabId}`);
             if (activeBtn) activeBtn.classList.add('bg-white/20', 'text-white');
             const activeMobBtn = document.getElementById(`mob-tab-${tabId}`);
             if (activeMobBtn) activeMobBtn.classList.add('active');
+            activeSection = tabId;
+            renderSection(tabId);
         }
 
     function switchMatchSubTab(subTabId) {
@@ -744,65 +880,14 @@ if (subTabId === 'composition') {
             if (scoreHome === undefined || scoreAway === undefined || scoreHome === "" || scoreAway === "") {
                 return '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-500">À jouer</span>';
             }
-            function getTeamColor(teamKey) {
-
-    const color =
-        state.teams?.[teamKey]?.color || 'slate';
-
-    const colors = {
-        sky: {
-            bg: 'bg-sky-50',
-            border: 'border-sky-300',
-            text: 'text-sky-800'
-        },
-        emerald: {
-            bg: 'bg-emerald-50',
-            border: 'border-emerald-300',
-            text: 'text-emerald-800'
-        },
-        red: {
-            bg: 'bg-red-50',
-            border: 'border-red-300',
-            text: 'text-red-800'
-        },
-        orange: {
-            bg: 'bg-orange-50',
-            border: 'border-orange-300',
-            text: 'text-orange-800'
-        },
-        purple: {
-            bg: 'bg-purple-50',
-            border: 'border-purple-300',
-            text: 'text-purple-800'
-        },
-        slate: {
-            bg: 'bg-slate-50',
-            border: 'border-slate-300',
-            text: 'text-slate-800'
-        }
-    };
-
-    return colors[color] || colors.slate;
-}
             const h = parseInt(scoreHome), a = parseInt(scoreAway);
             if (h > a) return '<span class="px-2.5 py-1 rounded text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">VICTOIRE 🟢</span>';
             if (h < a) return '<span class="px-2.5 py-1 rounded text-xs font-black bg-red-100 text-red-800 border border-red-300">DÉFAITE 🔴</span>';
             return '<span class="px-2.5 py-1 rounded text-xs font-black bg-slate-900 text-white border border-slate-700">MATCH NUL ⬛</span>';
         }
 
-        function calculateSeasonStats() {
-            let wins = 0, draws = 0, losses = 0;
-            Object.values(state.matches).forEach(m => {
-                if (m.scoreHome !== undefined && m.scoreAway !== undefined && m.scoreHome !== "" && m.scoreAway !== "") {
-                    const h = parseInt(m.scoreHome), a = parseInt(m.scoreAway);
-                    if (h > a) wins++; else if (h === a) draws++; else losses++;
-                }
-            });
-            return { wins, draws, losses };
-        }
 
-        // Rendu Tableau de bord
-        function renderDashboard() {
+function renderDashboard() {
            
             const role = window.currentUserRole || 'public';
 const userTeam = window.currentUserTeam || 'all';
@@ -854,7 +939,7 @@ dashboardMatches.forEach(m => {
     role === 'coach'
         ? getTeamCards(dashboardMatches)
         : getTotalTeamCards();
-            document.getElementById('stat-total-cards').innerHTML = `<span class="text-amber-500">${teamCards.yellows}🟨</span> <span class="text-red-600">${teamCards.reds}🟥</span>`;
+document.getElementById('stat-total-cards').innerHTML = `<span class="text-amber-500">${teamCards.yellows}🟨</span> <span class="text-red-600">${teamCards.reds}🟥</span>`;
 
             // Alerte Licences
             const missingLicences = dashboardPlayers.filter(
@@ -1111,6 +1196,7 @@ const niveauBadge =
         ? '<span class="font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700">🟡 Niveau 2</span>'
         : '<span class="font-bold px-2 py-0.5 rounded bg-red-100 text-red-700">🔴 Niveau 1</span>';
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
+                const hasBlessure = p.blessure === true;
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
                 const teamKey = p.team || p.cat; 
@@ -1119,6 +1205,12 @@ const niveauBadge =
                 const catBadge =`<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${teamColors.badge}">
         ${teamName}
     </span>`;
+
+
+                // Badge blessure
+                const blessureBadge = hasBlessure ?
+                    `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500 text-purple-100">🤕 Blessé</span>` :
+                    '';
 
 
                 // Calcul présences entraînements (nouveau format)
@@ -1172,6 +1264,7 @@ Object.values(state.trainings).forEach(session => {
     ${attendanceBadge}
     <p class="text-[11px] ${hasLicence ? teamColors.textLight : 'text-amber-700 font-bold'}">
         Licence: ${hasLicence ? p.licence : '⚠️ Manquante'}
+        ${blessureBadge}
     </p>
 </div>
                         <div class="flex items-center space-x-1.5">${catBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 ${teamColors.textLight} hover:${teamColors.textBold}" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
@@ -1204,6 +1297,8 @@ Object.values(state.trainings).forEach(session => {
                     </div>
                 </div>`;
             }).join('');
+
+            renderStaffEffectif();
         }
 
         window.renderEffectif = renderEffectif;
@@ -1292,6 +1387,7 @@ const userTeam = window.currentUserTeam || 'all';
             const counterBanner = document.getElementById('convocation-counter-banner');
             const carpoolBanner = document.getElementById('carpooling-counter-banner');
             const validationStatus = document.getElementById('match-validation-status');
+            const inviteSearchBlock = document.getElementById('invite-search-block');
 
            if (!state.selectedMatchId) {
 
@@ -1316,6 +1412,7 @@ const userTeam = window.currentUserTeam || 'all';
     if (carpoolBanner) {
     carpoolBanner.style.display = 'none';
 }
+    if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
 
     return;
 }
@@ -1326,6 +1423,7 @@ const userTeam = window.currentUserTeam || 'all';
 if (counterBanner) counterBanner.style.display = 'none';
 if (carpoolBanner) carpoolBanner.style.display = 'none';  
                 if(validationStatus) validationStatus.innerHTML = '';
+                if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
                 return;
             }
 
@@ -1339,6 +1437,7 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
     m &&
     (m.team || '').toLowerCase() !== userTeam.toLowerCase()
 ) {
+    if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
     return;
 }
 
@@ -1348,6 +1447,14 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             
                 ? state.players.filter(p => (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase())
                 : state.players;
+
+            const invites = Object.values(m.extraPlayers || {});
+            const existingIds = new Set(playersForMatch.map(p => p.id));
+            const playerItems = playersForMatch
+                .map(p => ({ p, invite: false }))
+                .concat(invites
+                    .filter(ep => !existingIds.has(ep.id))
+                    .map(ep => ({ p: ep, invite: true })));
 
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
             const teamColors = getTeamColorClasses(m.team);
@@ -1361,6 +1468,14 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             if (!m.positions) m.positions = {};
             if (!m.jerseys) m.jerseys = {};
             if (!m.carpool) m.carpool = {};
+
+            if (inviteSearchBlock) {
+                inviteSearchBlock.classList.toggle('hidden', role !== 'coach' && role !== 'responsable');
+                const inviteInput = document.getElementById('invite-search-input');
+                if (inviteInput) inviteInput.value = '';
+                const inviteResults = document.getElementById('invite-search-results');
+                if (inviteResults) inviteResults.innerHTML = '';
+            }
 
             infoCard.innerHTML = `
                 <div class="flex items-start space-x-3 w-full">
@@ -1427,7 +1542,7 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
 
             let convokedCount = 0, totalSeats = 0;
             const targetConvoked = parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
-            playersForMatch.forEach(p => {
+            playerItems.forEach(({ p }) => {
                 if (m.convocations[p.id] === 'convoke') convokedCount++;
                 totalSeats += parseInt(m.carpool[p.id]) || 0;
             });
@@ -1435,7 +1550,7 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             counterBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${convokedCount < targetConvoked ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`;
             counterBanner.innerHTML = `<div class="font-bold text-xs">Convocations : ${convokedCount} / ${targetConvoked}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${convokedCount < targetConvoked ? 'bg-amber-200' : 'bg-sky-200'}">${convokedCount < targetConvoked ? '⚠️ Incomplet' : '🔵 OK'}</span>`;
 
-    const summary = buildCarpoolSummary(m, playersForMatch);
+    const summary = buildCarpoolSummary(m, playerItems.map(it => it.p));
 
 // (statuts et compteurs calculés par buildCarpoolSummary)
 
@@ -1560,7 +1675,7 @@ renderMatchSummary(m);
             let htmlMobileCards = '';
             let htmlTableRows = '';
 
-            playersForMatch.forEach(p => {
+            playerItems.forEach(({ p, invite }) => {
                 const currentStatus = m.convocations[p.id] || 'none';
                 const selectedPosition = m.positions[p.id] || p.poste1 || '-';
                 const jerseyNumber = m.jerseys[p.id] || '';
@@ -1577,8 +1692,9 @@ renderMatchSummary(m);
                                     <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
                                     <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
                                 </div>
+                                ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                                 <div>
-                                    <div class="font-bold text-slate-800 text-xs">${p.name}</div>
+                                    <div class="font-bold text-slate-800 text-xs">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}</div>
                                     <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
                                 </div>
                             </div>
@@ -1621,7 +1737,7 @@ renderMatchSummary(m);
                 htmlTableRows += `
                     <tr class="${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
                         <td class="p-3 pl-4">
-                            <div class="font-bold text-slate-800">${p.name}</div>
+                            <div class="font-bold text-slate-800">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}</div>
                             <div class="text-[10px] text-slate-400">Poste favori : ${p.poste1 || '-'}</div>
                         </td>
                         <td class="p-3">
@@ -1646,68 +1762,16 @@ renderMatchSummary(m);
                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
                             </div>
+                            ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                         </td>
                     </tr>
                 `;
             });
 
-            // 2. Rendu du Staff / Coachs (pour Mobile et PC séparément)
-            let staffTableRows = '';
-            let staffMobileCards = '';
-
-            // Filtrer le staff par équipe pour les coaches
-            const staffForMatch = role === 'coach'
-    ? (state.staff || []).filter(s => {
-
-        if (!s.scope) return true;
-
-        const scopes = Array.isArray(s.scope)
-            ? s.scope
-            : [s.scope];
-
-        return scopes.some(scope =>
-            String(scope).toLowerCase() ===
-            userTeam.toLowerCase()
-        );
-
-    })
-    : (state.staff || []);
-
-            if (staffForMatch && staffForMatch.length > 0) {
-                staffTableRows += `<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">Encadrement / Staff Officiel</td></tr>`;
-                staffMobileCards += `<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">Encadrement / Staff Officiel</div>`;
-
-                staffForMatch.forEach(member => {
-                    const hasStaffLicence = member.licence && member.licence.trim() !== '';
-                    
-                    staffTableRows += `
-                        <tr class="bg-sky-50/20 border-b border-slate-100">
-                            <td class="p-3 pl-4">
-                                <div class="font-bold text-slate-800">${member.name}</div>
-                                <span class="text-[10px] text-sky-700 font-semibold">${member.role}</span>
-                            </td>
-                            <td class="p-3" colspan="5">
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-xs text-slate-600">Licence :</span>
-                                    <span class="font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border text-xs">${hasStaffLicence ? member.licence : 'Non renseignée'}</span>
-                                    ${hasStaffLicence ? `<button onclick="navigator.clipboard.writeText('${member.licence}'); showToast('Licence copiée !')" class="p-1 bg-slate-100 hover:bg-sky-100 text-sky-600 rounded text-xs" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>` : ''}
-                                </div>
-                            </td>
-                        </tr>`;
-
-                    staffMobileCards += `
-                        <div class="bg-sky-50/30 border border-slate-200 rounded-xl p-3 mb-2 flex items-center justify-between gap-2">
-                            <div>
-                                <div class="font-bold text-slate-800 text-xs">${member.name}</div>
-                                <span class="text-[10px] text-sky-700 font-semibold">${member.role}</span>
-                            </div>
-                            <div class="flex items-center space-x-1.5">
-                                <span class="font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border text-xs">${hasStaffLicence ? member.licence : 'Non renseignée'}</span>
-                                ${hasStaffLicence ? `<button onclick="navigator.clipboard.writeText('${member.licence}'); showToast('Licence copiée !')" class="p-1 bg-white hover:bg-sky-100 text-sky-600 rounded text-xs border" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>` : ''}
-                            </div>
-                        </div>`;
-                });
-            }
+            // 2. Rendu de l'Entourage (Coachs + Dirigeants) pour Mobile et PC
+            const entourage = buildEntourageHtml(m);
+            const staffTableRows = entourage.table;
+            const staffMobileCards = entourage.mobile;
 
             // Injection finale propre dans les deux conteneurs
             const mobileContainer = document.getElementById('mobile-players-container');
@@ -1725,16 +1789,6 @@ renderMatchSummary(m);
         // ============================================================
 
         let currentTrainingId = null;
-
-        function getTrainingStatusConfig(status) {
-            return {
-                present: { label: 'Présent', color: 'bg-emerald-500 text-white', icon: '✅' },
-                absent:  { label: 'Absent',  color: 'bg-red-500 text-white',     icon: '❌' },
-                retard:  { label: 'Retard',  color: 'bg-amber-400 text-white',   icon: '⏰' },
-                blesse:  { label: 'Blessé',  color: 'bg-purple-500 text-white',  icon: '🤕' },
-                none:    { label: '—',        color: 'bg-slate-100 text-slate-400', icon: '—' }
-            }[status] || { label: '—', color: 'bg-slate-100 text-slate-400', icon: '—' };
-        }
 
         function renderEntrainements() {
             renderTrainingStatsBar();
@@ -2100,6 +2154,19 @@ const nbTotal = playersForTraining.length;
             if (!currentTrainingId) return;
             if (!state.trainings[currentTrainingId].presence) state.trainings[currentTrainingId].presence = {};
             state.trainings[currentTrainingId].presence[pId] = status;
+            
+            // Mise à jour du champ blessure sur l'objet joueur (pour l'effetif)
+            const player = state.players.find(p => p.id === pId);
+            if (status === 'blesse') {
+                player.blessure = true;
+                player.blessureDateDebut = new Date().toISOString().split('T')[0];
+                player.blessureRetour = null;
+            } else if (status === 'present' || status === 'absent' || status === 'retard') {
+                player.blessure = false;
+                player.blessureDateDebut = null;
+                player.blessureRetour = new Date().toISOString().split('T')[0];
+            }
+            
             saveStateToFirebase();
             renderSessionPresenceStats(state.trainings[currentTrainingId]);
             renderAppel(state.trainings[currentTrainingId]);
@@ -2712,6 +2779,375 @@ function formatDateFr(dateString) {
            formatted.slice(1);
 }
 
+function openFeuilleDeMatch() {
+    const m = state.matches[state.selectedMatchId];
+    if (!m) {
+        showToast("Sélectionnez un match pour générer la feuille", "error");
+        return;
+    }
+
+    const now = new Date();
+    const annee = now.getFullYear();
+    const saison = now.getMonth() >= 6 ? annee + '/' + (annee + 1) : (annee - 1) + '/' + annee;
+
+    // Données du formulaire
+    const clubNom = 'RANGUEIL FC';
+    const teamLabel = state.teams?.[m.team]?.name || m.team || '';
+    const compet = m.competitionName || '';
+    const poule = m.poule || '';
+    const journee = m.journee || m.tour || '';
+    const dateStr = m.date
+        ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : '';
+    const dateTab = m.date 
+        ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).split('/') 
+        : ['', '', ''];
+    const heure = m.heure || '';
+    const stade = m.adresse || m.location || '';
+    const terrain = m.pelouse || '';
+    const opponent = m.opponent || '';
+
+    const convoques = state.players
+        .filter(p => m.convocations && m.convocations[p.id] === 'convoke')
+        .slice()
+        .sort((a, b) => {
+            const ja = parseInt(m.jerseys?.[a.id], 10) || 0;
+            const jb = parseInt(m.jerseys?.[b.id], 10) || 0;
+            if (ja && jb) return ja - jb;
+            if (ja) return -1;
+            if (jb) return 1;
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+    function ligneJoueur(p, i) {
+        const parts = (p.name || ' ').split(' ');
+        const nom = (parts[0] || '').toUpperCase();
+        const prenom = parts.slice(1).join(' ');
+        return `
+            <tr>
+                <td class="col-num">${i + 1}</td>
+                <td class="col-lic">${p.licence || ''}</td>
+                <td class="col-nom">${nom}</td>
+                <td class="col-prn">${prenom}</td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-motif"></td>
+            </tr>`;
+    }
+
+    function ligneVide(i) {
+        return `
+            <tr>
+                <td class="col-num">${i + 1}</td>
+                <td class="col-lic"></td>
+                <td class="col-nom"></td>
+                <td class="col-prn"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-motif"></td>
+            </tr>`;
+    }
+
+    const targetConvoked = parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
+    const mesLignes = convoques.map(ligneJoueur).join('') + Array.from({ length: Math.max(0, targetConvoked - convoques.length) }, (_, i) => ligneVide(convoques.length + i)).join('');
+    const lignesVides = Array.from({ length: targetConvoked }, (_, i) => ligneVide(i)).join('');
+
+    const sheetHtml = `
+<style>
+    #feuille-print { 
+        font-family: Arial, Helvetica, sans-serif; 
+        font-size: 9pt;
+        line-height: 1;
+        margin: 0;
+        padding: 0;
+    }
+    #feuille-print table { 
+        border-collapse: collapse; 
+        width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    #feuille-print td, #feuille-print th { 
+        border: 0.5pt solid #000; 
+        padding: 0.8pt 1.5pt;
+        margin: 0;
+        line-height: 1.2;
+    }
+    
+    /* Entête */
+    #feuille-print .fm-header { font-size: 6.5pt; vertical-align: top; }
+    #feuille-print .fm-header-label { font-weight: bold; background-color: #e8e8e8; width: 25%; }
+    #feuille-print .fm-header-value { font-size: 6.5pt; }
+    
+    /* Titre central */
+    #feuille-print .fm-title { font-weight: bold; text-align: center; font-size: 7.5pt; padding: 2pt; background-color: #000; color: #fff; }
+    #feuille-print .fm-title-main { font-size: 8pt; font-weight: 900; }
+    #feuille-print .fm-title-sub { font-size: 6pt; font-weight: bold; }
+    
+    /* Colonnes des tableaux de joueurs */
+    #feuille-print .col-num { width: 3%; text-align: center; font-size: 6.5pt; }
+    #feuille-print .col-lic { width: 10%; font-size: 6.5pt; }
+    #feuille-print .col-nom { width: 17%; font-size: 6.5pt; }
+    #feuille-print .col-prn { width: 14%; font-size: 6.5pt; }
+    #feuille-print .col-mk { width: 3%; text-align: center; font-size: 6pt; }
+    #feuille-print .col-motif { width: 32%; font-size: 6pt; }
+    
+    /* Tableau de joueurs */
+    #feuille-print .fm-player-table { table-layout: fixed; font-size: 6.5pt; }
+    #feuille-print .fm-player-table th { background-color: #e8e8e8; font-weight: bold; text-align: center; font-size: 6pt; padding: 1pt; }
+    #feuille-print .fm-player-table td { height: 5.5mm; vertical-align: top; padding: 0.5pt 1pt; font-size: 6.5pt; }
+    
+    /* Banc */
+    #feuille-print .fm-bench { height: 4mm; padding: 0; }
+    #feuille-print .fm-bench-label { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: bold; text-align: center; font-size: 7pt; padding: 1pt; }
+    
+    /* Signatures */
+    #feuille-print .fm-sig-box { height: 8mm; vertical-align: bottom; font-size: 6pt; padding: 0.5pt; }
+    
+    /* Annexe */
+    #feuille-print .fm-annexe { page-break-before: always; margin: 0; padding: 0; }
+    #feuille-print .fm-annexe-title { font-weight: bold; text-align: center; background-color: #e8e8e8; font-size: 7pt; padding: 1pt; }
+    #feuille-print .fm-annexe-box { border: 0.5pt solid #000; }
+    #feuille-print .fm-annexe-content { height: 32mm; border-bottom: 0.5pt solid #000; }
+    
+    @media print {
+        * { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; height: 100vh; }
+        html { margin: 0; padding: 0; height: 100vh; }
+        #feuille-print { margin: 0; padding: 0; }
+        .feuille-modal { margin: 0; padding: 0; }
+        .a4-sheet { margin: 0; padding: 5mm; }
+    }
+</style>
+
+<!-- PAGE 1 : FEUILLE PRINCIPALE -->
+
+<!-- ENTÊTE COMPACTE -->
+<table style="margin-bottom: 0.5pt; width: 100%; border-collapse: collapse;">
+    <tr>
+        <td style="width: 35%; vertical-align: top; padding: 0;">
+            <table class="fm-header" style="width: 100%; margin: 0;">
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">N° Match :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Compétition :</td><td class="fm-header-value" style="padding: 0.5pt;">${compet || '.......'}</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Journée :</td><td class="fm-header-value" style="padding: 0.5pt;">${journee || '.......'}</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Terrain :</td><td class="fm-header-value" style="padding: 0.5pt;">${terrain || stade || '...'}</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Date :</td><td class="fm-header-value" style="padding: 0.5pt;">${dateTab[0]||'..'} / ${dateTab[1]||'..'} / ${dateTab[2]||'..'} à ${heure || '..'}</td></tr>
+            </table>
+        </td>
+        <td style="width: 30%; vertical-align: top; padding: 0; text-align: center;">
+            <div style="background-color: #000; color: #fff; padding: 2pt 1pt;">
+                <div class="fm-title-main" style="margin: 0; font-size: 8pt;">FEUILLE DE MATCH</div>
+                <div style="font-size: 5.5pt; font-weight: bold;">LIGUE DE FOOTBALL D'OCCITANIE</div>
+                <div style="font-size: 5pt;">Saison ${saison}</div>
+            </div>
+        </td>
+        <td style="width: 35%; vertical-align: top; padding: 0;">
+            <table class="fm-header" style="width: 100%; margin: 0;">
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Arbitre :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Arbitre Asst 1 :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Arbitre Asst 2 :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Arbitre remplac. :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Délégué(s) :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- ÉQUIPES -->
+<table style="width: 100%; margin-bottom: 0.5pt; border-collapse: collapse;">
+    <tr>
+        <td style="width: 50%; text-align: center; background-color: #e8e8e8; font-weight: bold; font-size: 7.5pt; padding: 1pt;">
+            ${clubNom} (RECEVANT)
+        </td>
+        <td style="width: 50%; text-align: center; background-color: #e8e8e8; font-weight: bold; font-size: 7.5pt; padding: 1pt;">
+            ${(opponent || 'ÉQUIPE VISITEUSE').toUpperCase()} (VISITEUR)
+        </td>
+    </tr>
+</table>
+
+<!-- TABLEAUX DE JOUEURS COMPACTS -->
+<table style="width: 100%; border-collapse: collapse;">
+    <tr>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table class="fm-player-table" style="width: 100%;">
+                <tr>
+                    <th class="col-num">N°</th>
+                    <th class="col-lic">Licence</th>
+                    <th class="col-nom">NOM</th>
+                    <th class="col-prn">Prénom</th>
+                    <th class="col-mk">E</th>
+                    <th class="col-mk">A</th>
+                    <th class="col-mk">B</th>
+                    <th class="col-mk">R</th>
+                    <th class="col-mk">D</th>
+                    <th class="col-motif">Motif</th>
+                </tr>
+                ${mesLignes}
+            </table>
+        </td>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table class="fm-player-table" style="width: 100%;">
+                <tr>
+                    <th class="col-num">N°</th>
+                    <th class="col-lic">Licence</th>
+                    <th class="col-nom">NOM</th>
+                    <th class="col-prn">Prénom</th>
+                    <th class="col-mk">E</th>
+                    <th class="col-mk">A</th>
+                    <th class="col-mk">B</th>
+                    <th class="col-mk">R</th>
+                    <th class="col-mk">D</th>
+                    <th class="col-motif">Motif</th>
+                </tr>
+                ${lignesVides}
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- BANC RÉDUIT -->
+<table style="width: 100%; border-collapse: collapse; margin-bottom: 0.5pt;">
+    <tr>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table style="width: 100%;">
+                <tr>
+                    <td rowspan="2" class="fm-bench-label" style="width: 10mm; padding: 0.5pt;">BANC REC.</td>
+                    <th class="col-mk" style="padding: 0.5pt;">E</th><th class="col-mk" style="padding: 0.5pt;">A</th><th class="col-mk" style="padding: 0.5pt;">B</th><th class="col-mk" style="padding: 0.5pt;">R</th><th class="col-mk" style="padding: 0.5pt;">D</th>
+                </tr>
+                <tr><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td></tr>
+            </table>
+        </td>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table style="width: 100%;">
+                <tr>
+                    <td rowspan="2" class="fm-bench-label" style="width: 10mm; padding: 0.5pt;">BANC VIS.</td>
+                    <th class="col-mk" style="padding: 0.5pt;">E</th><th class="col-mk" style="padding: 0.5pt;">A</th><th class="col-mk" style="padding: 0.5pt;">B</th><th class="col-mk" style="padding: 0.5pt;">R</th><th class="col-mk" style="padding: 0.5pt;">D</th>
+                </tr>
+                <tr><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td></tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- SIGNATURES COMPACTES -->
+<table style="width: 100%; border-collapse: collapse;">
+    <tr>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table style="width: 100%; font-size: 6pt;">
+                <tr><td colspan="2" style="font-weight: bold; background-color: #e8e8e8; padding: 0.5pt;">Capitaine REC. : ......................</td></tr>
+                <tr>
+                    <td style="width: 50%; height: 8mm; vertical-align: bottom; padding: 0.5pt; border-top: 0.5pt solid #000;">Avant</td>
+                    <td style="height: 8mm; vertical-align: bottom; padding: 0.5pt; border-top: 0.5pt solid #000; border-left: 0.5pt solid #000;">Après</td>
+                </tr>
+            </table>
+        </td>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table style="width: 100%; font-size: 6pt;">
+                <tr><td colspan="2" style="font-weight: bold; background-color: #e8e8e8; padding: 0.5pt;">Capitaine VIS. : ......................</td></tr>
+                <tr>
+                    <td style="width: 50%; height: 8mm; vertical-align: bottom; padding: 0.5pt; border-top: 0.5pt solid #000;">Avant</td>
+                    <td style="height: 8mm; vertical-align: bottom; padding: 0.5pt; border-top: 0.5pt solid #000; border-left: 0.5pt solid #000;">Après</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<div style="font-size: 5.5pt; text-align: center; border-top: 0.5pt solid #000; padding-top: 0.5pt;">
+    D:Dirigeant — E:Éducateur — M:Encadrement Médical — R:Responsable
+</div>
+
+${buildFeuilleEntourageHtml(m)}
+
+<!-- PAGE 2 : ANNEXE COMPACTE -->
+<div class="fm-annexe" style="margin: 0; padding: 0;">
+
+<table style="width: 100%; margin-bottom: 0.5pt; font-size: 6pt; border-collapse: collapse;">
+    <tr>
+        <td class="fm-header-label" style="padding: 0.5pt;">N° Match :</td><td class="fm-header-value" style="width: 12%; padding: 0.5pt;">.........</td>
+        <td class="fm-header-label" style="padding: 0.5pt;">Compét. :</td><td class="fm-header-value" style="width: 18%; padding: 0.5pt;">${compet || '......'}</td>
+        <td class="fm-header-label" style="padding: 0.5pt;">Poule :</td><td class="fm-header-value" style="padding: 0.5pt;">${poule || '......'}</td>
+    </tr>
+    <tr>
+        <td class="fm-header-label" style="padding: 0.5pt;">Journée :</td><td class="fm-header-value" style="padding: 0.5pt;">.........</td>
+        <td class="fm-header-label" style="padding: 0.5pt;">Date :</td><td colspan="3" class="fm-header-value" style="padding: 0.5pt;">${dateTab[0]||'..'} / ${dateTab[1]||'..'} / ${dateTab[2]||'..'}</td>
+    </tr>
+</table>
+
+<div style="text-align: center; font-weight: bold; font-size: 8pt; letter-spacing: 1px; margin: 1pt 0; padding: 0.5pt 0;">ANNEXE FEUILLE DE MATCH</div>
+
+<table style="width: 100%; border-collapse: collapse;">
+    <tr>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <div class="fm-annexe-title" style="padding: 0.5pt;">RÉSERVES AVANT</div>
+            <div class="fm-annexe-content" style="height: 28mm;"></div>
+            <table style="width: 100%; font-size: 6pt; border-collapse: collapse;">
+                <tr><td style="height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; padding: 0.5pt; font-size: 5pt;">Sign. Cap./Dirgeants</td></tr>
+                <tr><td style="height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; padding: 0.5pt; font-size: 5pt;">Sign. Arbitre</td></tr>
+            </table>
+        </td>
+        <td style="width: 50%; vertical-align: top; padding: 0; border-left: 0.5pt solid #000;">
+            <div class="fm-annexe-title" style="padding: 0.5pt; border-left: none;">OBSERVATIONS APRÈS</div>
+            <div class="fm-annexe-content" style="height: 28mm;"></div>
+            <table style="width: 100%; font-size: 6pt; border-collapse: collapse;">
+                <tr><td style="height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; border-left: none; padding: 0.5pt; font-size: 5pt;">Sign. Cap./Dirgeants</td></tr>
+                <tr><td style="height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; border-left: none; padding: 0.5pt; font-size: 5pt;">Sign. Arbitre</td></tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<div style="margin-top: 1pt;">
+    <div class="fm-annexe-title" style="padding: 0.5pt;">RÉSERVES TECHNIQUES À TRANSCRIRE</div>
+    <div style="height: 40mm; border: 0.5pt solid #000; margin-bottom: 0.5pt;"></div>
+    <table style="width: 100%; font-size: 6pt; border-collapse: collapse;">
+        <tr>
+            <td style="width: 33.33%; height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; padding: 0.5pt; font-size: 5pt;">Sign. Cap./Dirgeants</td>
+            <td style="width: 33.33%; height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; border-left: none; padding: 0.5pt; font-size: 5pt;">Sign. Assistant</td>
+            <td style="width: 33.34%; height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; border-left: none; padding: 0.5pt; font-size: 5pt;">Sign. Arbitre</td>
+        </tr>
+    </table>
+</div>
+
+</div>`;
+
+    const modal = document.createElement('div');
+    modal.className = 'feuille-modal';
+    modal.id = 'feuille-modal';
+    modal.innerHTML = `
+        <div class="feuille-toolbar">
+            <button class="btn-print" onclick="imprimerFeuille()"><i class="fa-solid fa-print"></i> Imprimer</button>
+            <button class="btn-pdf" onclick="telechargerFeuillePDF()"><i class="fa-solid fa-file-pdf"></i> PDF officiel</button>
+            <button onclick="fermerFeuille()"><i class="fa-solid fa-xmark"></i> Fermer</button>
+        </div>
+        <div id="feuille-print" class="a4-sheet">${sheetHtml}</div>
+    `;
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) fermerFeuille();
+    });
+    document.body.appendChild(modal);
+    requestAnimationFrame(() => modal.classList.add('open'));
+}
+
+function imprimerFeuille() {
+    window.print();
+}
+
+function fermerFeuille() {
+    const el = document.getElementById('feuille-modal');
+    if (!el) return;
+    el.classList.remove('open');
+    setTimeout(() => {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+    }, 250);
+}
+
 function getResponseDeadline(dateString) {
 
     if (!dateString) return '--';
@@ -2893,6 +3329,8 @@ text +=
 
     text +=
         `\n💙 Allez Rangueil ! ⚽`;
+
+    text += buildEntourageWhatsAppText(m);
 
     navigator.clipboard
         .writeText(text)
@@ -3103,6 +3541,89 @@ https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpool
             saveStateToFirebase();
             renderMatchDetail();
         }
+
+        function onInviteSearchInput(value) {
+            const resultsEl = document.getElementById('invite-search-results');
+            if (!resultsEl) return;
+
+            const query = (value || '').trim().toLowerCase();
+            if (query.length < 2) {
+                resultsEl.innerHTML = '';
+                return;
+            }
+
+            if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) {
+                resultsEl.innerHTML = '';
+                return;
+            }
+
+            const m = state.matches[state.selectedMatchId];
+            const role = window.currentUserRole || 'public';
+            const userTeam = window.currentUserTeam || 'all';
+            const tokens = query.split(/\s+/);
+
+            const present = new Set(Object.keys(m.convocations || {}));
+            Object.keys(m.extraPlayers || {}).forEach(id => present.add(id));
+
+            const ownIds = new Set();
+            if (role === 'coach' || role === 'responsable') {
+                state.players.forEach(p => {
+                    if (present.has(p.id)) return;
+                    if ((p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase()) ownIds.add(p.id);
+                });
+            }
+
+            const matches = state.players.filter(p => {
+                if (present.has(p.id)) return false;
+                if (ownIds.has(p.id)) return false;
+                const hay = ((p.name || '') + ' ' + (p.licence || '') + ' ' + (p.team || '') + ' ' + (p.cat || '')).toLowerCase();
+                return tokens.every(t => hay.includes(t));
+            }).slice(0, 12);
+
+            if (!matches.length) {
+                resultsEl.innerHTML = '<div class="text-[11px] text-slate-400 py-1.5">Aucun joueur trouvé (ou déjà ajouté).</div>';
+                return;
+            }
+
+            resultsEl.innerHTML = matches.map(p => {
+                const teamName = state.teams?.[p.team]?.name || p.team || p.cat || 'Équipe';
+                return `
+                    <div class="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
+                        <div>
+                            <div class="font-bold text-slate-800 text-xs">${p.name}</div>
+                            <div class="text-[10px] text-slate-400">${teamName}${p.licence ? ' · ' + p.licence : ''}</div>
+                        </div>
+                        <button onclick="ajouterInviteJoueur('${m.id}', '${p.id}')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold">Ajouter</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function ajouterInviteJoueur(mId, playerId) {
+            const m = state.matches[mId];
+            if (!m) return;
+            const p = state.players.find(pp => pp.id === playerId);
+            if (!p) return;
+
+            if (!m.extraPlayers) m.extraPlayers = {};
+            m.extraPlayers[playerId] = Object.assign({}, p);
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function retirerInviteJoueur(mId, playerId) {
+            const m = state.matches[mId];
+            if (!m) return;
+
+            if (m.extraPlayers) delete m.extraPlayers[playerId];
+            if (m.convocations) delete m.convocations[playerId];
+            if (m.positions) delete m.positions[playerId];
+            if (m.jerseys) delete m.jerseys[playerId];
+            if (m.carpool) delete m.carpool[playerId];
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
 function updateMeetingPreview() {
 
     const matchTime =
@@ -3409,6 +3930,496 @@ if (role === 'responsable') {
             }
         }
 
+        /* ============================================================
+           GESTION DU STAFF & DIRIGEANTS
+           ============================================================ */
+
+        function getStaffRole(s) {
+            return (s && (s.role || s.functionName)) || "Dirigeant d'équipe";
+        }
+
+        function getStaffTeam(s) {
+            if (s && s.team) return s.team;
+            if (s && Array.isArray(s.scope)) return s.scope[0] || '';
+            if (s && typeof s.scope === 'string') return s.scope;
+            return '';
+        }
+
+        function staffHash(text) {
+            let h = 0;
+            for (let i = 0; i < text.length; i++) h = ((h << 5) - h + text.charCodeAt(i)) | 0;
+            return Math.abs(h).toString(36);
+        }
+
+        function staffId(s) {
+            if (!s) return '';
+            if (!s.id) s.id = 'ST_' + staffHash(((s.name || '') + '|' + (s.licence || '') + '|' + getStaffRole(s)).toLowerCase());
+            return s.id;
+        }
+
+        function normalizeStaff() {
+            if (!Array.isArray(state.staff)) state.staff = [];
+            state.staff.forEach(s => {
+                if (!s.team) s.team = getStaffTeam(s) || '';
+                if (!s.role && s.functionName) s.role = s.functionName;
+                staffId(s);
+            });
+        }
+
+        function setEffectifTab(tab) {
+            currentEffectifTab = tab;
+            const active = tab === 'staff';
+            const playersTab = document.getElementById('effectif-tab-joueurs');
+            const staffTab = document.getElementById('effectif-tab-staff');
+            const playersGrid = document.getElementById('effectif-full-container');
+            const staffGrid = document.getElementById('staff-effectif-container');
+            const searchPlayer = document.getElementById('search-player');
+            const addBtn = document.getElementById('effectif-add-btn');
+
+            if (playersTab) playersTab.className = active ? 'px-3 py-1.5 rounded-md text-slate-600 transition' : 'px-3 py-1.5 rounded-md bg-sky-600 text-white transition';
+            if (staffTab) staffTab.className = active ? 'px-3 py-1.5 rounded-md bg-sky-600 text-white transition' : 'px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-800 transition';
+            if (playersGrid) playersGrid.classList.toggle('hidden', active);
+            if (staffGrid) staffGrid.classList.toggle('hidden', !active);
+            if (searchPlayer) searchPlayer.classList.toggle('hidden', active);
+            if (addBtn) {
+                addBtn.innerHTML = active
+                    ? '<i class="fa-solid fa-user-tie"></i><span>Ajouter</span>'
+                    : '<i class="fa-solid fa-user-plus"></i><span>Ajouter</span>';
+            }
+            if (active) renderStaffEffectif();
+        }
+
+        function openEffectifAdd() {
+            if (currentEffectifTab === 'staff') {
+                openModalStaff();
+                renderStaffEffectif();
+            } else {
+                openModalPlayer();
+            }
+        }
+
+        function renderStaffEffectif() {
+            const container = document.getElementById('staff-effectif-container');
+            if (!container) return;
+            normalizeStaff();
+
+            const roleBadge = r => {
+                if (r === 'Coach Principal') return 'bg-sky-100 text-sky-800';
+                if (r === 'Coach Adjoint') return 'bg-indigo-100 text-indigo-800';
+                if (r === "Dirigeant d'équipe") return 'bg-amber-100 text-amber-800';
+                return 'bg-slate-100 text-slate-700';
+            };
+
+            const list = state.staff || [];
+
+            container.innerHTML = list.length ? list.map(s => {
+                const role = getStaffRole(s);
+                const teamKey = getStaffTeam(s);
+                const teamName = state.teams?.[teamKey]?.name || teamKey || 'Toutes équipes';
+                const hasLic = s.licence && String(s.licence).trim() && String(s.licence).trim() !== '-';
+                return `
+                    <div class="p-3 bg-white border border-slate-200 rounded-xl flex flex-col justify-between space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold text-xs text-slate-800">${s.name || '—'}</h3>
+                                <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${roleBadge(role)}">${role}</span>
+                                <p class="text-[11px] text-slate-500 mt-1">Équipe : ${teamName}</p>
+                            </div>
+                            <div class="flex items-center space-x-1.5">
+                                <button onclick="openModalStaff('${staffId(s)}')" class="p-1 text-sky-600 hover:bg-sky-100 rounded" aria-label="Modifier"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
+                                <button onclick="deleteStaffMember('${staffId(s)}')" class="p-1 text-slate-400 hover:text-red-600 rounded" aria-label="Supprimer"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                            <span class="text-[10px] text-slate-500 uppercase font-bold">Licence :</span>
+                            <span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border text-xs ${hasLic ? '' : 'text-amber-700'}">${hasLic ? s.licence : '⚠️ Manquante'}</span>
+                        </div>
+                    </div>`;
+            }).join('') : `
+                <div class="col-span-full text-center text-slate-400 text-xs py-8">
+                    <i class="fa-solid fa-user-tie text-2xl mb-2 opacity-30"></i>
+                    <p class="font-bold">Aucun membre de staff</p>
+                    <p>Ajoutez coaches et dirigeants avec le bouton « Ajouter ».</p>
+                </div>`;
+        }
+
+        function openModalStaff(staffToEdit = null) {
+            const form = document.getElementById('form-staff');
+            if (form) form.reset();
+
+            const teamSel = document.getElementById('s-team');
+            if (teamSel && (teamSel.options.length === 0 || document.getElementById('s-id').value !== staffToEdit)) {
+                const keys = Object.keys(state.teams || {});
+                teamSel.innerHTML = keys.map(k => `<option value="${k}">${state.teams[k].name || k.toUpperCase()}</option>`).join('');
+            }
+
+            if (staffToEdit) {
+                const s = (state.staff || []).find(x => staffId(x) === staffToEdit);
+                if (s) {
+                    document.getElementById('modal-staff-title').innerText = 'Modifier un membre du Staff';
+                    document.getElementById('s-id').value = staffId(s);
+                    document.getElementById('s-name').value = s.name || '';
+                    document.getElementById('s-licence').value = s.licence && s.licence !== '-' ? s.licence : '';
+                    const roleV = getStaffRole(s);
+                    const inList = ['Coach Principal', 'Coach Adjoint', "Dirigeant d'équipe"].indexOf(roleV) !== -1;
+                    document.getElementById('s-role').value = inList ? roleV : 'Autre';
+                    const tV = getStaffTeam(s);
+                    if (teamSel && tV && Object.keys(state.teams || {}).indexOf(tV) !== -1) teamSel.value = tV;
+                }
+            } else {
+                document.getElementById('modal-staff-title').innerText = 'Ajouter un membre du Staff';
+                document.getElementById('s-id').value = '';
+            }
+            toggleModal('modal-staff', true);
+        }
+
+        function handleSaveStaff(e) {
+            e.preventDefault();
+            const sId = document.getElementById('s-id').value;
+            const roleVal = document.getElementById('s-role').value;
+            const staffData = {
+                id: sId || 'ST_' + Date.now(),
+                name: document.getElementById('s-name').value,
+                licence: document.getElementById('s-licence').value.trim() || '-',
+                role: roleVal === 'Autre' ? "Dirigeant d'équipe" : roleVal,
+                team: document.getElementById('s-team').value || ''
+            };
+
+            if (sId) {
+                const idx = (state.staff || []).findIndex(x => staffId(x) === sId);
+                if (idx !== -1) {
+                    state.staff[idx] = Object.assign({}, state.staff[idx], staffData);
+                } else {
+                    if (!Array.isArray(state.staff)) state.staff = [];
+                    state.staff.push(staffData);
+                }
+            } else {
+                if (!Array.isArray(state.staff)) state.staff = [];
+                state.staff.push(staffData);
+            }
+
+            saveStateToFirebase();
+            toggleModal('modal-staff', false);
+            renderAll();
+        }
+
+        function deleteStaffMember(sid) {
+            const target = (state.staff || []).find(x => staffId(x) === sid);
+            if (!target) return;
+            if (confirm("Supprimer « " + (target.name || 'ce membre') + " » du staff ?")) {
+                state.staff = (state.staff || []).filter(x => staffId(x) !== sid);
+                saveStateToFirebase();
+                renderAll();
+            }
+        }
+
+        function copierTexte(t) {
+            if (!t) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(String(t)).then(() => { try { showToast('Copié !'); } catch (e) {} }).catch(() => {});
+            } else {
+                try { showToast('Copie non disponible', 'error'); } catch (e) {}
+            }
+        }
+
+        /* ============================================================
+           ENTOURAGE DU MATCH (Coach principal, adjoint, dirigeants)
+           ============================================================ */
+
+        function matchEntourageGuard(m) {
+            if (!m.entourage) m.entourage = { principalId: null, adjointId: null, dirigeants: {} };
+            if (!m.entourage.dirigeants) m.entourage.dirigeants = {};
+            if (!m.entourage.principalId) m.entourage.principalId = null;
+            if (!m.entourage.adjointId) m.entourage.adjointId = null;
+            return m.entourage;
+        }
+
+        function staffByEntourageId(id) {
+            if (!id) return null;
+            return (state.staff || []).find(s => staffId(s) === id) || null;
+        }
+
+        function staffSelectOptions(sortedStaff, selectedId, withEmpty) {
+            const parts = [];
+            if (withEmpty) parts.push('<option value="">— Aucun —</option>');
+            sortedStaff.forEach(s => {
+                const tid = getStaffTeam(s);
+                const tname = state.teams?.[tid]?.name || tid || '';
+                const sel = staffId(s) === selectedId ? ' selected' : '';
+                parts.push('<option value="' + staffId(s) + '"' + sel + '>' + (s.name || '—') + ' — ' + getStaffRole(s) + (tname ? ' (' + tname + ')' : '') + '</option>');
+            });
+            return parts.join('');
+        }
+
+        function entourageLicenceChip(s) {
+            if (!s) return '<span class="text-[10px] text-slate-400 italic">Aucun membre sélectionné</span>';
+            const lic = s.licence && String(s.licence).trim() && String(s.licence).trim() !== '-' ? s.licence : null;
+            const val = lic || '⚠️ Licence manquante';
+            const cls = lic ? '' : ' text-amber-700';
+            return '<div class="flex items-center space-x-1.5">'
+                + '<span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border text-xs' + cls + '">' + val + '</span>'
+                + (lic ? '<button onclick="copierTexte(\'' + lic + '\')" class="p-1 bg-slate-100 hover:bg-sky-100 text-sky-600 rounded text-xs border" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>' : '')
+                + '</div>';
+        }
+
+        function buildEntourageHtml(m) {
+            normalizeStaff();
+            const ent = matchEntourageGuard(m);
+            const staff = state.staff || [];
+
+            const principal = staffByEntourageId(ent.principalId);
+            const adjoint = staffByEntourageId(ent.adjointId);
+
+            const sortedStaff = staff.slice().sort((a, b) =>
+                getStaffRole(a).localeCompare(getStaffRole(b)) || (a.name || '').localeCompare(b.name || '')
+            );
+
+            let table = '';
+            let mobile = '';
+
+            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">🎽 Encadrement & Dirigeants</td></tr>';
+            mobile += '<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">🎽 Encadrement & Dirigeants</div>';
+
+            if (staff.length === 0) {
+                const hint = 'Ajoutez d\'abord coaches et dirigeants dans Effectif → Staff & Dirigeants.';
+                table += '<tr><td colspan="6" class="p-2 pl-4 text-[10px] text-slate-400 italic">' + hint + '</td></tr>';
+                mobile += '<div class="text-[10px] text-slate-400 italic mb-2">' + hint + '</div>';
+            } else {
+                const coachRow = (label, field, current) => `
+                    <tr class="border-b border-slate-100 bg-slate-50/40">
+                        <td class="p-2 pl-4 font-bold text-slate-700 text-xs">${label}</td>
+                        <td colspan="5" class="p-2">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <select id="entourage-coach-select-${m.id}-${field}-table" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg">
+                                    ${staffSelectOptions(sortedStaff, current ? staffId(current) : '', true)}
+                                </select>
+                                <button onclick="ajouterCoach('${m.id}','${field}','table')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold">Assigner</button>
+                                ${entourageLicenceChip(current)}
+                                ${current ? `<button onclick="retirerCoach('${m.id}','${field}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
+                            </div>
+                        </td>
+                    </tr>`;
+
+                table += coachRow('Coach principal', 'principal', principal);
+                table += coachRow('Coach adjoint', 'adjoint', adjoint);
+
+                const mobileCoach = (label, field, current) => `
+                    <div class="bg-white border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
+                        <div class="font-bold text-slate-700 text-xs">${label}</div>
+                        <div class="flex items-center space-x-2">
+                            <select id="entourage-coach-select-${m.id}-${field}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1">
+                                ${staffSelectOptions(sortedStaff, current ? staffId(current) : '', true)}
+                            </select>
+                            <button onclick="ajouterCoach('${m.id}','${field}','mobile')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold shrink-0">OK</button>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                            <span class="text-[10px] text-slate-500 uppercase font-bold">Licence</span>
+                            <div class="flex items-center space-x-1.5">
+                                ${entourageLicenceChip(current)}
+                                ${current ? `<button onclick="retirerCoach('${m.id}','${field}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+
+                mobile += mobileCoach('Coach principal', 'principal', principal);
+                mobile += mobileCoach('Coach adjoint', 'adjoint', adjoint);
+            }
+
+            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">👥 Dirigeants convoqués</td></tr>';
+
+            table += `
+                <tr class="border-b border-slate-100">
+                    <td class="p-2 pl-4 font-bold text-slate-700 text-xs">Ajouter</td>
+                    <td colspan="5" class="p-2">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <select id="entourage-dirigeant-select-${m.id}-table" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg">
+                                ${staffSelectOptions(sortedStaff, '', false)}
+                            </select>
+                            <button onclick="addMatchDirigeant('${m.id}','table')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold">Ajouter</button>
+                        </div>
+                    </td>
+                </tr>`;
+
+            mobile += `
+                <div class="bg-white border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
+                    <div class="font-bold text-slate-700 text-xs">Ajouter un dirigeant</div>
+                    <div class="flex items-center space-x-2">
+                        <select id="entourage-dirigeant-select-${m.id}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1">
+                            ${staffSelectOptions(sortedStaff, '', false)}
+                        </select>
+                        <button onclick="addMatchDirigeant('${m.id}','mobile')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold shrink-0">Ajouter</button>
+                    </div>
+                </div>`;
+
+            Object.keys(ent.dirigeants).forEach(id => {
+                const s = staffByEntourageId(id);
+                if (!s) return;
+                const d = ent.dirigeants[id] || { role: 'Juge de touche', convoked: true };
+
+                table += `
+                    <tr class="border-b border-slate-100 bg-slate-50/30">
+                        <td class="p-2 pl-4">
+                            <div class="font-bold text-slate-800 text-xs">${s.name}</div>
+                            <div class="text-[10px] text-slate-400">${getStaffRole(s)}</div>
+                        </td>
+                        <td class="p-2">${entourageLicenceChip(s)}</td>
+                        <td class="p-2">
+                            <select onchange="setMatchDirigeantRole('${m.id}','${id}',this.value)" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg">
+                                <option value="Juge de touche" ${d.role === 'Juge de touche' ? 'selected' : ''}>🚩 Juge de touche</option>
+                                <option value="Délégué" ${d.role === 'Délégué' ? 'selected' : ''}>📋 Délégué</option>
+                            </select>
+                        </td>
+                        <td class="p-2 text-center">
+                            <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
+                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','convoque')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Oui</button>
+                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','non')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'text-slate-600' : 'active-nonconvoke bg-slate-600 text-white'}">Non</button>
+                            </div>
+                        </td>
+                        <td class="p-2 text-center">
+                            <button onclick="retirerMatchDirigeant('${m.id}','${id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>
+                        </td>
+                    </tr>`;
+
+                mobile += `
+                    <div class="bg-white border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="font-bold text-slate-800 text-xs">${s.name}</div>
+                                <div class="text-[10px] text-slate-400">${getStaffRole(s)}</div>
+                            </div>
+                            <button onclick="retirerMatchDirigeant('${m.id}','${id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                            <span class="text-[10px] text-slate-500 uppercase font-bold">Licence</span>
+                            ${entourageLicenceChip(s)}
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                            <select onchange="setMatchDirigeantRole('${m.id}','${id}',this.value)" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1">
+                                <option value="Juge de touche" ${d.role === 'Juge de touche' ? 'selected' : ''}>🚩 Juge de touche</option>
+                                <option value="Délégué" ${d.role === 'Délégué' ? 'selected' : ''}>📋 Délégué</option>
+                            </select>
+                            <div class="inline-flex rounded-lg border p-0.5 bg-slate-50 shrink-0">
+                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','convoque')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Oui</button>
+                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','non')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'text-slate-600' : 'active-nonconvoke bg-slate-600 text-white'}">Non</button>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+
+            return { table, mobile };
+        }
+
+        function ajouterCoach(mId, field, suffix) {
+            normalizeStaff();
+            const m = state.matches[mId];
+            if (!m) return;
+            const sel = document.getElementById('entourage-coach-select-' + mId + '-' + field + '-' + suffix);
+            const val = sel ? sel.value : '';
+            if (!val) { showToast('Choisissez un coach dans la liste', 'error'); return; }
+            matchEntourageGuard(m);
+            if (field === 'adjoint') m.entourage.adjointId = val; else m.entourage.principalId = val;
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function retirerCoach(mId, field) {
+            const m = state.matches[mId];
+            if (!m) return;
+            matchEntourageGuard(m);
+            if (field === 'adjoint') m.entourage.adjointId = null; else m.entourage.principalId = null;
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function addMatchDirigeant(mId, suffix) {
+            const m = state.matches[mId];
+            if (!m) return;
+            const sel = document.getElementById('entourage-dirigeant-select-' + mId + '-' + suffix);
+            const val = sel ? sel.value : '';
+            if (!val) { showToast('Choisissez un dirigeant dans la liste', 'error'); return; }
+            matchEntourageGuard(m);
+            m.entourage.dirigeants[val] = { role: 'Juge de touche', convoked: true };
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function setMatchDirigeantRole(mId, staffSel, role) {
+            const m = state.matches[mId];
+            if (!m || !m.entourage || !m.entourage.dirigeants || !m.entourage.dirigeants[staffSel]) return;
+            m.entourage.dirigeants[staffSel].role = role;
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function setMatchDirigeantStatus(mId, staffSel, status) {
+            const m = state.matches[mId];
+            if (!m || !m.entourage || !m.entourage.dirigeants || !m.entourage.dirigeants[staffSel]) return;
+            m.entourage.dirigeants[staffSel].convoked = status === 'convoque';
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function retirerMatchDirigeant(mId, staffSel) {
+            const m = state.matches[mId];
+            if (!m || !m.entourage || !m.entourage.dirigeants) return;
+            delete m.entourage.dirigeants[staffSel];
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function buildEntourageWhatsAppText(m) {
+            normalizeStaff();
+            const ent = matchEntourageGuard(m);
+            const parts = [];
+
+            const principal = staffByEntourageId(ent.principalId);
+            const adjoint = staffByEntourageId(ent.adjointId);
+
+            if (principal) parts.push('👔 *Entraîneur :* ' + principal.name + (principal.licence && principal.licence !== '-' ? ' (' + principal.licence + ')' : ''));
+            if (adjoint) parts.push('👔 *Entraîneur adjoint :* ' + adjoint.name + (adjoint.licence && adjoint.licence !== '-' ? ' (' + adjoint.licence + ')' : ''));
+
+            Object.keys(ent.dirigeants || {}).forEach(id => {
+                const s = staffByEntourageId(id);
+                const d = ent.dirigeants[id];
+                if (!s || !d.convoked) return;
+                parts.push('📋 *Dirigeant (' + (d.role || 'Juge de touche') + ') :* ' + s.name);
+            });
+
+            if (!parts.length) return '';
+            return '\n🎽 *ENCADREMENT*\n' + parts.join('\n');
+        }
+
+        function buildFeuilleEntourageHtml(m) {
+            normalizeStaff();
+            const ent = matchEntourageGuard(m);
+
+            const principal = staffByEntourageId(ent.principalId);
+            const adjoint = staffByEntourageId(ent.adjointId);
+
+            const dirList = Object.keys(ent.dirigeants || {})
+                .map(id => ({ s: staffByEntourageId(id), d: ent.dirigeants[id] }))
+                .filter(x => x.s && x.d.convoked);
+
+            if (!principal && !adjoint && !dirList.length) return '';
+
+            const nomLic = s => (s ? (s.name || '—') + (s.licence && s.licence !== '-' ? ' (' + s.licence + ')' : '') : '—');
+
+            let rows = '';
+            if (principal) rows += '<tr><td style="width: 24%; padding: 0.5pt;">Entraîneur principal</td><td style="padding: 0.5pt;">' + nomLic(principal) + '</td></tr>';
+            if (adjoint) rows += '<tr><td style="width: 24%; padding: 0.5pt;">Entraîneur adjoint</td><td style="padding: 0.5pt;">' + nomLic(adjoint) + '</td></tr>';
+            dirList.forEach(x => rows += '<tr><td style="width: 24%; padding: 0.5pt;">Dirigeant (' + (x.d.role || 'Juge de touche') + ')</td><td style="padding: 0.5pt;">' + nomLic(x.s) + '</td></tr>');
+
+            return `
+                <table style="width: 100%; border-collapse: collapse; margin-top: 1pt; font-size: 6pt;">
+                    <tr>
+                        <td colspan="2" style="background-color: #e8e8e8; font-weight: bold; padding: 0.5pt;">
+                            ENCADREMENT & DIRIGEANTS
+                        </td>
+                    </tr>
+                    ${rows}
+                </table>`;
+        }
+
         function setFilterCat(cat) {
             currentCatFilter = cat;
             document.querySelectorAll('.cat-filter-btn').forEach(btn => {
@@ -3431,8 +4442,32 @@ if (active) {
         }
 
         function toggleModal(modalId, show) {
-            document.getElementById(modalId).classList.toggle('hidden', !show);
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            modal.classList.toggle('hidden', !show);
+            if (show) {
+                modal._previouslyFocused = document.activeElement;
+                const focusable = modal.querySelector('button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])');
+                if (focusable) focusable.focus();
+            } else {
+                const el = modal._previouslyFocused;
+                if (el && typeof el.focus === 'function') el.focus();
+            }
         }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const openModals = document.querySelectorAll('.modal-overlay:not(.hidden)');
+            if (!openModals.length) return;
+            const openModal = openModals[openModals.length - 1];
+            if (openModal.id === 'modal-event') {
+                closeEventModal();
+            } else if (openModal.id === 'admin-access-modal') {
+                toggleAdminModal(false);
+            } else {
+                toggleModal(openModal.id, false);
+            }
+        });
 
         function showToast(message, type = 'success') {
             const existing = document.getElementById('toast-notification');
@@ -3883,16 +4918,6 @@ function openNewAccountForm() {
 }
 
 
-// Gérer l'affichage du champ équipe selon le rôle sélectionné
-window.toggleTeamInput = function(role) {
-    const group = document.getElementById("team-input-group");
-    if (role === "admin" || role === "dirigeant" || role === "public") {
-        group.style.display = "none";
-    } else {
-        group.style.display = "block";
-    }
-}
-
 // Enregistrement ou mise à jour d'un compte dans Firebase
 document.addEventListener("DOMContentLoaded", () => {
     const coachForm = document.getElementById("coach-form");
@@ -4055,29 +5080,7 @@ if (container) {
     }
 };
 
-// 1. Enregistrer ou créer une équipe dans Firebase
-function handleSaveTeam(event) {
-    event.preventDefault();
-    
-    const teamIdInput = document.getElementById('team-id').value.trim().toLowerCase();
-    const teamNameInput = document.getElementById('team-name').value.trim();
-
-    if (!teamIdInput || !teamNameInput) return;
-
-    // Enregistrement dans Firebase sous le nœud "teams/identifiant_equipe"
-    firebase.database().ref('teams/' + teamIdInput).set({
-        name: teamNameInput
-    }, (error) => {
-        if (error) {
-            showToast("Erreur lors de l'enregistrement de l'équipe.", "error");
-        } else {
-            // Réinitialiser le formulaire de l'équipe
-            document.getElementById('team-form').reset();
-        }
-    });
-}
-
-// 2. Afficher la liste des équipes dans l'admin et mettre à jour l'application
+// Afficher la liste des équipes dans l'admin et mettre à jour l'application
 function renderAdminTeams(teamsData) {
     
 
@@ -5001,7 +6004,6 @@ function renderCalendar() {
         return true;
 
     });
-``
 
     const trainings =
     Object.values(state.trainings || {})
@@ -5124,9 +6126,10 @@ const matches =
         )
             return false;
 
-        return true;
+return true;
 
     });
+
 
     const trainings =
     Object.values(state.trainings || {})
@@ -5218,7 +6221,10 @@ const matches =
 ">
 
                 <div class="flex items-center gap-2 flex-wrap">
-    <div class="font-bold 
+
+                    <div class="font-bold">
+                        ${training.title || ''}
+                    </div>
 
                 <div class="text-xs text-slate-600">
                     ${training.heure || '--'}
@@ -5241,11 +6247,7 @@ const matches =
     ⚽ ${state.teams?.[training.team]?.name || training.team}
 </span>
 
-        ${state.teams?.[training.team]?.name || training.team}
-
-    </span>
-
-</div>   
+            </div>
 
             </div>
         `;
@@ -5348,6 +6350,13 @@ function openEventModal(eventId = null) {
         .classList
         .remove('hidden');
 
+    document.getElementById('modal-event')._previouslyFocused =
+        document.activeElement;
+
+    const firstField =
+        document.querySelector('#modal-event input, #modal-event select, #modal-event button');
+    if (firstField) firstField.focus();
+
     if (!eventId) {
 
         document.getElementById('e-id').value = '';
@@ -5417,10 +6426,16 @@ if (event.teams) {
 
 function closeEventModal() {
 
-    document
-        .getElementById('modal-event')
-        .classList
-        .add('hidden');
+    const modal =
+        document
+        .getElementById('modal-event');
+
+    if (!modal) return;
+
+    modal.classList.add('hidden');
+
+    const el = modal._previouslyFocused;
+    if (el && typeof el.focus === 'function') el.focus();
 
 }
 
@@ -5931,63 +6946,6 @@ function deleteEvent(eventId) {
     );
 
 }
-function getEventTeamsLabel(event) {
-
-    if (
-        event.teams &&
-        event.teams.includes("all")
-    ) {
-        return "🌍 Toutes les équipes";
-    }
-
-    return (event.teams || [])
-        .map(teamKey => {
-
-            const team =
-                state.teams?.[teamKey];
-
-            return team
-                ? team.name
-                : teamKey;
-
-        })
-        .join(" • ");
-
-}
-
-function getTeamBadge(event) {
-
-    if (
-        event.teams &&
-        event.teams.includes("all")
-    ) {
-
-        return `
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                🌍 Club
-            </span>
-        `;
-
-    }
-
-    return (event.teams || [])
-        .map(teamKey => {
-
-            const teamName =
-                state.teams?.[teamKey]?.name ||
-                teamKey;
-
-            return `
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800">
-                    ${teamName}
-                </span>
-            `;
-
-        })
-        .join(' ');
-
-}
-
 function addFunctionBlock() {
 
     const template =
@@ -6687,6 +7645,7 @@ async function fetchFFFCalendar() {
 
     const params = new URLSearchParams();
     params.set("ma_dat[after]", seasonStart);
+    params.set("itemsPerPage", "1000");
 
     let currentPath = "/api/clubs/" + clubNo + "/calendrier?" + params.toString();
     let matches = [];
@@ -6877,7 +7836,14 @@ async function refreshFFFCompetitions() {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyse en cours...';
     }
     try {
-        const calendar = await fetchFFFCalendar();
+        let calendar;
+        if (state.fffManualJson && state.fffManualJson.trim()) {
+            const obj = JSON.parse(state.fffManualJson);
+            calendar = Array.isArray(obj) ? obj : (obj["hydra:member"] || []);
+            if (calendar.length === 0) throw new Error("Le JSON collé ne contient aucun match");
+        } else {
+            calendar = await fetchFFFCalendar();
+        }
         window.__fffCalendar = calendar;
         window.__fffCompetitions = fffGroupCompetitions(calendar);
         renderAdminFFFModule();
@@ -6912,46 +7878,80 @@ function syncFFFMatches(opts) {
             if (isManual) setSyncBtn('<i class="fa-solid fa-spinner fa-spin"></i> Synchronisation en cours...', true);
 
             const links = state.fffLinks || {};
-            const linkedCpNos = Object.keys(links).map(Number);
-            if (linkedCpNos.length === 0) {
+            const linkedEntries = Object.entries(links).filter(e => e[1] && e[1].team);
+            if (linkedEntries.length === 0) {
                 if (isManual) showToast("ℹ️ Liez d'abord vos équipes aux compétitions FFF", "info");
                 return;
             }
 
-            const calendar = await fetchFFFCalendar();
-            window.__fffCalendar = calendar;
+            let clubCalendar = window.__fffCalendar || [];
+            if (clubCalendar.length === 0) {
+                try {
+                    clubCalendar = await fetchFFFCalendar();
+                } catch (e) {
+                    console.warn("FFF: calendrier club indisponible, on utilisera uniquement les JSON collés par compétition", e);
+                }
+            }
+
+            const compJsonMap = {};
+            Object.entries(state.fffCompJson || {}).forEach(([cpNo, raw]) => {
+                if (!raw || !raw.trim()) return;
+                try {
+                    const obj = JSON.parse(raw);
+                    const arr = Array.isArray(obj) ? obj : (obj["hydra:member"] || []);
+                    if (Array.isArray(arr) && arr.length) compJsonMap[cpNo] = arr;
+                } catch (e) {
+                    console.warn("FFF: JSON collé ignoré pour la compétition " + cpNo, e);
+                }
+            });
 
             let created = 0;
             let updated = 0;
+            const missingComps = [];
 
-            calendar.forEach(evt => {
-                const cpNo = evt.competition ? evt.competition.cp_no : null;
-                if (!linkedCpNos.some(c => c === Number(cpNo))) return;
+            linkedEntries.forEach(([cpNoStr, link]) => {
+                const cpNo = Number(cpNoStr);
+                const teamKey = link.team;
+                const compMatches = compJsonMap[cpNoStr] || (clubCalendar || []).filter(e => e && e.competition && Number(e.competition.cp_no) === cpNo);
 
-                const link = links[cpNo];
-                const teamKey = link && link.team;
-                const maNo = evt.ma_no;
-                const fffMatch = buildFFFMatch(evt);
-
-                let existing = Object.values(state.matches).find(m => m.fff && m.fff.ma_no === maNo);
-                if (!existing && teamKey) existing = findLinkedManualMatch(evt, teamKey);
-
-                if (existing) {
-                    applyFFFToExisting(existing, fffMatch);
-                    updated++;
-                } else if (teamKey) {
-                    state.matches[fffMatch.id] = fffMatch;
-                    created++;
+                if (!compMatches.length) {
+                    missingComps.push(link.competitionName || ("Compétition " + cpNo));
+                    return;
                 }
+
+                compMatches.forEach(evt => {
+                    const clubNoNow = state.fffClubNo || 18707;
+                    const involvesClub = evt && (
+                        (evt.home && evt.home.club && evt.home.club.cl_no === clubNoNow)
+                        || (evt.away && evt.away.club && evt.away.club.cl_no === clubNoNow)
+                    );
+                    if (!involvesClub) return;
+                    const maNo = evt.ma_no;
+                    const fffMatch = buildFFFMatch(evt);
+
+                    let existing = Object.values(state.matches).find(m => m.fff && m.fff.ma_no === maNo);
+                    if (!existing && teamKey) existing = findLinkedManualMatch(evt, teamKey);
+
+                    if (existing) {
+                        applyFFFToExisting(existing, fffMatch);
+                        updated++;
+                    } else if (teamKey) {
+                        state.matches[fffMatch.id] = fffMatch;
+                        created++;
+                    }
+                });
             });
 
             state.fffLastSync = Date.now();
             saveStateToFirebase();
             renderAll();
 
-            if (isManual) showToast("✅ " + created + " match(s) ajouté(s), " + updated + " mis à jour");
+            if (isManual) {
+                const warnMsg = missingComps.length ? " · ⚠️ " + missingComps.length + " compétition(s) sans matchs (collez leur JSON : 📥 Matchs)" : "";
+                showToast("✅ " + created + " match(s) ajouté(s), " + updated + " mis à jour" + warnMsg, missingComps.length ? "info" : "success");
+            }
             const statusEl = document.getElementById("fff-sync-status");
-            if (statusEl) statusEl.textContent = "Dernière synchro : " + fffFormatDate(new Date()) + " · " + created + " nouveau(x) · " + updated + " mis à jour";
+            if (statusEl) statusEl.textContent = "Dernière synchro : " + fffFormatDate(new Date()) + " · " + created + " nouveau(x) · " + updated + " mis à jour" + (missingComps.length ? " · ⚠️ " + missingComps.length + " compétition(s) sans matchs" : "");
             renderAdminFFFModule();
         } catch (err) {
             console.error("FFF sync error:", err);
@@ -6996,6 +7996,62 @@ function onFFFSaveProxy() {
     saveStateToFirebase();
     showToast(value ? "✅ Proxy enregistré" : "ℹ️ Proxy retiré, retour à l'accès direct");
     renderAdminFFFModule();
+}
+
+function onFFFSaveManualJson() {
+    const ta = document.getElementById("fff-manual-json");
+    const value = (ta && ta.value || "").trim();
+    if (value) {
+        try {
+            const obj = JSON.parse(value);
+            const list = obj && (Array.isArray(obj) ? obj : obj["hydra:member"]);
+            if (!list || !Array.isArray(list)) throw new Error("Ce n'est pas le calendrier FFF attendu");
+        } catch (err) {
+            showToast("❌ JSON invalide : " + err.message, "error");
+            return;
+        }
+    }
+    state.fffManualJson = value;
+    saveStateToFirebase();
+    showToast(value ? "✅ JSON FFF enregistré" : "ℹ️ JSON manuel retiré");
+}
+
+function onFFFManualJsonClear() {
+    state.fffManualJson = "";
+    saveStateToFirebase();
+    showToast("ℹ️ JSON manuel effacé");
+    renderAdminFFFModule();
+}
+
+function onFFFToggleCompJson(cpNo) {
+    const box = document.getElementById("fff-comp-json-box-" + cpNo);
+    if (!box) return;
+    const willShow = box.classList.contains("hidden");
+    box.classList.toggle("hidden");
+    if (willShow) {
+        const ta = document.getElementById("fff-comp-json-" + cpNo);
+        if (ta) ta.focus();
+    }
+}
+
+function onFFFSaveCompJson(cpNo) {
+    const ta = document.getElementById("fff-comp-json-" + cpNo);
+    const value = (ta && ta.value || "").trim();
+    if (value) {
+        try {
+            const obj = JSON.parse(value);
+            const list = obj && (Array.isArray(obj) ? obj : obj["hydra:member"]);
+            if (!list || !Array.isArray(list) || list.length === 0) throw new Error("Aucun match dans ce JSON");
+        } catch (err) {
+            showToast("❌ JSON invalide : " + err.message, "error");
+            return;
+        }
+    }
+    state.fffCompJson = state.fffCompJson || {};
+    state.fffCompJson[cpNo] = value;
+    saveStateToFirebase();
+    renderAdminFFFModule();
+    showToast(value ? "✅ Matchs de la compétition enregistrés" : "ℹ️ JSON de la compétition retiré");
 }
 
 function renderAdminFFFModule() {
@@ -7062,6 +8118,21 @@ function renderAdminFFFModule() {
             💡 L'API FFF bloque parfois les navigateurs (Akamai). Sans proxy, l'appli essaie 4 itinéraires automatiquement. Si tout échoue, collez ici l'URL d'un mini-proxy Google Apps Script (instructions à la demande) pour garantir l'accès.
         </div>
     </div>
+
+    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-4">
+        <div class="flex items-center justify-between gap-2 mb-1">
+            <label class="block text-[11px] font-semibold text-emerald-800">JSON FFF collé à la main — la méthode 100% fiable (Aucune protection ne bloque votre navigateur)</label>
+            <div class="flex gap-2 flex-shrink-0">
+                <button onclick="onFFFSaveManualJson()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Enregistrer</button>
+                <button onclick="onFFFManualJsonClear()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold">Effacer</button>
+            </div>
+        </div>
+        <textarea id="fff-manual-json" rows="5" placeholder="Collez ici le contenu de la page (voir le mode d'emploi ci-dessous)" class="w-full border rounded-lg p-2 text-xs font-mono">${(state.fffManualJson || "").replace(/</g, "\\u003c")}</textarea>
+        <div class="text-[11px] text-emerald-800 mt-2">
+            📋 <b>Mode d'emploi :</b> ① ouvrez l'URL ci-dessous dans un onglet → ② <b>Ctrl+A</b> puis <b>Ctrl+C</b> → ③ collez ici → ④ <b>Enregistrer</b> → ⑤ <b>Analyser</b> → ⑥ liez vos équipes → ⑦ <b>⚠️ Important :</b> cette page ne montre que les <b>prochains</b> matchs. Pour un <b>championnat au complet</b>, cliquez sur <b>📥 Matchs</b> d'une compétition liée et collez le JSON de <b>son</b> URL dédiée (l'API compétition contient toute la saison) → ⑧ <b>Synchroniser maintenant</b>.
+            <br>🔗 URL de détection (calendrier club) : <code class="break-all">https://api-dofa.fff.fr/api/clubs/${state.fffClubNo || 18707}/calendrier?itemsPerPage=1000</code>
+        </div>
+    </div>
 `;
 
     if (comps.length === 0) {
@@ -7088,6 +8159,14 @@ function renderAdminFFFModule() {
             const typeBadge = c.tipo === "CH" ? "bg-blue-100 text-blue-700"
                 : c.tipo === "CP" ? "bg-fuchsia-100 text-fuchsia-700"
                 : "bg-amber-100 text-amber-700";
+            const compJsonRaw = ((state.fffCompJson || {})[c.cp_no] || "").trim();
+            let compJsonCount = 0;
+            if (compJsonRaw) {
+                try {
+                    const cj = JSON.parse(compJsonRaw);
+                    compJsonCount = Array.isArray(cj) ? cj.length : ((cj && cj["hydra:member"]) || []).length;
+                } catch (e) { compJsonCount = 0; }
+            }
 
             html += `
             <div class="bg-slate-50 border ${linked ? "border-emerald-300 bg-emerald-50/40" : "border-slate-200"} rounded-xl p-3 mb-2">
@@ -7097,7 +8176,7 @@ function renderAdminFFFModule() {
                             <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold mr-1.5 ${typeBadge}">${fffTypeLabel(c.tipo)}</span>
                             ${c.name}
                         </div>
-                        <div class="text-[11px] text-slate-500 mt-0.5">${catLabel} · ${c.matches} match(s)${c.poule ? " · " + c.poule : ""}</div>
+                        <div class="text-[11px] text-slate-500 mt-0.5">${catLabel} · ${c.matches} match(s)${c.poule ? " · " + c.poule : ""}${compJsonRaw ? " · 📥 JSON collé" : ""}</div>
                     </div>
                     <div class="flex items-center gap-2">
                         ${linked ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold">✓ ${teamName}</span>` : ""}
@@ -7105,8 +8184,24 @@ function renderAdminFFFModule() {
                             <option value="">— Ne pas lier —</option>
                             ${Object.entries(state.teams || {}).map(([k, t]) => `<option value="${k}" ${linked === k ? "selected" : ""}>${t.name || k.toUpperCase()}</option>`).join("")}
                         </select>
+                        ${linked ? `<button onclick="onFFFToggleCompJson('${c.cp_no}')" class="border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 px-2.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap">📥 Matchs</button>` : ""}
                     </div>
                 </div>
+                ${linked ? `
+                <div id="fff-comp-json-box-${c.cp_no}" class="hidden mt-2 border-t border-violet-100 pt-2">
+                    <div class="text-[11px] text-slate-600 mb-1">
+                        <b>Compétition au complet :</b> collez ici le JSON de ses matchs (l'API club ne montre que les prochains matchs). Ouvrez l'URL ci-dessous dans un onglet, <b>Ctrl+A</b> puis <b>Ctrl+C</b>, et collez le tout.
+                    </div>
+                    <div class="text-[10px] bg-white rounded-lg p-2 mb-2 border border-violet-100 break-all font-mono">
+                        https://api-dofa.fff.fr/api/match_entities?competition.cp_no=${c.cp_no}&amp;ma_dat[after]=2026-06-01
+                    </div>
+                    <textarea id="fff-comp-json-${c.cp_no}" rows="4" placeholder="Collez ici le contenu de la page (voir l'URL ci-dessus)" class="w-full border rounded-lg p-2 text-xs font-mono">${(compJsonRaw || "").replace(/</g, "\\u003c")}</textarea>
+                    <div class="flex items-center gap-2 mt-1.5">
+                        <button onclick="onFFFSaveCompJson('${c.cp_no}')" class="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Enregistrer</button>
+                        ${compJsonCount ? `<span class="text-[11px] font-bold text-emerald-700">✓ ${compJsonCount} match(s) prêt(s) à importer</span>` : `<span class="text-[11px] text-slate-400">Aucun JSON collé pour l'instant</span>`}
+                    </div>
+                </div>
+                ` : ""}
             </div>
             `;
         });
@@ -7918,6 +9013,11 @@ function getPosteLabel(code) {
     return POSTE_LIBELLES[key] || key;
 }
 
+function getFirstName(player) {
+    if (!player) return '';
+    return (player.name || '').split(' ').pop();
+}
+
 function renderMatchComposition() {
 
     const container =
@@ -8169,7 +9269,7 @@ ${getFormationSlots(
                     mt-1
                     text-center">
 
-                    ${player.name}
+                    ${getFirstName(player)}
 
                 </div>
 
@@ -8201,7 +9301,7 @@ ${terrainPlayers.map(player => {
                                 ">
 
                                 <div class="font-bold text-xs">
-                                    ${player.name}
+                                    ${getFirstName(player)}
                                 </div>
 
                                 <div class="text-[10px] text-sky-700 font-semibold">
@@ -8309,80 +9409,6 @@ function dropPlayer(event) {
     saveStateToFirebase();
 
     draggedPlayerId = null;
-
-    renderMatchComposition();
-}
-
-function selectCompositionPlayer(playerId) {
-
-    selectedCompositionPlayer = playerId;
-
-    showToast(
-        "Cliquez sur une zone du terrain"
-    );
-
-}
-
-function moveSelectedPlayer(event) {
-
-    if (!selectedCompositionPlayer) {
-        return;
-    }
-
-    const terrain =
-        document.getElementById(
-            'composition-terrain'
-        );
-
-    if (!terrain) return;
-
-    const rect =
-        terrain.getBoundingClientRect();
-
-    const x =
-        ((event.clientX - rect.left)
-        / rect.width) * 100;
-
-    const y =
-        ((event.clientY - rect.top)
-        / rect.height) * 100;
-
-    const match =
-        state.matches[
-            state.selectedMatchId
-        ];
-
-    match.composition[
-        selectedCompositionPlayer
-    ] = {
-        x,
-        y
-    };
-
-    saveStateToFirebase();
-
-    selectedCompositionPlayer = null;
-
-    renderMatchComposition();
-
-    showToast(
-        "Joueur déplacé"
-    );
-}
-
-function addPlayerToComposition(playerId) {
-
-    const match =
-        state.matches[state.selectedMatchId];
-
-    match.composition[playerId] = {
-
-        x: 50,
-        y: 50
-
-    };
-
-    saveStateToFirebase();
 
     renderMatchComposition();
 }
