@@ -1,3 +1,108 @@
+// Ajouter les styles CSS pour la feuille de match
+const feuilleStyles = `
+    .feuille-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        overflow: auto;
+    }
+    
+    .feuille-modal.open {
+        opacity: 1;
+    }
+    
+    .feuille-toolbar {
+        position: sticky;
+        top: 0;
+        background: white;
+        padding: 10px;
+        display: flex;
+        gap: 10px;
+        border-bottom: 1px solid #ccc;
+        z-index: 10000;
+    }
+    
+    .feuille-toolbar button {
+        padding: 8px 15px;
+        background: #0284c7;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 13px;
+    }
+    
+    .feuille-toolbar button:hover {
+        background: #0369a1;
+    }
+    
+    .feuille-toolbar .btn-print {
+        background: #16a34a;
+    }
+    
+    .feuille-toolbar .btn-print:hover {
+        background: #15803d;
+    }
+    
+    .a4-sheet {
+        width: 210mm;
+        height: 297mm;
+        padding: 10mm;
+        margin: 20px auto;
+        background: white;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    @media print {
+        body, html {
+            margin: 0;
+            padding: 0;
+            background: white;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .feuille-modal {
+            position: static;
+            background: white;
+            display: block;
+            opacity: 1;
+            overflow: visible;
+        }
+        
+        .feuille-toolbar {
+            display: none;
+        }
+        
+        .a4-sheet {
+            width: 100%;
+            height: auto;
+            margin: 0;
+            padding: 0;
+            box-shadow: none;
+            page-break-after: always;
+        }
+        
+        #feuille-print {
+            width: 100%;
+            height: auto;
+        }
+    }
+`;
+
+const styleElement = document.createElement('style');
+styleElement.textContent = feuilleStyles;
+document.head.appendChild(styleElement);
+
 document.addEventListener("DOMContentLoaded", () => {
     const pinScreen = document.getElementById("pin-screen");
     const pinInput = document.getElementById("pin-input");
@@ -213,15 +318,7 @@ if (pinScreen) {
             });
         }
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyBVdcpzLr_VxfLTvN8kpkNv69Hc4xdzct0",
-            authDomain: "ai-studio-applet-webapp-1b612.firebaseapp.com",
-            databaseURL: "https://ai-studio-applet-webapp-1b612-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "ai-studio-applet-webapp-1b612",
-            storageBucket: "ai-studio-applet-webapp-1b612.firebasestorage.app",
-            messagingSenderId: "279839540206",
-            appId: "1:279839540206:web:a5d82ea7b4d9a9cf9d84ff"
-        };
+        const firebaseConfig = window.firebaseConfig;
 
         try { firebase.initializeApp(firebaseConfig); } catch(e) {}
         window.authReady = firebase.auth().signInAnonymously().catch(function (err) {
@@ -230,12 +327,12 @@ if (pinScreen) {
         const db = firebase.database();
 
         // Données initiales par défaut (Effectif de base)
-        const defaultPlayers = [
-            { id: "J001", name: "BAILLARIN Theo", licence: "9603227294", phonePere: "06 76 16 72 65", team: "u14", poste1: "AD", poste2: "BU", poste3: "MC" },
-            { id: "J002", name: "BAZABAS Mael", licence: "9604869553", phonePere: "06 48 62 75 80", team: "u14", poste1: "BU", poste2: "AG", poste3: "-" },
-            { id: "J003", name: "BEAULIEU Barthelemy", licence: "9602804942", phonePere: "06 61 53 24 85", team: "u14", poste1: "DC", poste2: "MDC", poste3: "-" },
-            { id: "J018", name: "BONNEFIS Antoine", licence: "9603191094", phonePere: "06 22 34 04 20", team: "u13", poste1: "AD", poste2: "DD", poste3: "-" },
-            { id: "J004", name: "BOUAJAJ Ibrahim", licence: "9605352704", phonePere: "06 95 84 64 94", team: "u14", poste1: "DC", poste2: "MDC", poste3: "-" },
+const defaultPlayers = [
+            { id: "J001", name: "BAILLARIN Theo", licence: "9603227294", phonePere: "06 76 16 72 65", team: "u14", poste1: "AD", poste2: "BU", poste3: "MC", blessure: false, blessureDateDebut: null, blessureRetour: null },
+            { id: "J002", name: "BAZABAS Mael", licence: "9604869553", phonePere: "06 48 62 75 80", team: "u14", poste1: "BU", poste2: "AG", poste3: "-", blessure: false, blessureDateDebut: null, blessureRetour: null },
+            { id: "J003", name: "BEAULIEU Barthelemy", licence: "9602804942", phonePere: "06 61 53 24 85", team: "u14", poste1: "DC", poste2: "MDC", poste3: "-", blessure: false, blessureDateDebut: null, blessureRetour: null },
+            { id: "J018", name: "BONNEFIS Antoine", licence: "9603191094", phonePere: "06 22 34 04 20", team: "u13", poste1: "AD", poste2: "DD", poste3: "-", blessure: false, blessureDateDebut: null, blessureRetour: null },
+            { id: "J004", name: "BOUAJAJ Ibrahim", licence: "9605352704", phonePere: "06 95 84 64 94", team: "u14", poste1: "DC", poste2: "MDC", poste3: "-", blessure: false, blessureDateDebut: null, blessureRetour: null },
             { id: "J019", name: "FRESQUET Jules", licence: "9603971174", phonePere: "-", team: "u13", poste1: "MC", poste2: "MO", poste3: "-" }
         ];
 
@@ -252,12 +349,21 @@ if (pinScreen) {
     carpoolResponses: {},
     settings: {},
     exerciseTemplates: [],
+    fffClubNo: 18707,
+    fffApiBase: "https://api-dofa.fff.fr/api",
+    fffLinks: {},
+    fffLastSync: null,
+    fffAutoSync: true,
+    fffProxyUrl: "",
+    fffManualJson: "",
+    fffCompJson: {},
 };
 
 // Variables d'interface uniquement
-let currentSession = 1;
 let selectedMatchId = null;
 let currentCatFilter = 'all';
+let currentEffectifTab = 'joueurs';
+let activeSection = 'dashboard';
 
         // --- 3. SYNCHRONISATION FIREBASE ---
         db.ref('rangueil_data').on('value', (snapshot) => {
@@ -271,6 +377,14 @@ let currentCatFilter = 'all';
                     state.stats = (data && data.stats) || {};
                     state.staff = (data && data.staff) || [];
                     state.settings = (data && data.settings) || { trainingDays: [2, 5] };
+                    state.fffClubNo = (data && data.fffClubNo) || 18707;
+                    state.fffApiBase = (data && data.fffApiBase) || "https://api-dofa.fff.fr/api";
+                    state.fffLinks = (data && data.fffLinks) || {};
+                    state.fffLastSync = (data && data.fffLastSync) || null;
+                    state.fffAutoSync = (data && data.fffAutoSync) !== false;
+                    state.fffProxyUrl = (data && data.fffProxyUrl) || "";
+                    state.fffManualJson = (data && data.fffManualJson) || "";
+                    state.fffCompJson = (data && data.fffCompJson) || {};
                     saveStateToFirebase();
                 } else {
                     state.players = (data.players || []).map(p => {
@@ -293,6 +407,22 @@ state.settings =
     data.settings || { trainingDays: [2, 5] };
 state.exerciseTemplates =
     data.exerciseTemplates || [];
+state.fffClubNo =
+    data.fffClubNo || 18707;
+state.fffApiBase =
+    data.fffApiBase || "https://api-dofa.fff.fr/api";
+state.fffLinks =
+    data.fffLinks || {};
+state.fffLastSync =
+    data.fffLastSync || null;
+state.fffAutoSync =
+    data.fffAutoSync !== false;
+state.fffProxyUrl =
+    data.fffProxyUrl || "";
+state.fffManualJson =
+    data.fffManualJson || "";
+state.fffCompJson =
+    data.fffCompJson || {};
                     // Migration ancien format numérique → nouveau format objet
                     const rawTrainings = data.trainings || {};
                     if (Object.keys(rawTrainings).length > 0 && !isNaN(Object.keys(rawTrainings)[0])) {
@@ -325,7 +455,8 @@ if (
     state.selectedMatchId = null;
 } 
 
-                renderAll();
+                renderSection(activeSection);
+                maybeAutoSyncFFF();
             } catch(err) {
                 console.error("Erreur de synchronisation :", err);
             }
@@ -346,12 +477,19 @@ function saveStateToFirebase() {
     events: state.events,
     carpoolResponses: state.carpoolResponses,
     exerciseTemplates: state.exerciseTemplates,
-    settings: state.settings
+    settings: state.settings,
+    fffClubNo: state.fffClubNo,
+    fffApiBase: state.fffApiBase,
+    fffLinks: state.fffLinks,
+    fffLastSync: state.fffLastSync,
+    fffAutoSync: state.fffAutoSync,
+    fffProxyUrl: state.fffProxyUrl,
+    fffManualJson: state.fffManualJson,
+    fffCompJson: state.fffCompJson
 };
 
-    db.ref('rangueil_data').update(dataToSave);
-}
-``
+db.ref('rangueil_data').update(dataToSave);
+        }
 
         // --- 4. NAVIGATION & ONGLETS ---
 
@@ -381,6 +519,36 @@ function saveStateToFirebase() {
             renderStaffV2();
             renderCalendar();
             
+        }
+
+        function renderSection(tabId) {
+            switch (tabId) {
+                case 'dashboard':
+                    renderDashboard();
+                    break;
+                case 'effectif':
+                    renderTeamFilters();
+                    renderEffectif();
+                    break;
+                case 'matchs':
+                    renderTeamFilters();
+                    populateMatchSelector();
+                    renderMatchesResultsList();
+                    renderMatchDetail();
+                    break;
+                case 'entrainements':
+                    renderTeamFilters();
+                    renderEntrainements();
+                    break;
+                case 'calendrier':
+                    renderCalendar();
+                    break;
+                case 'staff':
+                    renderStaffV2();
+                    break;
+                case 'admin':
+                    break;
+            }
         }
 
         // === FONCTION GLOBALE : Couleurs d'équipe ===
@@ -579,13 +747,12 @@ return colorMap[colorName] || colorMap.slate;
 
             const targetSec = document.getElementById(`sec-${tabId}`);
             if(targetSec) targetSec.classList.remove('hidden');
-            if (tabId === 'matchs') {
-    renderMatchDetail();
-}
             const activeBtn = document.getElementById(`tab-${tabId}`);
             if (activeBtn) activeBtn.classList.add('bg-white/20', 'text-white');
             const activeMobBtn = document.getElementById(`mob-tab-${tabId}`);
             if (activeMobBtn) activeMobBtn.classList.add('active');
+            activeSection = tabId;
+            renderSection(tabId);
         }
 
     function switchMatchSubTab(subTabId) {
@@ -713,65 +880,14 @@ if (subTabId === 'composition') {
             if (scoreHome === undefined || scoreAway === undefined || scoreHome === "" || scoreAway === "") {
                 return '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-500">À jouer</span>';
             }
-            function getTeamColor(teamKey) {
-
-    const color =
-        state.teams?.[teamKey]?.color || 'slate';
-
-    const colors = {
-        sky: {
-            bg: 'bg-sky-50',
-            border: 'border-sky-300',
-            text: 'text-sky-800'
-        },
-        emerald: {
-            bg: 'bg-emerald-50',
-            border: 'border-emerald-300',
-            text: 'text-emerald-800'
-        },
-        red: {
-            bg: 'bg-red-50',
-            border: 'border-red-300',
-            text: 'text-red-800'
-        },
-        orange: {
-            bg: 'bg-orange-50',
-            border: 'border-orange-300',
-            text: 'text-orange-800'
-        },
-        purple: {
-            bg: 'bg-purple-50',
-            border: 'border-purple-300',
-            text: 'text-purple-800'
-        },
-        slate: {
-            bg: 'bg-slate-50',
-            border: 'border-slate-300',
-            text: 'text-slate-800'
-        }
-    };
-
-    return colors[color] || colors.slate;
-}
             const h = parseInt(scoreHome), a = parseInt(scoreAway);
             if (h > a) return '<span class="px-2.5 py-1 rounded text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">VICTOIRE 🟢</span>';
             if (h < a) return '<span class="px-2.5 py-1 rounded text-xs font-black bg-red-100 text-red-800 border border-red-300">DÉFAITE 🔴</span>';
             return '<span class="px-2.5 py-1 rounded text-xs font-black bg-slate-900 text-white border border-slate-700">MATCH NUL ⬛</span>';
         }
 
-        function calculateSeasonStats() {
-            let wins = 0, draws = 0, losses = 0;
-            Object.values(state.matches).forEach(m => {
-                if (m.scoreHome !== undefined && m.scoreAway !== undefined && m.scoreHome !== "" && m.scoreAway !== "") {
-                    const h = parseInt(m.scoreHome), a = parseInt(m.scoreAway);
-                    if (h > a) wins++; else if (h === a) draws++; else losses++;
-                }
-            });
-            return { wins, draws, losses };
-        }
 
-        // Rendu Tableau de bord
-        function renderDashboard() {
+function renderDashboard() {
            
             const role = window.currentUserRole || 'public';
 const userTeam = window.currentUserTeam || 'all';
@@ -823,7 +939,7 @@ dashboardMatches.forEach(m => {
     role === 'coach'
         ? getTeamCards(dashboardMatches)
         : getTotalTeamCards();
-            document.getElementById('stat-total-cards').innerHTML = `<span class="text-amber-500">${teamCards.yellows}🟨</span> <span class="text-red-600">${teamCards.reds}🟥</span>`;
+document.getElementById('stat-total-cards').innerHTML = `<span class="text-amber-500">${teamCards.yellows}🟨</span> <span class="text-red-600">${teamCards.reds}🟥</span>`;
 
             // Alerte Licences
             const missingLicences = dashboardPlayers.filter(
@@ -1055,10 +1171,15 @@ if (role === 'responsable') {
 
 } else if (role === 'coach') {
 
+    const allowedTeams = userTeam
+        .split(',')
+        .map(t => t.trim().toLowerCase());
+
     playersToDisplay = state.players.filter(
         p =>
-            (p.team || p.cat || '').toLowerCase() ===
-            userTeam.toLowerCase()
+            allowedTeams.includes(
+                (p.team || p.cat || '').toLowerCase()
+            )
     );
 }
     
@@ -1075,6 +1196,7 @@ const niveauBadge =
         ? '<span class="font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700">🟡 Niveau 2</span>'
         : '<span class="font-bold px-2 py-0.5 rounded bg-red-100 text-red-700">🔴 Niveau 1</span>';
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
+                const hasBlessure = p.blessure === true;
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
                 const teamKey = p.team || p.cat; 
@@ -1083,6 +1205,12 @@ const niveauBadge =
                 const catBadge =`<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${teamColors.badge}">
         ${teamName}
     </span>`;
+
+
+                // Badge blessure
+                const blessureBadge = hasBlessure ?
+                    `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500 text-purple-100">🤕 Blessé</span>` :
+                    '';
 
 
                 // Calcul présences entraînements (nouveau format)
@@ -1108,9 +1236,14 @@ Object.values(state.trainings).forEach(session => {
         return;
     }
 
-    totalSessions++;
-
     const presence = session.presence || {};
+
+    // Ignorer les séances dont l'appel n'a pas été rempli
+    if (Object.keys(presence).length === 0) {
+        return;
+    }
+
+    totalSessions++;
 
     if (
         presence[p.id] === 'present' ||
@@ -1131,6 +1264,7 @@ Object.values(state.trainings).forEach(session => {
     ${attendanceBadge}
     <p class="text-[11px] ${hasLicence ? teamColors.textLight : 'text-amber-700 font-bold'}">
         Licence: ${hasLicence ? p.licence : '⚠️ Manquante'}
+        ${blessureBadge}
     </p>
 </div>
                         <div class="flex items-center space-x-1.5">${catBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 ${teamColors.textLight} hover:${teamColors.textBold}" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
@@ -1163,7 +1297,11 @@ Object.values(state.trainings).forEach(session => {
                     </div>
                 </div>`;
             }).join('');
+
+            renderStaffEffectif();
         }
+
+        window.renderEffectif = renderEffectif;
 
         // Rendu Matchs & Convocations
         function populateMatchSelector() {
@@ -1249,6 +1387,7 @@ const userTeam = window.currentUserTeam || 'all';
             const counterBanner = document.getElementById('convocation-counter-banner');
             const carpoolBanner = document.getElementById('carpooling-counter-banner');
             const validationStatus = document.getElementById('match-validation-status');
+            const inviteSearchBlock = document.getElementById('invite-search-block');
 
            if (!state.selectedMatchId) {
 
@@ -1273,6 +1412,7 @@ const userTeam = window.currentUserTeam || 'all';
     if (carpoolBanner) {
     carpoolBanner.style.display = 'none';
 }
+    if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
 
     return;
 }
@@ -1283,6 +1423,7 @@ const userTeam = window.currentUserTeam || 'all';
 if (counterBanner) counterBanner.style.display = 'none';
 if (carpoolBanner) carpoolBanner.style.display = 'none';  
                 if(validationStatus) validationStatus.innerHTML = '';
+                if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
                 return;
             }
 
@@ -1296,6 +1437,7 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
     m &&
     (m.team || '').toLowerCase() !== userTeam.toLowerCase()
 ) {
+    if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
     return;
 }
 
@@ -1305,6 +1447,14 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             
                 ? state.players.filter(p => (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase())
                 : state.players;
+
+            const invites = Object.values(m.extraPlayers || {});
+            const existingIds = new Set(playersForMatch.map(p => p.id));
+            const playerItems = playersForMatch
+                .map(p => ({ p, invite: false }))
+                .concat(invites
+                    .filter(ep => !existingIds.has(ep.id))
+                    .map(ep => ({ p: ep, invite: true })));
 
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
             const teamColors = getTeamColorClasses(m.team);
@@ -1318,6 +1468,14 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             if (!m.positions) m.positions = {};
             if (!m.jerseys) m.jerseys = {};
             if (!m.carpool) m.carpool = {};
+
+            if (inviteSearchBlock) {
+                inviteSearchBlock.classList.toggle('hidden', role !== 'coach' && role !== 'responsable');
+                const inviteInput = document.getElementById('invite-search-input');
+                if (inviteInput) inviteInput.value = '';
+                const inviteResults = document.getElementById('invite-search-results');
+                if (inviteResults) inviteResults.innerHTML = '';
+            }
 
             infoCard.innerHTML = `
                 <div class="flex items-start space-x-3 w-full">
@@ -1368,6 +1526,7 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
                             <div>📅 ${formattedDate} à ${m.heure || '14:30'}</div>
                             <div>🌿 ${m.pelouse || 'Synthétique'}</div>
                         </div>
+                        <div class="mt-1.5 text-[11px] font-bold text-sky-700">🕐 Rendez-vous : ${getRdvHeure(m) || '--'}${m.meetingPlace ? ' — ' + m.meetingPlace : ''}</div>
                     </div>
                 </div>`;
 
@@ -1384,7 +1543,7 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
 
             let convokedCount = 0, totalSeats = 0;
             const targetConvoked = parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
-            playersForMatch.forEach(p => {
+            playerItems.forEach(({ p }) => {
                 if (m.convocations[p.id] === 'convoke') convokedCount++;
                 totalSeats += parseInt(m.carpool[p.id]) || 0;
             });
@@ -1392,224 +1551,123 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             counterBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${convokedCount < targetConvoked ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`;
             counterBanner.innerHTML = `<div class="font-bold text-xs">Convocations : ${convokedCount} / ${targetConvoked}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${convokedCount < targetConvoked ? 'bg-amber-200' : 'bg-sky-200'}">${convokedCount < targetConvoked ? '⚠️ Incomplet' : '🔵 OK'}</span>`;
 
-    const carpoolResponses =
-    state.carpoolResponses?.[
-        m.carpoolId
-    ] || {};
+    const summary = buildCarpoolSummary(m, playerItems.map(it => it.p));
 
-const responses =
-    Object.keys(carpoolResponses).length;
-
-const totalConvoked =
-    playersForMatch.filter(
-        p => m.convocations[p.id] === 'convoke'
-    ).length;
-
-let drivers = 0;
-let passengers = 0;
-let directs = 0;
-let absents = 0;
-let seats = 0;
-
-const driverList = [];
-const driverNoSeatList = [];
-const passengerList = [];
-const directList = [];
-const absentList = [];
-
-Object.entries(carpoolResponses)
-    .forEach(([playerId, r]) => {
-
-        const player =
-            state.players.find(
-                p => p.id === playerId
-            );
-
-        const playerName =
-            player?.name || playerId;
-
-        if (r.status === 'driver') {
-
-            if ((r.seats || 0) > 0) {
-
-                drivers++;
-                seats += r.seats || 0;
-
-                driverList.push(
-                    `${playerName} (${r.seats || 0} places)`
-                );
-
-            } else {
-
-                driverNoSeatList.push(
-                    playerName
-                );
-
-            }
-
-        }
-
-        if (r.status === 'passenger') {
-
-            passengers++;
-            passengerList.push(playerName);
-
-        }
-
-        if (r.status === 'direct') {
-
-            directs++;
-            directList.push(playerName);
-
-        }
-
-        if (r.status === 'absent') {
-
-            absents++;
-            absentList.push(playerName);
-
-        }
-
-    });
-
-const pendingList = [];
-
-playersForMatch.forEach(p => {
-
-    if (
-        m.convocations[p.id] === 'convoke' &&
-        !carpoolResponses[p.id]
-    ) {
-
-        pendingList.push(
-            p.name
-        );
-
-    }
-
-});
-
-const pending =
-    totalConvoked - responses;
-
-const missingSeats =
-    passengers - seats;
-
-const transportStatus =
-    missingSeats > 0
-        ? `🔴 Il manque ${missingSeats} place(s)`
-        : `🟢 Transport assuré`;
-
-const transportClass =
-    missingSeats > 0
-        ? 'text-red-700'
-        : 'text-emerald-700';
+// (statuts et compteurs calculés par buildCarpoolSummary)
 
 if (carpoolBanner) {
 
     carpoolBanner.className =
-        "p-3 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-900";
+        `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${summary.closed ? 'bg-sky-50 border-sky-200 text-sky-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`;
 
     carpoolBanner.innerHTML = `
 <div class="w-full text-xs space-y-1">
 
+<div class="flex flex-wrap items-center gap-2">
+    <div class="font-bold">🚗 Covoiturage</div>
+    ${summary.closed ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-200 text-sky-900">🔒 Confirmé par le coach</span>' : '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-200 text-emerald-900">En cours</span>'}
+</div>
+
+<div>
+✅ Réponses : ${summary.responses}/${summary.totalConvoked}
+</div>
+
+<div>
+⏳ En attente : ${summary.pending}
+</div>
+
+<div>
+🚗 Conducteurs : ${summary.drivers}
+</div>
+
+<div>
+👤 Passagers : ${summary.passengers}
+</div>
+
+<div>
+📍 Direct : ${summary.directs}
+</div>
+
+<div>
+❌ Absents : ${summary.absents}
+</div>
+
 <div class="font-bold">
-🚗 Covoiturage
+🚘 Places proposées : ${summary.seats}
 </div>
 
-<div>
-✅ Réponses : ${responses}/${totalConvoked}
+<div class="font-bold ${summary.transportClass}">
+${summary.transportStatus}
 </div>
 
-<div>
-⏳ En attente : ${pending}
-</div>
-
-<div>
-🚗 Conducteurs : ${drivers}
-</div>
-
-<div>
-👤 Passagers : ${passengers}
-</div>
-
-<div>
-📍 Direct : ${directs}
-</div>
-
-<div>
-❌ Absents : ${absents}
-</div>
-
-<div class="font-bold">
-🚘 Places proposées : ${seats}
-</div>
-
-<div class="font-bold ${transportClass}">
-${transportStatus}
-</div>
-
-${driverList.length ? `
+${summary.driverList.length ? `
 <div class="mt-2">
 🚗 <strong>Conducteurs</strong><br>
-${driverList.join('<br>')}
+${summary.driverList.join('<br>')}
 </div>
 ` : ''}
 
-${driverNoSeatList.length ? `
+${summary.driverNoSeatList.length ? `
 <div class="mt-2">
 🚙 <strong>Conducteurs sans place</strong><br>
-${driverNoSeatList.join('<br>')}
+${summary.driverNoSeatList.join('<br>')}
 </div>
 ` : ''}
 
-${passengerList.length ? `
+${summary.driverAssignments.length ? `
+<div class="mt-2">
+🚗→👤 <strong>Attribution</strong><br>
+${summary.driverAssignments.map(a => `${a.name} : ${a.passengerNames.length ? a.passengerNames.join(', ') : '—'}`).join('<br>')}
+</div>
+` : ''}
+
+${summary.toPlaceList.length ? `
+<div class="mt-2">
+🚫 <strong>À placer</strong><br>
+${summary.toPlaceList.join('<br>')}
+</div>
+` : ''}
+
+${summary.passengerList.length ? `
 <div class="mt-2">
 👤 <strong>Passagers</strong><br>
-${passengerList.join('<br>')}
+${summary.passengerList.join('<br>')}
 </div>
 ` : ''}
 
-${directList.length ? `
+${summary.directList.length ? `
 <div class="mt-2">
 📍 <strong>Direct</strong><br>
-${directList.join('<br>')}
+${summary.directList.join('<br>')}
 </div>
 ` : ''}
 
-${absentList.length ? `
+${summary.absentList.length ? `
 <div class="mt-2">
 ❌ <strong>Absents</strong><br>
-${absentList.join('<br>')}
+${summary.absentList.join('<br>')}
 </div>
 ` : ''}
 
-${pendingList.length ? `
+${summary.pendingList.length ? `
 <div class="mt-2">
 ⏳ <strong>En attente</strong><br>
-${pendingList.join('<br>')}
+${summary.pendingList.join('<br>')}
+</div>
+` : ''}
+
+${m.carpoolId ? `
+<div class="mt-3 flex flex-wrap gap-2">
+    <button onclick="openCarpoolQR('${m.id}')" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold rounded-lg">🏷️ QR & lien</button>
+    ${(role === 'coach' || role === 'admin' || role === 'responsable') ? (summary.closed ? `<button onclick="setCarpoolClosed('${m.id}', false)" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold rounded-lg">🔓 Rouvrir</button>` : `<button onclick="setCarpoolClosed('${m.id}', true)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg"><i class="fa-solid fa-lock mr-1"></i>Clôturer le covoiturage</button>`) : ''}
+    <button onclick="copyCarpoolRecap('${m.id}')" class="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-[11px] font-bold rounded-lg">📤 Récap WhatsApp</button>
 </div>
 ` : ''}
 
 </div>
 `;
-
 }
-renderTransportTab({
-    drivers,
-    passengers,
-    directs,
-    absents,
-    responses,
-    pending,
-    seats,
-    driverList,
-    passengerList,
-    directList,
-    absentList,
-    pendingList,
-    transportStatus
-});
+renderTransportTab(summary);
 
 renderMatchSummary(m);
 
@@ -1618,7 +1676,7 @@ renderMatchSummary(m);
             let htmlMobileCards = '';
             let htmlTableRows = '';
 
-            playersForMatch.forEach(p => {
+            playerItems.forEach(({ p, invite }) => {
                 const currentStatus = m.convocations[p.id] || 'none';
                 const selectedPosition = m.positions[p.id] || p.poste1 || '-';
                 const jerseyNumber = m.jerseys[p.id] || '';
@@ -1635,8 +1693,9 @@ renderMatchSummary(m);
                                     <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
                                     <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
                                 </div>
+                                ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                                 <div>
-                                    <div class="font-bold text-slate-800 text-xs">${p.name}</div>
+                                    <div class="font-bold text-slate-800 text-xs">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}</div>
                                     <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
                                 </div>
                             </div>
@@ -1679,7 +1738,7 @@ renderMatchSummary(m);
                 htmlTableRows += `
                     <tr class="${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
                         <td class="p-3 pl-4">
-                            <div class="font-bold text-slate-800">${p.name}</div>
+                            <div class="font-bold text-slate-800">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}</div>
                             <div class="text-[10px] text-slate-400">Poste favori : ${p.poste1 || '-'}</div>
                         </td>
                         <td class="p-3">
@@ -1704,68 +1763,16 @@ renderMatchSummary(m);
                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
                             </div>
+                            ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                         </td>
                     </tr>
                 `;
             });
 
-            // 2. Rendu du Staff / Coachs (pour Mobile et PC séparément)
-            let staffTableRows = '';
-            let staffMobileCards = '';
-
-            // Filtrer le staff par équipe pour les coaches
-            const staffForMatch = role === 'coach'
-    ? (state.staff || []).filter(s => {
-
-        if (!s.scope) return true;
-
-        const scopes = Array.isArray(s.scope)
-            ? s.scope
-            : [s.scope];
-
-        return scopes.some(scope =>
-            String(scope).toLowerCase() ===
-            userTeam.toLowerCase()
-        );
-
-    })
-    : (state.staff || []);
-
-            if (staffForMatch && staffForMatch.length > 0) {
-                staffTableRows += `<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">Encadrement / Staff Officiel</td></tr>`;
-                staffMobileCards += `<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">Encadrement / Staff Officiel</div>`;
-
-                staffForMatch.forEach(member => {
-                    const hasStaffLicence = member.licence && member.licence.trim() !== '';
-                    
-                    staffTableRows += `
-                        <tr class="bg-sky-50/20 border-b border-slate-100">
-                            <td class="p-3 pl-4">
-                                <div class="font-bold text-slate-800">${member.name}</div>
-                                <span class="text-[10px] text-sky-700 font-semibold">${member.role}</span>
-                            </td>
-                            <td class="p-3" colspan="5">
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-xs text-slate-600">Licence :</span>
-                                    <span class="font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border text-xs">${hasStaffLicence ? member.licence : 'Non renseignée'}</span>
-                                    ${hasStaffLicence ? `<button onclick="navigator.clipboard.writeText('${member.licence}'); showToast('Licence copiée !')" class="p-1 bg-slate-100 hover:bg-sky-100 text-sky-600 rounded text-xs" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>` : ''}
-                                </div>
-                            </td>
-                        </tr>`;
-
-                    staffMobileCards += `
-                        <div class="bg-sky-50/30 border border-slate-200 rounded-xl p-3 mb-2 flex items-center justify-between gap-2">
-                            <div>
-                                <div class="font-bold text-slate-800 text-xs">${member.name}</div>
-                                <span class="text-[10px] text-sky-700 font-semibold">${member.role}</span>
-                            </div>
-                            <div class="flex items-center space-x-1.5">
-                                <span class="font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border text-xs">${hasStaffLicence ? member.licence : 'Non renseignée'}</span>
-                                ${hasStaffLicence ? `<button onclick="navigator.clipboard.writeText('${member.licence}'); showToast('Licence copiée !')" class="p-1 bg-white hover:bg-sky-100 text-sky-600 rounded text-xs border" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>` : ''}
-                            </div>
-                        </div>`;
-                });
-            }
+            // 2. Rendu de l'Entourage (Coachs + Dirigeants) pour Mobile et PC
+            const entourage = buildEntourageHtml(m);
+            const staffTableRows = entourage.table;
+            const staffMobileCards = entourage.mobile;
 
             // Injection finale propre dans les deux conteneurs
             const mobileContainer = document.getElementById('mobile-players-container');
@@ -1783,16 +1790,6 @@ renderMatchSummary(m);
         // ============================================================
 
         let currentTrainingId = null;
-
-        function getTrainingStatusConfig(status) {
-            return {
-                present: { label: 'Présent', color: 'bg-emerald-500 text-white', icon: '✅' },
-                absent:  { label: 'Absent',  color: 'bg-red-500 text-white',     icon: '❌' },
-                retard:  { label: 'Retard',  color: 'bg-amber-400 text-white',   icon: '⏰' },
-                blesse:  { label: 'Blessé',  color: 'bg-purple-500 text-white',  icon: '🤕' },
-                none:    { label: '—',        color: 'bg-slate-100 text-slate-400', icon: '—' }
-            }[status] || { label: '—', color: 'bg-slate-100 text-slate-400', icon: '—' };
-        }
 
         function renderEntrainements() {
             renderTrainingStatsBar();
@@ -1927,17 +1924,28 @@ const nbTotal = playersForTraining.length;
 
     });
             const nbSessions = sessions.length;
-            const nbPlayers = state.players.length;
+
+            // Ne compter que les séances dont l'appel a réellement été rempli :
+            // une séance sans présence ({} ) ne doit pas faire baisser la moyenne.
+            const filledSessions = sessions.filter(s =>
+                (s.presence && Object.keys(s.presence).length > 0)
+            );
             let totalPresences = 0, totalPossible = 0;
-            sessions.forEach(s => {
-                const vals = Object.values(s.presence || {});
-                totalPresences += vals.filter(v =>
+            filledSessions.forEach(s => {
+                const playersForTraining = state.players.filter(p =>
+    (p.team || p.cat || '').toLowerCase() ===
+    (s.team || '').toLowerCase()
+);
+                    const possible = playersForTraining.length;
+                    if (possible === 0) return;
+                    const vals = Object.values(s.presence || {});
+                    totalPresences += vals.filter(v =>
     v === 'present' || v === 'retard'
 ).length;
-                totalPossible += nbPlayers;
-            });
-            const avgPct = totalPossible > 0 ? Math.round((totalPresences / totalPossible) * 100) : 0;
-            const avgColor = avgPct >= 75 ? 'text-emerald-600' : avgPct >= 50 ? 'text-amber-600' : 'text-red-500';
+                    totalPossible += possible;
+                });
+            const avgPct = totalPossible > 0 ? Math.round((totalPresences / totalPossible) * 100) : null;
+            const avgColor = avgPct === null ? 'text-slate-400' : avgPct >= 75 ? 'text-emerald-600' : avgPct >= 50 ? 'text-amber-600' : 'text-red-500';
 
             const bar = document.getElementById('training-stats-bar');
             if (!bar) return;
@@ -1947,7 +1955,7 @@ const nbTotal = playersForTraining.length;
                     <p class="text-[11px] text-slate-500 mt-0.5">Séances</p>
                 </div>
                 <div class="bg-white p-3 rounded-xl border border-slate-100 card-shadow text-center">
-                    <p class="text-2xl font-extrabold ${avgColor}">${avgPct}%</p>
+                    <p class="text-2xl font-extrabold ${avgColor}">${avgPct === null ? '—' : avgPct + '%'}</p>
                     <p class="text-[11px] text-slate-500 mt-0.5">Présence moy.</p>
                 </div>
                 <div class="bg-white p-3 rounded-xl border border-slate-100 card-shadow text-center">
@@ -1955,6 +1963,8 @@ const nbTotal = playersForTraining.length;
                     <p class="text-[11px] text-slate-500 mt-0.5">Présences tot.</p>
                 </div>`;
         }
+
+        window.renderTrainingStatsBar = renderTrainingStatsBar;
 
         function openTrainingDetail(tId) {
             currentTrainingId = tId;
@@ -2017,11 +2027,18 @@ const nbTotal = playersForTraining.length;
             const role = window.currentUserRole || 'public';
             const userTeam = window.currentUserTeam || 'all';
             
-            // Filtrer les joueurs par équipe du coach
+            // Filtrer les joueurs par équipe du coach (multi-scopes possibles)
+            const userScopes = String(userTeam || '')
+                .split(',')
+                .map(t => t.trim().toLowerCase())
+                .filter(Boolean);
+
             let playersToShow = state.players;
             if (role === 'coach') {
                 playersToShow = state.players.filter(p =>
-                    (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase()
+                    userScopes.includes(
+                        (p.team || p.cat || '').toLowerCase()
+                    )
                 );
             }
             
@@ -2064,12 +2081,23 @@ const nbTotal = playersForTraining.length;
                 return d < today;
             });
             
-            // Filtrer les séances de l'équipe du coach
+            // Filtrer les séances de l'équipe du coach (multi-scopes possibles)
+            const userScopes = String(userTeam || '')
+                .split(',')
+                .map(t => t.trim().toLowerCase())
+                .filter(Boolean);
+
             if (role === 'coach') {
                 pastSessions = pastSessions.filter(s =>
-                    (s.team || '').toLowerCase() === userTeam.toLowerCase()
+                    userScopes.includes((s.team || '').toLowerCase())
                 );
             }
+
+            // Ignorer les séances dont l'appel n'a pas été rempli
+            pastSessions = pastSessions.filter(s => {
+                const presence = s.presence || {};
+                return Object.keys(presence).length > 0;
+            });
             
             const container = document.getElementById('training-attendance-bars');
             if (!container) return;
@@ -2078,26 +2106,35 @@ const nbTotal = playersForTraining.length;
                 return;
             }
             
-            // Filtrer les joueurs par équipe du coach
+            // Filtrer les joueurs par équipe du coach (multi-scopes possibles)
             let playersToShow = state.players;
             if (role === 'coach') {
                 playersToShow = state.players.filter(p =>
-                    (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase()
+                    userScopes.includes(
+                        (p.team || p.cat || '').toLowerCase()
+                    )
                 );
             }
             
             const rows = playersToShow.map(p => {
-                let present = 0, total = pastSessions.length;
+                let present = 0, total = 0;
                 pastSessions.forEach(s => {
-    const status = (s.presence || {})[p.id];
+                    if (
+                        (s.team || '').toLowerCase() !==
+                        (p.team || p.cat || '').toLowerCase()
+                    ) {
+                        return;
+                    }
+                    total++;
+                    const status = (s.presence || {})[p.id];
 
-    if (
-        status === 'present' ||
-        status === 'retard'
-    ) {
-        present++;
-    }
-});
+                    if (
+                        status === 'present' ||
+                        status === 'retard'
+                    ) {
+                        present++;
+                    }
+                });
                 const pct = total > 0 ? Math.round((present / total) * 100) : 0;
                 const barColor = pct >= 75 ? 'bg-emerald-400' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400';
                 const textColor = pct >= 75 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-red-500';
@@ -2112,10 +2149,25 @@ const nbTotal = playersForTraining.length;
             container.innerHTML = rows.map(r => r.html).join('');
         }
 
+        window.renderAttendanceBars = renderAttendanceBars;
+
         function setTrainingStatus(pId, status) {
             if (!currentTrainingId) return;
             if (!state.trainings[currentTrainingId].presence) state.trainings[currentTrainingId].presence = {};
             state.trainings[currentTrainingId].presence[pId] = status;
+            
+            // Mise à jour du champ blessure sur l'objet joueur (pour l'effetif)
+            const player = state.players.find(p => p.id === pId);
+            if (status === 'blesse') {
+                player.blessure = true;
+                player.blessureDateDebut = new Date().toISOString().split('T')[0];
+                player.blessureRetour = null;
+            } else if (status === 'present' || status === 'absent' || status === 'retard') {
+                player.blessure = false;
+                player.blessureDateDebut = null;
+                player.blessureRetour = new Date().toISOString().split('T')[0];
+            }
+            
             saveStateToFirebase();
             renderSessionPresenceStats(state.trainings[currentTrainingId]);
             renderAppel(state.trainings[currentTrainingId]);
@@ -2219,6 +2271,7 @@ function duplicateTraining() {
         date: '',
         heure: source.heure || '18:00',
         theme: source.theme || '',
+        lieu: source.lieu || 'Complexe Sportif de Rangueil',
         presence: {},
         pdfData: source.pdfData || null,
         pdfName: source.pdfName || null
@@ -2242,13 +2295,27 @@ function duplicateTraining() {
                 document.getElementById('t-date').value = s.date || '';
                 document.getElementById('t-heure').value = s.heure || '18:00';
                 document.getElementById('t-theme').value = s.theme || '';
+                document.getElementById('t-lieu').value = (s.lieu === 'Stade Struxiano' || s.lieu === 'Complexe Sportif de Rangueil') ? s.lieu : tLieuForDay(s.date);
             } else {
                 document.getElementById('t-title').value = '';
                 document.getElementById('t-date').value = new Date().toISOString().split('T')[0];
                 document.getElementById('t-heure').value = '18:00';
                 document.getElementById('t-theme').value = '';
+                document.getElementById('t-lieu').value = tLieuForDay(document.getElementById('t-date').value);
             }
             toggleModal('modal-training', true);
+        }
+
+        function tLieuForDay(dateStr) {
+            if (!dateStr) return 'Complexe Sportif de Rangueil';
+            const wd = new Date(dateStr + 'T12:00:00').getDay();
+            return wd === 2 ? 'Stade Struxiano' : 'Complexe Sportif de Rangueil';
+        }
+
+        function autoFillTrainingLieu() {
+            const lieuEl = document.getElementById('t-lieu');
+            if (!lieuEl) return;
+            lieuEl.value = tLieuForDay(document.getElementById('t-date').value);
         }
 
         function handleSaveTraining() {
@@ -2265,6 +2332,7 @@ function duplicateTraining() {
                 heure: document.getElementById('t-heure').value || '18:00',
                 team: document.getElementById('t-team').value,
                 theme: theme,
+                lieu: document.getElementById('t-lieu').value || 'Complexe Sportif de Rangueil',
                 presence: existing.presence || {},
                 pdfData: existing.pdfData || null,
                 pdfName: existing.pdfName || null
@@ -2381,6 +2449,7 @@ function duplicateTraining() {
                 date: dateStr,
                 heure: source.heure || '18:00',
                 theme: source.theme || '',
+                lieu: source.lieu || 'Complexe Sportif de Rangueil',
                 team: source.team || '',
                 presence: {},
                 pdfData: source.pdfData || null,
@@ -2397,6 +2466,8 @@ function duplicateTraining() {
         window.updateRecurPreview = updateRecurPreview;
         window.openModalTrainingSettings = openModalTrainingSettings;
         window.handleSaveTrainingSettings = handleSaveTrainingSettings;
+        window.autoFillTrainingLieu = autoFillTrainingLieu;
+        window.tLieuForDay = tLieuForDay;
 
         function editCurrentTraining() {
             if (currentTrainingId) openModalTraining(currentTrainingId);
@@ -2709,6 +2780,425 @@ function formatDateFr(dateString) {
            formatted.slice(1);
 }
 
+function openFeuilleDeMatch() {
+    const m = state.matches[state.selectedMatchId];
+    if (!m) {
+        showToast("Sélectionnez un match pour générer la feuille", "error");
+        return;
+    }
+
+    const now = new Date();
+    const annee = now.getFullYear();
+    const saison = now.getMonth() >= 6 ? annee + '/' + (annee + 1) : (annee - 1) + '/' + annee;
+
+    // Données du formulaire
+    const clubNom = 'RANGUEIL FC';
+    const teamLabel = state.teams?.[m.team]?.name || m.team || '';
+    const compet = m.competitionName || '';
+    const poule = m.poule || '';
+    const journee = m.journee || m.tour || '';
+    const dateStr = m.date
+        ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : '';
+    const dateTab = m.date 
+        ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).split('/') 
+        : ['', '', ''];
+    const heure = m.heure || '';
+    const stade = m.adresse || m.location || '';
+    const terrain = m.pelouse || '';
+    const opponent = m.opponent || '';
+
+    const convoques = state.players
+        .filter(p => m.convocations && m.convocations[p.id] === 'convoke')
+        .slice()
+        .sort((a, b) => {
+            const ja = parseInt(m.jerseys?.[a.id], 10) || 0;
+            const jb = parseInt(m.jerseys?.[b.id], 10) || 0;
+            if (ja && jb) return ja - jb;
+            if (ja) return -1;
+            if (jb) return 1;
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+    function ligneJoueur(p, i) {
+        const parts = (p.name || ' ').split(' ');
+        const nom = (parts[0] || '').toUpperCase();
+        const prenom = parts.slice(1).join(' ');
+        return `
+            <tr>
+                <td class="col-num">${i + 1}</td>
+                <td class="col-lic">${p.licence || ''}</td>
+                <td class="col-nom">${nom}</td>
+                <td class="col-prn">${prenom}</td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-motif"></td>
+            </tr>`;
+    }
+
+    function ligneVide(i) {
+        return `
+            <tr>
+                <td class="col-num">${i + 1}</td>
+                <td class="col-lic"></td>
+                <td class="col-nom"></td>
+                <td class="col-prn"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-mk"></td>
+                <td class="col-motif"></td>
+            </tr>`;
+    }
+
+    const targetConvoked = parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
+    const mesLignes = convoques.map(ligneJoueur).join('') + Array.from({ length: Math.max(0, targetConvoked - convoques.length) }, (_, i) => ligneVide(convoques.length + i)).join('');
+    const lignesVides = Array.from({ length: targetConvoked }, (_, i) => ligneVide(i)).join('');
+
+    const sheetHtml = `
+<style>
+    #feuille-print { 
+        font-family: Arial, Helvetica, sans-serif; 
+        font-size: 9pt;
+        line-height: 1;
+        margin: 0;
+        padding: 0;
+    }
+    #feuille-print table { 
+        border-collapse: collapse; 
+        width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    #feuille-print td, #feuille-print th { 
+        border: 0.5pt solid #000; 
+        padding: 0.8pt 1.5pt;
+        margin: 0;
+        line-height: 1.2;
+    }
+    
+    /* Entête */
+    #feuille-print .fm-header { font-size: 6.5pt; vertical-align: top; }
+    #feuille-print .fm-header-label { font-weight: bold; background-color: #e8e8e8; width: 25%; }
+    #feuille-print .fm-header-value { font-size: 6.5pt; }
+    
+    /* Titre central */
+    #feuille-print .fm-title { font-weight: bold; text-align: center; font-size: 7.5pt; padding: 2pt; background-color: #000; color: #fff; }
+    #feuille-print .fm-title-main { font-size: 8pt; font-weight: 900; }
+    #feuille-print .fm-title-sub { font-size: 6pt; font-weight: bold; }
+    
+    /* Colonnes des tableaux de joueurs */
+    #feuille-print .col-num { width: 3%; text-align: center; font-size: 6.5pt; }
+    #feuille-print .col-lic { width: 10%; font-size: 6.5pt; }
+    #feuille-print .col-nom { width: 17%; font-size: 6.5pt; }
+    #feuille-print .col-prn { width: 14%; font-size: 6.5pt; }
+    #feuille-print .col-mk { width: 3%; text-align: center; font-size: 6pt; }
+    #feuille-print .col-motif { width: 32%; font-size: 6pt; }
+    
+    /* Tableau de joueurs */
+    #feuille-print .fm-player-table { table-layout: fixed; font-size: 6.5pt; }
+    #feuille-print .fm-player-table th { background-color: #e8e8e8; font-weight: bold; text-align: center; font-size: 6pt; padding: 1pt; }
+    #feuille-print .fm-player-table td { height: 5.5mm; vertical-align: top; padding: 0.5pt 1pt; font-size: 6.5pt; }
+    
+    /* Banc */
+    #feuille-print .fm-bench { height: 4mm; padding: 0; }
+    #feuille-print .fm-bench-label { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: bold; text-align: center; font-size: 7pt; padding: 1pt; }
+    
+    /* Signatures */
+    #feuille-print .fm-sig-box { height: 8mm; vertical-align: bottom; font-size: 6pt; padding: 0.5pt; }
+    
+    /* Annexe */
+    #feuille-print .fm-annexe { page-break-before: always; margin: 0; padding: 0; }
+    #feuille-print .fm-annexe-title { font-weight: bold; text-align: center; background-color: #e8e8e8; font-size: 7pt; padding: 1pt; }
+    #feuille-print .fm-annexe-box { border: 0.5pt solid #000; }
+    #feuille-print .fm-annexe-content { height: 32mm; border-bottom: 0.5pt solid #000; }
+    
+    @media print {
+        * { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; height: 100vh; }
+        html { margin: 0; padding: 0; height: 100vh; }
+        #feuille-print { margin: 0; padding: 0; }
+        .feuille-modal { margin: 0; padding: 0; }
+        .a4-sheet { margin: 0; padding: 5mm; }
+    }
+</style>
+
+<!-- PAGE 1 : FEUILLE PRINCIPALE -->
+
+<!-- ENTÊTE COMPACTE -->
+<table style="margin-bottom: 0.5pt; width: 100%; border-collapse: collapse;">
+    <tr>
+        <td style="width: 35%; vertical-align: top; padding: 0;">
+            <table class="fm-header" style="width: 100%; margin: 0;">
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">N° Match :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Compétition :</td><td class="fm-header-value" style="padding: 0.5pt;">${compet || '.......'}</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Journée :</td><td class="fm-header-value" style="padding: 0.5pt;">${journee || '.......'}</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Terrain :</td><td class="fm-header-value" style="padding: 0.5pt;">${terrain || stade || '...'}</td></tr>
+                <tr><td class="fm-header-label" style="padding: 0.5pt;">Date :</td><td class="fm-header-value" style="padding: 0.5pt;">${dateTab[0]||'..'} / ${dateTab[1]||'..'} / ${dateTab[2]||'..'} à ${heure || '..'}</td></tr>
+            </table>
+        </td>
+        <td style="width: 30%; vertical-align: top; padding: 0; text-align: center;">
+            <div style="background-color: #000; color: #fff; padding: 2pt 1pt;">
+                <div class="fm-title-main" style="margin: 0; font-size: 8pt;">FEUILLE DE MATCH</div>
+                <div style="font-size: 5.5pt; font-weight: bold;">LIGUE DE FOOTBALL D'OCCITANIE</div>
+                <div style="font-size: 5pt;">Saison ${saison}</div>
+            </div>
+        </td>
+        <td style="width: 35%; vertical-align: top; padding: 0;">
+            <table class="fm-header" style="width: 100%; margin: 0; font-size: 6.5pt;">
+                <!-- En-tête -->
+                <tr style="background-color: #e8e8e8;">
+                    <td style="padding: 0.5pt; width: 50%; border-right: 0.5pt solid #000; font-weight: bold;">N° Licence ou CI</td>
+                    <td style="padding: 0.5pt; width: 10%; text-align: center; border-right: 0.5pt solid #000; font-weight: bold; font-size: 5.5pt;">Ben.</td>
+                    <td style="padding: 0.5pt; width: 10%; text-align: center; border-right: 0.5pt solid #000; font-weight: bold; font-size: 5.5pt;">Off.</td>
+                    <td style="padding: 0.5pt; width: 30%; font-weight: bold;">NOM Prénom</td>
+                </tr>
+                <!-- Arbitre -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">Arbitre : 2548062598</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;">BENTAHAR Soheib</td>
+                </tr>
+                <!-- Arbitre Assistant 1 -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">Arbitre Asst 1 : 2543210918</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☑</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;">TURAN Yusuf</td>
+                </tr>
+                <!-- Arbitre Assistant 2 -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">Arbitre Asst 2 : 9605327226</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☑</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;">GRECO Paolo</td>
+                </tr>
+                <!-- Arbitre remplaçant -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">Arbitre remplaçant :</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;">...................</td>
+                </tr>
+                <!-- Délégué(s) -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">Délégué(s)</td>
+                    <td colspan="2" style="padding: 0.5pt; border-right: 0.5pt solid #000;"></td>
+                    <td style="padding: 0.5pt;">...................</td>
+                </tr>
+                <!-- Délégué ligne 2 -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">1856518106</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☑</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;">EON Lionel</td>
+                </tr>
+                <!-- Délégué ligne 3 vide -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;"></td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;"></td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- ÉQUIPES -->
+<table style="width: 100%; margin-bottom: 0.5pt; border-collapse: collapse;">
+    <tr>
+        <td style="width: 50%; text-align: center; background-color: #e8e8e8; font-weight: bold; font-size: 7.5pt; padding: 1pt;">
+            ${clubNom} (RECEVANT)
+        </td>
+        <td style="width: 50%; text-align: center; background-color: #e8e8e8; font-weight: bold; font-size: 7.5pt; padding: 1pt;">
+            ${(opponent || 'ÉQUIPE VISITEUSE').toUpperCase()} (VISITEUR)
+        </td>
+    </tr>
+</table>
+
+<!-- TABLEAUX DE JOUEURS COMPACTS -->
+<table style="width: 100%; border-collapse: collapse;">
+    <tr>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table class="fm-player-table" style="width: 100%;">
+                <tr>
+                    <th class="col-num">N°</th>
+                    <th class="col-lic">Licence</th>
+                    <th class="col-nom">NOM</th>
+                    <th class="col-prn">Prénom</th>
+                    <th class="col-mk">E</th>
+                    <th class="col-mk">A</th>
+                    <th class="col-mk">B</th>
+                    <th class="col-mk">R</th>
+                    <th class="col-mk">D</th>
+                    <th class="col-motif">Motif</th>
+                </tr>
+                ${mesLignes}
+            </table>
+        </td>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table class="fm-player-table" style="width: 100%;">
+                <tr>
+                    <th class="col-num">N°</th>
+                    <th class="col-lic">Licence</th>
+                    <th class="col-nom">NOM</th>
+                    <th class="col-prn">Prénom</th>
+                    <th class="col-mk">E</th>
+                    <th class="col-mk">A</th>
+                    <th class="col-mk">B</th>
+                    <th class="col-mk">R</th>
+                    <th class="col-mk">D</th>
+                    <th class="col-motif">Motif</th>
+                </tr>
+                ${lignesVides}
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- BANC RÉDUIT -->
+<table style="width: 100%; border-collapse: collapse; margin-bottom: 0.5pt;">
+    <tr>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table style="width: 100%;">
+                <tr>
+                    <td rowspan="2" class="fm-bench-label" style="width: 10mm; padding: 0.5pt;">BANC REC.</td>
+                    <th class="col-mk" style="padding: 0.5pt;">E</th><th class="col-mk" style="padding: 0.5pt;">A</th><th class="col-mk" style="padding: 0.5pt;">B</th><th class="col-mk" style="padding: 0.5pt;">R</th><th class="col-mk" style="padding: 0.5pt;">D</th>
+                </tr>
+                <tr><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td></tr>
+            </table>
+        </td>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table style="width: 100%;">
+                <tr>
+                    <td rowspan="2" class="fm-bench-label" style="width: 10mm; padding: 0.5pt;">BANC VIS.</td>
+                    <th class="col-mk" style="padding: 0.5pt;">E</th><th class="col-mk" style="padding: 0.5pt;">A</th><th class="col-mk" style="padding: 0.5pt;">B</th><th class="col-mk" style="padding: 0.5pt;">R</th><th class="col-mk" style="padding: 0.5pt;">D</th>
+                </tr>
+                <tr><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td><td class="fm-bench"></td></tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- SIGNATURES COMPACTES -->
+<table style="width: 100%; border-collapse: collapse;">
+    <tr>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table style="width: 100%; font-size: 6pt;">
+                <tr><td colspan="2" style="font-weight: bold; background-color: #e8e8e8; padding: 0.5pt;">Capitaine REC. : ......................</td></tr>
+                <tr>
+                    <td style="width: 50%; height: 8mm; vertical-align: bottom; padding: 0.5pt; border-top: 0.5pt solid #000;">Avant</td>
+                    <td style="height: 8mm; vertical-align: bottom; padding: 0.5pt; border-top: 0.5pt solid #000; border-left: 0.5pt solid #000;">Après</td>
+                </tr>
+            </table>
+        </td>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <table style="width: 100%; font-size: 6pt;">
+                <tr><td colspan="2" style="font-weight: bold; background-color: #e8e8e8; padding: 0.5pt;">Capitaine VIS. : ......................</td></tr>
+                <tr>
+                    <td style="width: 50%; height: 8mm; vertical-align: bottom; padding: 0.5pt; border-top: 0.5pt solid #000;">Avant</td>
+                    <td style="height: 8mm; vertical-align: bottom; padding: 0.5pt; border-top: 0.5pt solid #000; border-left: 0.5pt solid #000;">Après</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<div style="font-size: 5.5pt; text-align: center; border-top: 0.5pt solid #000; padding-top: 0.5pt;">
+    D:Dirigeant — E:Éducateur — M:Encadrement Médical — R:Responsable
+</div>
+
+${buildFeuilleEntourageHtml(m)}
+
+<!-- PAGE 2 : ANNEXE COMPACTE -->
+<div class="fm-annexe" style="margin: 0; padding: 0;">
+
+<table style="width: 100%; margin-bottom: 0.5pt; font-size: 6pt; border-collapse: collapse;">
+    <tr>
+        <td class="fm-header-label" style="padding: 0.5pt;">N° Match :</td><td class="fm-header-value" style="width: 12%; padding: 0.5pt;">.........</td>
+        <td class="fm-header-label" style="padding: 0.5pt;">Compét. :</td><td class="fm-header-value" style="width: 18%; padding: 0.5pt;">${compet || '......'}</td>
+        <td class="fm-header-label" style="padding: 0.5pt;">Poule :</td><td class="fm-header-value" style="padding: 0.5pt;">${poule || '......'}</td>
+    </tr>
+    <tr>
+        <td class="fm-header-label" style="padding: 0.5pt;">Journée :</td><td class="fm-header-value" style="padding: 0.5pt;">.........</td>
+        <td class="fm-header-label" style="padding: 0.5pt;">Date :</td><td colspan="3" class="fm-header-value" style="padding: 0.5pt;">${dateTab[0]||'..'} / ${dateTab[1]||'..'} / ${dateTab[2]||'..'}</td>
+    </tr>
+</table>
+
+<div style="text-align: center; font-weight: bold; font-size: 8pt; letter-spacing: 1px; margin: 1pt 0; padding: 0.5pt 0;">ANNEXE FEUILLE DE MATCH</div>
+
+<table style="width: 100%; border-collapse: collapse;">
+    <tr>
+        <td style="width: 50%; vertical-align: top; padding: 0;">
+            <div class="fm-annexe-title" style="padding: 0.5pt;">RÉSERVES AVANT</div>
+            <div class="fm-annexe-content" style="height: 28mm;"></div>
+            <table style="width: 100%; font-size: 6pt; border-collapse: collapse;">
+                <tr><td style="height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; padding: 0.5pt; font-size: 5pt;">Sign. Cap./Dirgeants</td></tr>
+                <tr><td style="height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; padding: 0.5pt; font-size: 5pt;">Sign. Arbitre</td></tr>
+            </table>
+        </td>
+        <td style="width: 50%; vertical-align: top; padding: 0; border-left: 0.5pt solid #000;">
+            <div class="fm-annexe-title" style="padding: 0.5pt; border-left: none;">OBSERVATIONS APRÈS</div>
+            <div class="fm-annexe-content" style="height: 28mm;"></div>
+            <table style="width: 100%; font-size: 6pt; border-collapse: collapse;">
+                <tr><td style="height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; border-left: none; padding: 0.5pt; font-size: 5pt;">Sign. Cap./Dirgeants</td></tr>
+                <tr><td style="height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; border-left: none; padding: 0.5pt; font-size: 5pt;">Sign. Arbitre</td></tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<div style="margin-top: 1pt;">
+    <div class="fm-annexe-title" style="padding: 0.5pt;">RÉSERVES TECHNIQUES À TRANSCRIRE</div>
+    <div style="height: 40mm; border: 0.5pt solid #000; margin-bottom: 0.5pt;"></div>
+    <table style="width: 100%; font-size: 6pt; border-collapse: collapse;">
+        <tr>
+            <td style="width: 33.33%; height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; padding: 0.5pt; font-size: 5pt;">Sign. Cap./Dirgeants</td>
+            <td style="width: 33.33%; height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; border-left: none; padding: 0.5pt; font-size: 5pt;">Sign. Assistant</td>
+            <td style="width: 33.34%; height: 6mm; vertical-align: bottom; border: 0.5pt solid #000; border-left: none; padding: 0.5pt; font-size: 5pt;">Sign. Arbitre</td>
+        </tr>
+    </table>
+</div>
+
+</div>`;
+
+    const modal = document.createElement('div');
+    modal.className = 'feuille-modal';
+    modal.id = 'feuille-modal';
+    modal.innerHTML = `
+        <div class="feuille-toolbar">
+            <button class="btn-print" onclick="imprimerFeuille()"><i class="fa-solid fa-print"></i> Imprimer</button>
+            <button class="btn-pdf" onclick="telechargerFeuillePDF()"><i class="fa-solid fa-file-pdf"></i> PDF officiel</button>
+            <button onclick="fermerFeuille()"><i class="fa-solid fa-xmark"></i> Fermer</button>
+        </div>
+        <div id="feuille-print" class="a4-sheet">${sheetHtml}</div>
+    `;
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) fermerFeuille();
+    });
+    document.body.appendChild(modal);
+    requestAnimationFrame(() => modal.classList.add('open'));
+}
+
+function imprimerFeuille() {
+    window.print();
+}
+
+function fermerFeuille() {
+    const el = document.getElementById('feuille-modal');
+    if (!el) return;
+    el.classList.remove('open');
+    setTimeout(() => {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+    }, 250);
+}
+
 function getResponseDeadline(dateString) {
 
     if (!dateString) return '--';
@@ -2813,6 +3303,12 @@ function formatDeadlineFr(deadlineText) {
     text +=
     `📅 *Date :* ${formatDateFr(m.date)}\n`;
 
+    text +=
+        `🚗 *Covoiturage — répondez en 30 secondes chrono :*\n`;
+
+    text +=
+        `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpoolId}\n\n`;
+
     if (
         m.location === 'Domicile'
     ) {
@@ -2849,10 +3345,7 @@ function formatDeadlineFr(deadlineText) {
     `🚗 *ORGANISATION DU DÉPLACEMENT*\n\n`;
 
 text +=
-    `👉 *Répondre au covoiturage :*\n`;
-
-text +=
-    `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpoolId}\n\n`;
+    `👉 *Lien de réponse en haut du message ☝️*\n\n`;
 
 
 text +=
@@ -2868,7 +3361,7 @@ text +=
     }
 
     text +=
-        `🕐 *Rendez-vous :* ${document.getElementById('m-rdv-preview')?.innerText || '--'}\n`;
+        `🕐 *Rendez-vous :* ${getRdvHeure(m) || '--'}\n`;
 
     text +=
         `⚽ *Coup d'envoi :* ${m.heure || '--'}\n\n`;
@@ -2878,8 +3371,13 @@ text +=
 text +=
     `${getResponseDeadline(m.date)}\n\n`;
 
+    const targetConvocations =
+        parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
+
     text +=
-        `📋 *Joueurs convoqués (${convoked.length})*\n\n`;
+        (convoked.length < targetConvocations)
+        ? `📋 *Joueurs convoqués pour l'instant (${convoked.length}/${targetConvocations})*\n\n`
+        : `📋 *Joueurs convoqués (${convoked.length})*\n\n`;
 
     convoked.forEach((p, idx) => {
 
@@ -2890,6 +3388,8 @@ text +=
 
     text +=
         `\n💙 Allez Rangueil ! ⚽`;
+
+    text += buildEntourageWhatsAppText(m);
 
     navigator.clipboard
         .writeText(text)
@@ -2910,40 +3410,189 @@ function generateCarpoolReminder() {
 
     if (!m) return;
 
-    const carpoolResponses =
-        state.carpoolResponses?.[
-            m.carpoolId
-        ] || {};
+    const summary = buildCarpoolSummary(m, state.players || []);
 
-    const pendingPlayers =
-        state.players.filter(
-            p =>
-                m.convocations?.[p.id] === 'convoke' &&
-                !carpoolResponses[p.id]
-        );
+    const target =
+        parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
 
-    let text =
+    // Base du calcul transport : objectif équipe (inclut les futurs convoqués)
+    const base = Math.max(target, summary.totalConvoked);
+    const covered = summary.drivers + summary.seats;
+    const need = base - summary.directs - summary.absents;
+    const missing = need - covered;
+    const freeSeats = summary.seats - summary.passengers;
+    const pendingCount = summary.pendingList.length;
+
+    const link =
+        `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpoolId}`;
+
+    const pl = (n, s) => n + ' ' + s + (n > 1 ? 's' : '');
+
+    // "NOM Prénom" → "Prénom N." (court, convivial, sans ambiguïté malgré les doublons)
+    const shortFirst = (full) => {
+        const w = String(full || '').trim().split(/\s+/).filter(Boolean);
+        if (w.length <= 1) return w[0] || '';
+        return w.slice(1).join(' ') + ' ' + (w[0][0] || '').toUpperCase() + '.';
+    };
+
+    // Libellé par joueur : surnom ("Prénom usuel" de la fiche) prioritaire,
+    // sinon "Prénom N." — unicité globale au message (collision → nom complet)
+    const byId = {};
+    (state.players || []).forEach(p => { if (p && p.id) byId[p.id] = p; });
+
+    const rawFor = (id, full) => {
+        const p = id ? byId[id] : null;
+        const nick = p && p.nickname ? String(p.nickname).trim() : '';
+        if (nick) return nick;
+        const nm = (p && p.name) || full || '';
+        return shortFirst(nm);
+    };
+    const canonFor = (id, full) => {
+        const p = id ? byId[id] : null;
+        return String((p && p.name) || full || '').trim();
+    };
+
+    const respMapAll = state.carpoolResponses?.[m.carpoolId] || {};
+    const pendingIdsAll = (state.players || [])
+        .filter(p => m.convocations?.[p.id] === 'convoke' && !respMapAll[p.id])
+        .map(p => p.id);
+    const passengerIdsAll = Object.entries(respMapAll)
+        .filter(([id, r]) => r && r.status === 'passenger')
+        .map(([id]) => id);
+    const nameOf = (id) => (byId[id] && byId[id].name) || id;
+
+    const labelSlots = []
+        .concat(summary.driverAssignments.map(a => ({ id: a.id, full: a.name })))
+        .concat(summary.driverAssignments.flatMap(a => (a.passengerIds || []).map(pid => ({ id: pid, full: nameOf(pid) }))))
+        .concat(passengerIdsAll.map(id => ({ id, full: nameOf(id) })))
+        .concat(pendingIdsAll.map(id => ({ id, full: nameOf(id) })));
+    const rawCounts = {};
+    labelSlots.forEach(s => {
+        const r = rawFor(s.id, s.full);
+        rawCounts[r] = (rawCounts[r] || 0) + 1;
+    });
+    const fmtSlot = (s) => {
+        const r = rawFor(s.id, s.full);
+        return rawCounts[r] > 1 ? canonFor(s.id, s.full) : r;
+    };
+
+    const driverShorts = summary.driverAssignments.map(a => fmtSlot({ id: a.id, full: a.name }));
+
+    const driverLines = summary.driverAssignments.map((a, i) =>
+        `• ${driverShorts[i]} — ${pl(a.seats, 'place')}`
+    ).join('\n');
+
+    const driverDetailLines = summary.driverAssignments.map((a, i) => {
+        const px = (a.passengerIds || []).map(pid => fmtSlot({ id: pid, full: nameOf(pid) }));
+        return `• ${driverShorts[i]} → ${px.length ? px.join(', ') : '—'}`;
+    }).join('\n');
+
+    const pendingShort = pendingIdsAll.map(id => fmtSlot({ id, full: nameOf(id) })).join(', ');
+    const passengersShort = passengerIdsAll.map(id => fmtSlot({ id, full: nameOf(id) })).join(', ');
+    const driversShort = driverShorts.join(' et ');
+
+    // Version URGENTE si match aujourd'hui ou demain et transport non bouclé
+    const todayD = new Date();
+    todayD.setHours(0, 0, 0, 0);
+    const matchD = m.date ? new Date(m.date + 'T12:00:00') : null;
+    if (matchD) matchD.setHours(0, 0, 0, 0);
+    const diffDays = matchD
+        ? Math.round((matchD - todayD) / 86400000)
+        : 99;
+    const isUrgent =
+        diffDays <= 1 && (pendingCount > 0 || missing > 0);
+
+    let text = '';
+
+    if (pendingCount === 0 && missing <= 0) {
+
+        // === VERSION COMPLÈTE : pur remerciement ===
+        text =
+`🔵⚪ RANGUEIL FC ⚪🔵
+
+✅ ${base}/${base} — TOUT LE MONDE A RÉPONDU, MERCI !
+
+🚗 Merci tout particulier à nos conducteurs :
+${driverDetailLines}
+
+🟢 Transport assuré. Bon match à tous 💙⚽`;
+
+    } else if (isUrgent) {
+
+        // === VERSION URGENTE (J-1 / jour J) ===
+        text =
+`🔵⚪ RANGUEIL FC — ⏰ DERNIER APPEL COVOITURAGE
+
+🙏 Merci aux parents qui ont répondu et à nos conducteurs ${driversShort || '—'} qui prennent leur voiture.
+
+🧮 Transport : ${summary.drivers} conducteurs — ${summary.seats} places → ${covered}/${base} joueurs couverts${missing > 0 ? `
+🔎 Il manque ${missing} place(s) !` : ''}
+
+❌ Sans réponse avant ce soir 18h, votre enfant sera noté SANS TRANSPORT et ne pourra pas être du déplacement.
+
+Il manque : ${pendingShort}
+
+👉 C'est ici : ${link}
+
+Merci de votre réactivité 💙`;
+
+    } else {
+
+        // === VERSION STANDARD ===
+        text =
 `🔵⚪ RANGUEIL FC ⚪🔵
 
 ⏳ RELANCE COVOITURAGE
-
-Merci aux joueurs ayant déjà répondu ✅
-
-Les joueurs suivants n'ont pas encore renseigné leur mode de déplacement :
-
 `;
 
-    pendingPlayers.forEach(p => {
-        text += `• ${p.name}\n`;
-    });
+        if (summary.totalConvoked < target) {
+            text += `
+📋 Liste encore provisoire : ${summary.totalConvoked} convoqués pour l'instant, ${pl(target - summary.totalConvoked, 'nom')} à venir.
+`;
+        }
 
-    text += `
+        text += `
+✅ ${summary.responses}/${summary.totalConvoked} ont déjà répondu — merci !
+`;
 
-🚗 Répondre ici :
-https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpoolId}
+        if (summary.drivers > 0) {
+            text += `
+🚗 Un grand merci à nos ${pl(summary.drivers, 'conducteur')} :
+${driverLines}
+`;
+        }
+
+        if (summary.passengers > 0) {
+            text += `
+👤 Merci aussi à ${passengersShort} qui ont répondu passagers —
+vos places sont réservées ✅ (${pl(freeSeats, 'place')} encore ${freeSeats > 1 ? 'libres' : 'libre'})
+`;
+        }
+
+        text += `
+🧮 Transport : ${pl(summary.drivers, 'conducteur')} — ${pl(summary.seats, 'place')} → ${covered}/${base} joueurs couverts
+${missing > 0 ? `🔎 Il manque ${pl(missing, 'place')} !` : `✅ Assez de places pour tout le monde.`}
+`;
+
+        text += `
+⚠️ MÊME LES PASSAGERS doivent répondre : sans votre clic,
+aucune place n'est réservée pour votre enfant.
+Un passager non déclaré = un enfant sans siège prévu.
+`;
+
+        if (pendingCount > 0) {
+            text += `
+⏳ Il manque encore la réponse de : ${pendingShort}
+`;
+        }
+
+        text += `
+👉 Répondre ici (30 secondes) : ${link}
 
 💙 Allez Rangueil !
 `;
+
+    }
 
     navigator.clipboard
         .writeText(text)
@@ -3100,6 +3749,122 @@ https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpool
             saveStateToFirebase();
             renderMatchDetail();
         }
+
+        function onInviteSearchInput(value) {
+            const resultsEl = document.getElementById('invite-search-results');
+            if (!resultsEl) return;
+
+            const query = (value || '').trim().toLowerCase();
+            if (query.length < 2) {
+                resultsEl.innerHTML = '';
+                return;
+            }
+
+            if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) {
+                resultsEl.innerHTML = '';
+                return;
+            }
+
+            const m = state.matches[state.selectedMatchId];
+            const role = window.currentUserRole || 'public';
+            const userTeam = window.currentUserTeam || 'all';
+            const tokens = query.split(/\s+/);
+
+            const present = new Set(Object.keys(m.convocations || {}));
+            Object.keys(m.extraPlayers || {}).forEach(id => present.add(id));
+
+            const ownIds = new Set();
+            if (role === 'coach' || role === 'responsable') {
+                state.players.forEach(p => {
+                    if (present.has(p.id)) return;
+                    if ((p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase()) ownIds.add(p.id);
+                });
+            }
+
+            const matches = state.players.filter(p => {
+                if (present.has(p.id)) return false;
+                if (ownIds.has(p.id)) return false;
+                const hay = ((p.name || '') + ' ' + (p.licence || '') + ' ' + (p.team || '') + ' ' + (p.cat || '')).toLowerCase();
+                return tokens.every(t => hay.includes(t));
+            }).slice(0, 12);
+
+            if (!matches.length) {
+                resultsEl.innerHTML = '<div class="text-[11px] text-slate-400 py-1.5">Aucun joueur trouvé (ou déjà ajouté).</div>';
+                return;
+            }
+
+            resultsEl.innerHTML = matches.map(p => {
+                const teamName = state.teams?.[p.team]?.name || p.team || p.cat || 'Équipe';
+                return `
+                    <div class="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
+                        <div>
+                            <div class="font-bold text-slate-800 text-xs">${p.name}</div>
+                            <div class="text-[10px] text-slate-400">${teamName}${p.licence ? ' · ' + p.licence : ''}</div>
+                        </div>
+                        <button onclick="ajouterInviteJoueur('${m.id}', '${p.id}')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold">Ajouter</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function ajouterInviteJoueur(mId, playerId) {
+            const m = state.matches[mId];
+            if (!m) return;
+            const p = state.players.find(pp => pp.id === playerId);
+            if (!p) return;
+
+            if (!m.extraPlayers) m.extraPlayers = {};
+            m.extraPlayers[playerId] = Object.assign({}, p);
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function retirerInviteJoueur(mId, playerId) {
+            const m = state.matches[mId];
+            if (!m) return;
+
+            if (m.extraPlayers) delete m.extraPlayers[playerId];
+            if (m.convocations) delete m.convocations[playerId];
+            if (m.positions) delete m.positions[playerId];
+            if (m.jerseys) delete m.jerseys[playerId];
+            if (m.carpool) delete m.carpool[playerId];
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+// Calcule l'heure de RDV : coup d'envoi - arrivée - (trajet + sécurité si extérieur)
+function computeRdvHeure(heureStr, location, travel, arrival, security) {
+    if (!heureStr || !String(heureStr).includes(':')) return '';
+    const parts = String(heureStr).split(':').map(Number);
+    const hours = parts[0] || 0;
+    const minutes = parts[1] || 0;
+    const arr = parseInt(arrival) || 60;
+    let totalMinutes;
+    if (location === 'Domicile') {
+        totalMinutes = (hours * 60) + minutes - arr;
+    } else {
+        totalMinutes = (hours * 60) + minutes - arr - (parseInt(travel) || 0) - (parseInt(security) || 0);
+    }
+    if (totalMinutes < 0) totalMinutes = 0;
+    const rdvHours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+    const rdvMinutes = String(totalMinutes % 60).padStart(2, '0');
+    return rdvHours + ':' + rdvMinutes;
+}
+
+// Heure RDV d'un match : champ persisté si présent, sinon recalculé depuis les marges
+// (couvre les matchs créés avant l'ajout du champ rdvHeure)
+function getRdvHeure(m) {
+    if (!m) return '';
+    if (m.rdvHeure) return m.rdvHeure;
+    return computeRdvHeure(
+        m.heure,
+        m.location,
+        m.travelTime != null ? m.travelTime : 25,
+        m.arrivalMargin != null ? m.arrivalMargin : 60,
+        m.securityMargin != null ? m.securityMargin : 10
+    );
+}
+
 function updateMeetingPreview() {
 
     const matchTime =
@@ -3120,46 +3885,13 @@ function updateMeetingPreview() {
     const location =
         document.getElementById('m-location').value;
 
-    const [hours, minutes] =
-        matchTime.split(':').map(Number);
-
     const arrival =
     parseInt(
         document.getElementById('m-arrival-margin').value
     ) || 60;
 
-let totalMinutes;
-
-if (location === 'Domicile') {
-
-    totalMinutes =
-        (hours * 60) +
-        minutes -
-        arrival;
-
-} else {
-
-    totalMinutes =
-        (hours * 60) +
-        minutes -
-        arrival -
-        travel -
-        security;
-
-}
-
-    if (totalMinutes < 0) totalMinutes = 0;
-
-    const rdvHours =
-        String(Math.floor(totalMinutes / 60))
-            .padStart(2, '0');
-
-    const rdvMinutes =
-        String(totalMinutes % 60)
-            .padStart(2, '0');
-
     document.getElementById('m-rdv-preview').innerText =
-        rdvHours + ':' + rdvMinutes;
+        computeRdvHeure(matchTime, location, travel, arrival, security) || '--';
 }
 
 function updateMatchLocationUI() {
@@ -3256,14 +3988,19 @@ function updateMatchLocationUI() {
     const matchId = document.getElementById('m-id').value || 'M' + Date.now();
     const existingMatch =
     state.matches[matchId] || {};
+    const saveHeure = document.getElementById('m-heure').value;
+    const saveLocation = document.getElementById('m-location').value;
+    const saveTravel = parseInt(document.getElementById('m-travel-time').value) || 25;
+    const saveArrival = parseInt(document.getElementById('m-arrival-margin').value) || 60;
+    const saveSecurity = parseInt(document.getElementById('m-security-margin').value) || 10;
     const matchData = {
         id: matchId,
         opponent: document.getElementById('m-opponent').value,
         adresse: document.getElementById('m-adresse').value,
         date: document.getElementById('m-date').value,
-        heure: document.getElementById('m-heure').value,
+        heure: saveHeure,
         type: document.getElementById('m-type').value,
-        location: document.getElementById('m-location').value,
+        location: saveLocation,
         pelouse: document.getElementById('m-pelouse').value,
         team: teamValue,
 
@@ -3275,23 +4012,17 @@ meetingPlace:
     document.getElementById('m-meeting-place').value,
 
 
-travelTime:
-    parseInt(
-        document.getElementById('m-travel-time').value
-    ) || 25,
+travelTime: saveTravel,
 
- arrivalMargin:
-    parseInt(
-        document.getElementById('m-arrival-margin').value
-    ) || 60,  
+ arrivalMargin: saveArrival,
 
-securityMargin:
-    parseInt(
-        document.getElementById('m-security-margin').value
-    ) || 10,
-        // Initialiser les champs optionnels
-        scoreHome: "",
-        scoreAway: "",
+securityMargin: saveSecurity,
+
+// Heure de RDV calculée et persistée (affichée page covoiturage + WhatsApp)
+rdvHeure: computeRdvHeure(saveHeure, saveLocation, saveTravel, saveArrival, saveSecurity),
+        // Conserver les scores existants (ne pas les effacer à l'édition)
+        scoreHome: existingMatch.scoreHome != null ? existingMatch.scoreHome : "",
+        scoreAway: existingMatch.scoreAway != null ? existingMatch.scoreAway : "",
         convocations: existingMatch.convocations || {},
 positions: existingMatch.positions || {},
 jerseys: existingMatch.jerseys || {},
@@ -3332,6 +4063,7 @@ state.selectedMatchId = matchId;
                     document.getElementById('modal-player-title').innerText = "Modifier le Joueur";
                     document.getElementById('p-id').value = player.id;
                     document.getElementById('p-name').value = player.name || '';
+                    document.getElementById('p-nickname').value = player.nickname || '';
                     document.getElementById('p-licence').value = player.licence !== '-' ? player.licence : '';
                     document.getElementById('p-team').value = player.team || 'U14';
                     document.getElementById('p-poste1').value = (player.poste1 || '').replace('-', '');
@@ -3372,9 +4104,12 @@ if (role === 'responsable') {
         function handleSavePlayer(e) {
             e.preventDefault();
             const pId = document.getElementById('p-id').value;
+            const existingPlayer = pId ? state.players.find(p => p.id === pId) : null;
             const playerData = {
+    ...(existingPlayer || {}),
     id: pId || 'J_' + Date.now(),
     name: document.getElementById('p-name').value,
+    nickname: document.getElementById('p-nickname').value.trim(),
     licence: document.getElementById('p-licence').value.trim() || '-',
     team: document.getElementById('p-team').value,
     poste1: document.getElementById('p-poste1').value.trim() || '-',
@@ -3406,6 +4141,496 @@ if (role === 'responsable') {
             }
         }
 
+        /* ============================================================
+           GESTION DU STAFF & DIRIGEANTS
+           ============================================================ */
+
+        function getStaffRole(s) {
+            return (s && (s.role || s.functionName)) || "Dirigeant d'équipe";
+        }
+
+        function getStaffTeam(s) {
+            if (s && s.team) return s.team;
+            if (s && Array.isArray(s.scope)) return s.scope[0] || '';
+            if (s && typeof s.scope === 'string') return s.scope;
+            return '';
+        }
+
+        function staffHash(text) {
+            let h = 0;
+            for (let i = 0; i < text.length; i++) h = ((h << 5) - h + text.charCodeAt(i)) | 0;
+            return Math.abs(h).toString(36);
+        }
+
+        function staffId(s) {
+            if (!s) return '';
+            if (!s.id) s.id = 'ST_' + staffHash(((s.name || '') + '|' + (s.licence || '') + '|' + getStaffRole(s)).toLowerCase());
+            return s.id;
+        }
+
+        function normalizeStaff() {
+            if (!Array.isArray(state.staff)) state.staff = [];
+            state.staff.forEach(s => {
+                if (!s.team) s.team = getStaffTeam(s) || '';
+                if (!s.role && s.functionName) s.role = s.functionName;
+                staffId(s);
+            });
+        }
+
+        function setEffectifTab(tab) {
+            currentEffectifTab = tab;
+            const active = tab === 'staff';
+            const playersTab = document.getElementById('effectif-tab-joueurs');
+            const staffTab = document.getElementById('effectif-tab-staff');
+            const playersGrid = document.getElementById('effectif-full-container');
+            const staffGrid = document.getElementById('staff-effectif-container');
+            const searchPlayer = document.getElementById('search-player');
+            const addBtn = document.getElementById('effectif-add-btn');
+
+            if (playersTab) playersTab.className = active ? 'px-3 py-1.5 rounded-md text-slate-600 transition' : 'px-3 py-1.5 rounded-md bg-sky-600 text-white transition';
+            if (staffTab) staffTab.className = active ? 'px-3 py-1.5 rounded-md bg-sky-600 text-white transition' : 'px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-800 transition';
+            if (playersGrid) playersGrid.classList.toggle('hidden', active);
+            if (staffGrid) staffGrid.classList.toggle('hidden', !active);
+            if (searchPlayer) searchPlayer.classList.toggle('hidden', active);
+            if (addBtn) {
+                addBtn.innerHTML = active
+                    ? '<i class="fa-solid fa-user-tie"></i><span>Ajouter</span>'
+                    : '<i class="fa-solid fa-user-plus"></i><span>Ajouter</span>';
+            }
+            if (active) renderStaffEffectif();
+        }
+
+        function openEffectifAdd() {
+            if (currentEffectifTab === 'staff') {
+                openModalStaff();
+                renderStaffEffectif();
+            } else {
+                openModalPlayer();
+            }
+        }
+
+        function renderStaffEffectif() {
+            const container = document.getElementById('staff-effectif-container');
+            if (!container) return;
+            normalizeStaff();
+
+            const roleBadge = r => {
+                if (r === 'Coach Principal') return 'bg-sky-100 text-sky-800';
+                if (r === 'Coach Adjoint') return 'bg-indigo-100 text-indigo-800';
+                if (r === "Dirigeant d'équipe") return 'bg-amber-100 text-amber-800';
+                return 'bg-slate-100 text-slate-700';
+            };
+
+            const list = state.staff || [];
+
+            container.innerHTML = list.length ? list.map(s => {
+                const role = getStaffRole(s);
+                const teamKey = getStaffTeam(s);
+                const teamName = state.teams?.[teamKey]?.name || teamKey || 'Toutes équipes';
+                const hasLic = s.licence && String(s.licence).trim() && String(s.licence).trim() !== '-';
+                return `
+                    <div class="p-3 bg-white border border-slate-200 rounded-xl flex flex-col justify-between space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold text-xs text-slate-800">${s.name || '—'}</h3>
+                                <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${roleBadge(role)}">${role}</span>
+                                <p class="text-[11px] text-slate-500 mt-1">Équipe : ${teamName}</p>
+                            </div>
+                            <div class="flex items-center space-x-1.5">
+                                <button onclick="openModalStaff('${staffId(s)}')" class="p-1 text-sky-600 hover:bg-sky-100 rounded" aria-label="Modifier"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
+                                <button onclick="deleteStaffMember('${staffId(s)}')" class="p-1 text-slate-400 hover:text-red-600 rounded" aria-label="Supprimer"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                            <span class="text-[10px] text-slate-500 uppercase font-bold">Licence :</span>
+                            <span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border text-xs ${hasLic ? '' : 'text-amber-700'}">${hasLic ? s.licence : '⚠️ Manquante'}</span>
+                        </div>
+                    </div>`;
+            }).join('') : `
+                <div class="col-span-full text-center text-slate-400 text-xs py-8">
+                    <i class="fa-solid fa-user-tie text-2xl mb-2 opacity-30"></i>
+                    <p class="font-bold">Aucun membre de staff</p>
+                    <p>Ajoutez coaches et dirigeants avec le bouton « Ajouter ».</p>
+                </div>`;
+        }
+
+        function openModalStaff(staffToEdit = null) {
+            const form = document.getElementById('form-staff');
+            if (form) form.reset();
+
+            const teamSel = document.getElementById('s-team');
+            if (teamSel && (teamSel.options.length === 0 || document.getElementById('s-id').value !== staffToEdit)) {
+                const keys = Object.keys(state.teams || {});
+                teamSel.innerHTML = keys.map(k => `<option value="${k}">${state.teams[k].name || k.toUpperCase()}</option>`).join('');
+            }
+
+            if (staffToEdit) {
+                const s = (state.staff || []).find(x => staffId(x) === staffToEdit);
+                if (s) {
+                    document.getElementById('modal-staff-title').innerText = 'Modifier un membre du Staff';
+                    document.getElementById('s-id').value = staffId(s);
+                    document.getElementById('s-name').value = s.name || '';
+                    document.getElementById('s-licence').value = s.licence && s.licence !== '-' ? s.licence : '';
+                    const roleV = getStaffRole(s);
+                    const inList = ['Coach Principal', 'Coach Adjoint', "Dirigeant d'équipe"].indexOf(roleV) !== -1;
+                    document.getElementById('s-role').value = inList ? roleV : 'Autre';
+                    const tV = getStaffTeam(s);
+                    if (teamSel && tV && Object.keys(state.teams || {}).indexOf(tV) !== -1) teamSel.value = tV;
+                }
+            } else {
+                document.getElementById('modal-staff-title').innerText = 'Ajouter un membre du Staff';
+                document.getElementById('s-id').value = '';
+            }
+            toggleModal('modal-staff', true);
+        }
+
+        function handleSaveStaff(e) {
+            e.preventDefault();
+            const sId = document.getElementById('s-id').value;
+            const roleVal = document.getElementById('s-role').value;
+            const staffData = {
+                id: sId || 'ST_' + Date.now(),
+                name: document.getElementById('s-name').value,
+                licence: document.getElementById('s-licence').value.trim() || '-',
+                role: roleVal === 'Autre' ? "Dirigeant d'équipe" : roleVal,
+                team: document.getElementById('s-team').value || ''
+            };
+
+            if (sId) {
+                const idx = (state.staff || []).findIndex(x => staffId(x) === sId);
+                if (idx !== -1) {
+                    state.staff[idx] = Object.assign({}, state.staff[idx], staffData);
+                } else {
+                    if (!Array.isArray(state.staff)) state.staff = [];
+                    state.staff.push(staffData);
+                }
+            } else {
+                if (!Array.isArray(state.staff)) state.staff = [];
+                state.staff.push(staffData);
+            }
+
+            saveStateToFirebase();
+            toggleModal('modal-staff', false);
+            renderAll();
+        }
+
+        function deleteStaffMember(sid) {
+            const target = (state.staff || []).find(x => staffId(x) === sid);
+            if (!target) return;
+            if (confirm("Supprimer « " + (target.name || 'ce membre') + " » du staff ?")) {
+                state.staff = (state.staff || []).filter(x => staffId(x) !== sid);
+                saveStateToFirebase();
+                renderAll();
+            }
+        }
+
+        function copierTexte(t) {
+            if (!t) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(String(t)).then(() => { try { showToast('Copié !'); } catch (e) {} }).catch(() => {});
+            } else {
+                try { showToast('Copie non disponible', 'error'); } catch (e) {}
+            }
+        }
+
+        /* ============================================================
+           ENTOURAGE DU MATCH (Coach principal, adjoint, dirigeants)
+           ============================================================ */
+
+        function matchEntourageGuard(m) {
+            if (!m.entourage) m.entourage = { principalId: null, adjointId: null, dirigeants: {} };
+            if (!m.entourage.dirigeants) m.entourage.dirigeants = {};
+            if (!m.entourage.principalId) m.entourage.principalId = null;
+            if (!m.entourage.adjointId) m.entourage.adjointId = null;
+            return m.entourage;
+        }
+
+        function staffByEntourageId(id) {
+            if (!id) return null;
+            return (state.staff || []).find(s => staffId(s) === id) || null;
+        }
+
+        function staffSelectOptions(sortedStaff, selectedId, withEmpty) {
+            const parts = [];
+            if (withEmpty) parts.push('<option value="">— Aucun —</option>');
+            sortedStaff.forEach(s => {
+                const tid = getStaffTeam(s);
+                const tname = state.teams?.[tid]?.name || tid || '';
+                const sel = staffId(s) === selectedId ? ' selected' : '';
+                parts.push('<option value="' + staffId(s) + '"' + sel + '>' + (s.name || '—') + ' — ' + getStaffRole(s) + (tname ? ' (' + tname + ')' : '') + '</option>');
+            });
+            return parts.join('');
+        }
+
+        function entourageLicenceChip(s) {
+            if (!s) return '<span class="text-[10px] text-slate-400 italic">Aucun membre sélectionné</span>';
+            const lic = s.licence && String(s.licence).trim() && String(s.licence).trim() !== '-' ? s.licence : null;
+            const val = lic || '⚠️ Licence manquante';
+            const cls = lic ? '' : ' text-amber-700';
+            return '<div class="flex items-center space-x-1.5">'
+                + '<span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border text-xs' + cls + '">' + val + '</span>'
+                + (lic ? '<button onclick="copierTexte(\'' + lic + '\')" class="p-1 bg-slate-100 hover:bg-sky-100 text-sky-600 rounded text-xs border" title="Copier la licence"><i class="fa-regular fa-copy"></i></button>' : '')
+                + '</div>';
+        }
+
+        function buildEntourageHtml(m) {
+            normalizeStaff();
+            const ent = matchEntourageGuard(m);
+            const staff = state.staff || [];
+
+            const principal = staffByEntourageId(ent.principalId);
+            const adjoint = staffByEntourageId(ent.adjointId);
+
+            const sortedStaff = staff.slice().sort((a, b) =>
+                getStaffRole(a).localeCompare(getStaffRole(b)) || (a.name || '').localeCompare(b.name || '')
+            );
+
+            let table = '';
+            let mobile = '';
+
+            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">🎽 Encadrement & Dirigeants</td></tr>';
+            mobile += '<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">🎽 Encadrement & Dirigeants</div>';
+
+            if (staff.length === 0) {
+                const hint = 'Ajoutez d\'abord coaches et dirigeants dans Effectif → Staff & Dirigeants.';
+                table += '<tr><td colspan="6" class="p-2 pl-4 text-[10px] text-slate-400 italic">' + hint + '</td></tr>';
+                mobile += '<div class="text-[10px] text-slate-400 italic mb-2">' + hint + '</div>';
+            } else {
+                const coachRow = (label, field, current) => `
+                    <tr class="border-b border-slate-100 bg-slate-50/40">
+                        <td class="p-2 pl-4 font-bold text-slate-700 text-xs">${label}</td>
+                        <td colspan="5" class="p-2">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <select id="entourage-coach-select-${m.id}-${field}-table" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg">
+                                    ${staffSelectOptions(sortedStaff, current ? staffId(current) : '', true)}
+                                </select>
+                                <button onclick="ajouterCoach('${m.id}','${field}','table')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold">Assigner</button>
+                                ${entourageLicenceChip(current)}
+                                ${current ? `<button onclick="retirerCoach('${m.id}','${field}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
+                            </div>
+                        </td>
+                    </tr>`;
+
+                table += coachRow('Coach principal', 'principal', principal);
+                table += coachRow('Coach adjoint', 'adjoint', adjoint);
+
+                const mobileCoach = (label, field, current) => `
+                    <div class="bg-white border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
+                        <div class="font-bold text-slate-700 text-xs">${label}</div>
+                        <div class="flex items-center space-x-2">
+                            <select id="entourage-coach-select-${m.id}-${field}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1">
+                                ${staffSelectOptions(sortedStaff, current ? staffId(current) : '', true)}
+                            </select>
+                            <button onclick="ajouterCoach('${m.id}','${field}','mobile')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold shrink-0">OK</button>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                            <span class="text-[10px] text-slate-500 uppercase font-bold">Licence</span>
+                            <div class="flex items-center space-x-1.5">
+                                ${entourageLicenceChip(current)}
+                                ${current ? `<button onclick="retirerCoach('${m.id}','${field}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+
+                mobile += mobileCoach('Coach principal', 'principal', principal);
+                mobile += mobileCoach('Coach adjoint', 'adjoint', adjoint);
+            }
+
+            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">👥 Dirigeants convoqués</td></tr>';
+
+            table += `
+                <tr class="border-b border-slate-100">
+                    <td class="p-2 pl-4 font-bold text-slate-700 text-xs">Ajouter</td>
+                    <td colspan="5" class="p-2">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <select id="entourage-dirigeant-select-${m.id}-table" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg">
+                                ${staffSelectOptions(sortedStaff, '', false)}
+                            </select>
+                            <button onclick="addMatchDirigeant('${m.id}','table')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold">Ajouter</button>
+                        </div>
+                    </td>
+                </tr>`;
+
+            mobile += `
+                <div class="bg-white border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
+                    <div class="font-bold text-slate-700 text-xs">Ajouter un dirigeant</div>
+                    <div class="flex items-center space-x-2">
+                        <select id="entourage-dirigeant-select-${m.id}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1">
+                            ${staffSelectOptions(sortedStaff, '', false)}
+                        </select>
+                        <button onclick="addMatchDirigeant('${m.id}','mobile')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold shrink-0">Ajouter</button>
+                    </div>
+                </div>`;
+
+            Object.keys(ent.dirigeants).forEach(id => {
+                const s = staffByEntourageId(id);
+                if (!s) return;
+                const d = ent.dirigeants[id] || { role: 'Juge de touche', convoked: true };
+
+                table += `
+                    <tr class="border-b border-slate-100 bg-slate-50/30">
+                        <td class="p-2 pl-4">
+                            <div class="font-bold text-slate-800 text-xs">${s.name}</div>
+                            <div class="text-[10px] text-slate-400">${getStaffRole(s)}</div>
+                        </td>
+                        <td class="p-2">${entourageLicenceChip(s)}</td>
+                        <td class="p-2">
+                            <select onchange="setMatchDirigeantRole('${m.id}','${id}',this.value)" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg">
+                                <option value="Juge de touche" ${d.role === 'Juge de touche' ? 'selected' : ''}>🚩 Juge de touche</option>
+                                <option value="Délégué" ${d.role === 'Délégué' ? 'selected' : ''}>📋 Délégué</option>
+                            </select>
+                        </td>
+                        <td class="p-2 text-center">
+                            <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
+                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','convoque')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Oui</button>
+                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','non')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'text-slate-600' : 'active-nonconvoke bg-slate-600 text-white'}">Non</button>
+                            </div>
+                        </td>
+                        <td class="p-2 text-center">
+                            <button onclick="retirerMatchDirigeant('${m.id}','${id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>
+                        </td>
+                    </tr>`;
+
+                mobile += `
+                    <div class="bg-white border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="font-bold text-slate-800 text-xs">${s.name}</div>
+                                <div class="text-[10px] text-slate-400">${getStaffRole(s)}</div>
+                            </div>
+                            <button onclick="retirerMatchDirigeant('${m.id}','${id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                            <span class="text-[10px] text-slate-500 uppercase font-bold">Licence</span>
+                            ${entourageLicenceChip(s)}
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                            <select onchange="setMatchDirigeantRole('${m.id}','${id}',this.value)" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1">
+                                <option value="Juge de touche" ${d.role === 'Juge de touche' ? 'selected' : ''}>🚩 Juge de touche</option>
+                                <option value="Délégué" ${d.role === 'Délégué' ? 'selected' : ''}>📋 Délégué</option>
+                            </select>
+                            <div class="inline-flex rounded-lg border p-0.5 bg-slate-50 shrink-0">
+                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','convoque')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Oui</button>
+                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','non')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'text-slate-600' : 'active-nonconvoke bg-slate-600 text-white'}">Non</button>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+
+            return { table, mobile };
+        }
+
+        function ajouterCoach(mId, field, suffix) {
+            normalizeStaff();
+            const m = state.matches[mId];
+            if (!m) return;
+            const sel = document.getElementById('entourage-coach-select-' + mId + '-' + field + '-' + suffix);
+            const val = sel ? sel.value : '';
+            if (!val) { showToast('Choisissez un coach dans la liste', 'error'); return; }
+            matchEntourageGuard(m);
+            if (field === 'adjoint') m.entourage.adjointId = val; else m.entourage.principalId = val;
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function retirerCoach(mId, field) {
+            const m = state.matches[mId];
+            if (!m) return;
+            matchEntourageGuard(m);
+            if (field === 'adjoint') m.entourage.adjointId = null; else m.entourage.principalId = null;
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function addMatchDirigeant(mId, suffix) {
+            const m = state.matches[mId];
+            if (!m) return;
+            const sel = document.getElementById('entourage-dirigeant-select-' + mId + '-' + suffix);
+            const val = sel ? sel.value : '';
+            if (!val) { showToast('Choisissez un dirigeant dans la liste', 'error'); return; }
+            matchEntourageGuard(m);
+            m.entourage.dirigeants[val] = { role: 'Juge de touche', convoked: true };
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function setMatchDirigeantRole(mId, staffSel, role) {
+            const m = state.matches[mId];
+            if (!m || !m.entourage || !m.entourage.dirigeants || !m.entourage.dirigeants[staffSel]) return;
+            m.entourage.dirigeants[staffSel].role = role;
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function setMatchDirigeantStatus(mId, staffSel, status) {
+            const m = state.matches[mId];
+            if (!m || !m.entourage || !m.entourage.dirigeants || !m.entourage.dirigeants[staffSel]) return;
+            m.entourage.dirigeants[staffSel].convoked = status === 'convoque';
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function retirerMatchDirigeant(mId, staffSel) {
+            const m = state.matches[mId];
+            if (!m || !m.entourage || !m.entourage.dirigeants) return;
+            delete m.entourage.dirigeants[staffSel];
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        function buildEntourageWhatsAppText(m) {
+            normalizeStaff();
+            const ent = matchEntourageGuard(m);
+            const parts = [];
+
+            const principal = staffByEntourageId(ent.principalId);
+            const adjoint = staffByEntourageId(ent.adjointId);
+
+            if (principal) parts.push('👔 *Entraîneur :* ' + principal.name + (principal.licence && principal.licence !== '-' ? ' (' + principal.licence + ')' : ''));
+            if (adjoint) parts.push('👔 *Entraîneur adjoint :* ' + adjoint.name + (adjoint.licence && adjoint.licence !== '-' ? ' (' + adjoint.licence + ')' : ''));
+
+            Object.keys(ent.dirigeants || {}).forEach(id => {
+                const s = staffByEntourageId(id);
+                const d = ent.dirigeants[id];
+                if (!s || !d.convoked) return;
+                parts.push('📋 *Dirigeant (' + (d.role || 'Juge de touche') + ') :* ' + s.name);
+            });
+
+            if (!parts.length) return '';
+            return '\n🎽 *ENCADREMENT*\n' + parts.join('\n');
+        }
+
+        function buildFeuilleEntourageHtml(m) {
+            normalizeStaff();
+            const ent = matchEntourageGuard(m);
+
+            const principal = staffByEntourageId(ent.principalId);
+            const adjoint = staffByEntourageId(ent.adjointId);
+
+            const dirList = Object.keys(ent.dirigeants || {})
+                .map(id => ({ s: staffByEntourageId(id), d: ent.dirigeants[id] }))
+                .filter(x => x.s && x.d.convoked);
+
+            if (!principal && !adjoint && !dirList.length) return '';
+
+            const nomLic = s => (s ? (s.name || '—') + (s.licence && s.licence !== '-' ? ' (' + s.licence + ')' : '') : '—');
+
+            let rows = '';
+            if (principal) rows += '<tr><td style="width: 24%; padding: 0.5pt;">Entraîneur principal</td><td style="padding: 0.5pt;">' + nomLic(principal) + '</td></tr>';
+            if (adjoint) rows += '<tr><td style="width: 24%; padding: 0.5pt;">Entraîneur adjoint</td><td style="padding: 0.5pt;">' + nomLic(adjoint) + '</td></tr>';
+            dirList.forEach(x => rows += '<tr><td style="width: 24%; padding: 0.5pt;">Dirigeant (' + (x.d.role || 'Juge de touche') + ')</td><td style="padding: 0.5pt;">' + nomLic(x.s) + '</td></tr>');
+
+            return `
+                <table style="width: 100%; border-collapse: collapse; margin-top: 1pt; font-size: 6pt;">
+                    <tr>
+                        <td colspan="2" style="background-color: #e8e8e8; font-weight: bold; padding: 0.5pt;">
+                            ENCADREMENT & DIRIGEANTS
+                        </td>
+                    </tr>
+                    ${rows}
+                </table>`;
+        }
+
         function setFilterCat(cat) {
             currentCatFilter = cat;
             document.querySelectorAll('.cat-filter-btn').forEach(btn => {
@@ -3428,8 +4653,32 @@ if (active) {
         }
 
         function toggleModal(modalId, show) {
-            document.getElementById(modalId).classList.toggle('hidden', !show);
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            modal.classList.toggle('hidden', !show);
+            if (show) {
+                modal._previouslyFocused = document.activeElement;
+                const focusable = modal.querySelector('button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])');
+                if (focusable) focusable.focus();
+            } else {
+                const el = modal._previouslyFocused;
+                if (el && typeof el.focus === 'function') el.focus();
+            }
         }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const openModals = document.querySelectorAll('.modal-overlay:not(.hidden)');
+            if (!openModals.length) return;
+            const openModal = openModals[openModals.length - 1];
+            if (openModal.id === 'modal-event') {
+                closeEventModal();
+            } else if (openModal.id === 'admin-access-modal') {
+                toggleAdminModal(false);
+            } else {
+                toggleModal(openModal.id, false);
+            }
+        });
 
         function showToast(message, type = 'success') {
             const existing = document.getElementById('toast-notification');
@@ -3880,16 +5129,6 @@ function openNewAccountForm() {
 }
 
 
-// Gérer l'affichage du champ équipe selon le rôle sélectionné
-window.toggleTeamInput = function(role) {
-    const group = document.getElementById("team-input-group");
-    if (role === "admin" || role === "dirigeant" || role === "public") {
-        group.style.display = "none";
-    } else {
-        group.style.display = "block";
-    }
-}
-
 // Enregistrement ou mise à jour d'un compte dans Firebase
 document.addEventListener("DOMContentLoaded", () => {
     const coachForm = document.getElementById("coach-form");
@@ -4052,29 +5291,7 @@ if (container) {
     }
 };
 
-// 1. Enregistrer ou créer une équipe dans Firebase
-function handleSaveTeam(event) {
-    event.preventDefault();
-    
-    const teamIdInput = document.getElementById('team-id').value.trim().toLowerCase();
-    const teamNameInput = document.getElementById('team-name').value.trim();
-
-    if (!teamIdInput || !teamNameInput) return;
-
-    // Enregistrement dans Firebase sous le nœud "teams/identifiant_equipe"
-    firebase.database().ref('teams/' + teamIdInput).set({
-        name: teamNameInput
-    }, (error) => {
-        if (error) {
-            showToast("Erreur lors de l'enregistrement de l'équipe.", "error");
-        } else {
-            // Réinitialiser le formulaire de l'équipe
-            document.getElementById('team-form').reset();
-        }
-    });
-}
-
-// 2. Afficher la liste des équipes dans l'admin et mettre à jour l'application
+// Afficher la liste des équipes dans l'admin et mettre à jour l'application
 function renderAdminTeams(teamsData) {
     
 
@@ -4117,6 +5334,186 @@ firebase.database().ref('teams').on('value', (snapshot) => {
     const data = snapshot.val() || {};
     renderAdminTeams(data);
 });
+
+function buildCarpoolSummary(m, playersForMatch) {
+    const carpoolResponses = state.carpoolResponses?.[m.carpoolId] || {};
+    const responses = Object.keys(carpoolResponses).length;
+
+    const totalConvoked = playersForMatch.filter(p => m.convocations[p.id] === 'convoke').length;
+
+    let drivers = 0;
+    let passengers = 0;
+    let directs = 0;
+    let absents = 0;
+    let seats = 0;
+
+    const driverList = [];
+    const driverNoSeatList = [];
+    const passengerList = [];
+    const directList = [];
+    const absentList = [];
+    const driverAssignments = [];
+    const placedIds = new Set();
+
+    Object.entries(carpoolResponses)
+        .forEach(([playerId, r]) => {
+
+            const player = state.players.find(p => p.id === playerId);
+            const playerName = player?.name || playerId;
+
+            if (r.status === 'driver') {
+
+                if ((r.seats || 0) > 0) {
+
+                    drivers++;
+                    seats += r.seats || 0;
+
+                    const passengerIds = Array.isArray(r.passengers)
+                        ? r.passengers.slice(0, r.seats || 0)
+                        : [];
+
+                    passengerIds.forEach(id => placedIds.add(id));
+
+                    driverList.push(
+                        `${playerName} (${r.seats || 0} places)`
+                    );
+
+                    driverAssignments.push({
+                        id: playerId,
+                        name: playerName,
+                        seats: r.seats || 0,
+                        passengerIds,
+                        passengerNames: passengerIds.map(
+                            id => state.players.find(p => p.id === id)?.name || id
+                        )
+                    });
+
+                } else {
+
+                    driverNoSeatList.push(playerName);
+
+                }
+
+            }
+
+            if (r.status === 'passenger') {
+
+                passengers++;
+                passengerList.push(playerName);
+
+            }
+
+            if (r.status === 'direct') {
+
+                directs++;
+                directList.push(playerName);
+
+            }
+
+            if (r.status === 'absent') {
+
+                absents++;
+                absentList.push(playerName);
+
+            }
+
+        });
+
+    const toPlaceListIds = Object.entries(carpoolResponses)
+        .filter(([playerId, r]) => r.status === 'passenger' && !placedIds.has(playerId))
+        .map(([playerId]) => playerId);
+
+    const toPlaceList = toPlaceListIds.map(
+        id => state.players.find(p => p.id === id)?.name || id
+    );
+
+    const availablePassengers = toPlaceListIds
+        .map(id => state.players.find(p => p.id === id))
+        .filter(Boolean)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .map(p => ({ id: p.id, name: p.name }));
+
+    const pendingList = [];
+
+    playersForMatch.forEach(p => {
+
+        if (
+            m.convocations[p.id] === 'convoke' &&
+            !carpoolResponses[p.id]
+        ) {
+
+            pendingList.push(
+                p.name
+            );
+
+        }
+
+    });
+
+    const pending = totalConvoked - responses;
+    const missingSeats = passengers - seats;
+    const closed = !!m.carpoolClosed;
+
+    let transportStatus;
+    let transportClass;
+
+    if (closed) {
+
+        transportStatus = '🔒 Covoiturage confirmé par le coach';
+        transportClass = 'text-sky-700';
+
+    } else if (toPlaceList.length > 0) {
+
+        transportStatus = `🔴 ${toPlaceList.length} passager(s) à placer`;
+        transportClass = 'text-red-700';
+
+    } else if (missingSeats > 0) {
+
+        transportStatus = `🔴 Il manque ${missingSeats} place(s)`;
+        transportClass = 'text-red-700';
+
+    } else if (responses === 0) {
+
+        transportStatus = '⏳ Aucune réponse pour l\'instant';
+        transportClass = 'text-amber-700';
+
+    } else if (pendingList.length > 0) {
+
+        transportStatus = `⏳ En attente de ${pendingList.length} réponse(s)`;
+        transportClass = 'text-amber-700';
+
+    } else {
+
+        transportStatus = '🟢 Transport assuré — tout le monde a répondu';
+        transportClass = 'text-emerald-700';
+
+    }
+
+    return {
+        matchId: m.id,
+        drivers,
+        passengers,
+        directs,
+        absents,
+        responses,
+        pending,
+        seats,
+        totalConvoked,
+        driverList,
+        driverNoSeatList,
+        passengerList,
+        directList,
+        absentList,
+        pendingList,
+        toPlaceList,
+        driverAssignments,
+        availablePassengers,
+        missingSeats,
+        transportStatus,
+        transportClass,
+        closed
+    };
+}
 
 function renderTransportTab(data) {
 
@@ -4229,6 +5626,56 @@ function renderTransportTab(data) {
 
         </div>
 
+        <div class="mt-4 border rounded-xl p-4">
+
+            <h3 class="font-bold mb-2">
+                🚗 → 👤 Répartition des passagers
+            </h3>
+
+            ${data.driverAssignments.length ? data.driverAssignments.map(a => `
+                <div class="border-b border-slate-100 py-2">
+
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div class="font-semibold">
+                            ${a.name}
+                            <span class="text-[10px] text-slate-400">
+                                (${a.seats} places)
+                            </span>
+                        </div>
+                        <div class="flex flex-wrap gap-1">
+                            ${a.passengerNames.map((pn, i) => `
+                                <span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold flex items-center gap-1">
+                                    ${pn}
+                                    <button onclick="carpoolRemovePassenger('${data.matchId}','${a.id}','${a.passengerIds[i]}')" class="text-sky-500 hover:text-red-600" title="Retirer">✕</button>
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <select
+                        onchange="carpoolAssignPassenger('${data.matchId}','${a.id}', this.value); this.value=''"
+                        class="mt-1 w-full p-1.5 text-xs border rounded-lg bg-white">
+                        <option value="">
+                            ➕ Ajouter un passager (${a.passengerNames.length}/${a.seats})
+                        </option>
+                        ${data.availablePassengers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                    </select>
+
+                </div>
+            `).join('') : '<p class="text-xs text-slate-400">Aucun conducteur avec places pour le moment.</p>'}
+
+            ${data.toPlaceList.length ? `
+                <div class="mt-3">
+                    <strong class="text-red-700">
+                        🚫 À placer (${data.toPlaceList.length})
+                    </strong>
+                    <br>
+                    ${data.toPlaceList.join('<br>')}
+                </div>
+            ` : '<div class="mt-3 text-xs text-slate-400">Tous les passagers sont placés ✅</div>'}
+
+        </div>
+
         <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
 
             <h3 class="font-bold mb-2">
@@ -4243,6 +5690,304 @@ function renderTransportTab(data) {
 
     `;
 }
+
+function carpoolAssignPassenger(matchId, driverId, passengerId) {
+
+    if (!passengerId) return;
+
+    const match = state.matches[matchId];
+
+    if (!match) return;
+
+    const responsesMap =
+        state.carpoolResponses[match.carpoolId] || {};
+
+    const driverResponse = responsesMap[driverId];
+
+    if (
+        !driverResponse ||
+        driverResponse.status !== 'driver' ||
+        (driverResponse.seats || 0) <= 0
+    ) {
+        showToast('Ce conducteur n\'a pas de place disponible');
+        return;
+    }
+
+    const passenger = state.players.find(p => p.id === passengerId);
+
+    if (!passenger) return;
+
+    const current = Array.isArray(driverResponse.passengers)
+        ? driverResponse.passengers.slice()
+        : [];
+
+    if (current.includes(passengerId)) {
+        showToast('Ce passager est déjà dans ce véhicule');
+        return;
+    }
+
+    if (current.length >= (driverResponse.seats || 0)) {
+
+        showToast('Plus de place dans ce véhicule');
+        return;
+
+    }
+
+    Object.entries(responsesMap).forEach(([id, r]) => {
+
+        if (r.status === 'driver' && Array.isArray(r.passengers)) {
+
+            r.passengers = r.passengers.filter(pid => pid !== passengerId);
+
+        }
+
+    });
+
+    current.push(passengerId);
+    driverResponse.passengers = current;
+
+    state.carpoolResponses[match.carpoolId] = responsesMap;
+
+    saveStateToFirebase();
+    showToast(`${passenger.name} placé ✅`);
+    renderMatchDetail();
+
+}
+
+function carpoolRemovePassenger(matchId, driverId, passengerId) {
+
+    const match = state.matches[matchId];
+
+    if (!match) return;
+
+    const responsesMap =
+        state.carpoolResponses[match.carpoolId] || {};
+
+    const driverResponse = responsesMap[driverId];
+
+    if (!driverResponse || !Array.isArray(driverResponse.passengers)) return;
+
+    driverResponse.passengers = driverResponse.passengers.filter(pid => pid !== passengerId);
+
+    state.carpoolResponses[match.carpoolId] = responsesMap;
+
+    saveStateToFirebase();
+    showToast('Passager retiré');
+    renderMatchDetail();
+
+}
+
+function setCarpoolClosed(matchId, closed) {
+
+    const match = state.matches[matchId];
+
+    if (!match) return;
+
+    match.carpoolClosed = !!closed;
+
+    saveStateToFirebase();
+
+    showToast(
+        closed
+            ? 'Covoiturage clôturé : la page publique passe en lecture seule 🔒'
+            : 'Covoiturage rouvert 🔓'
+    );
+
+    renderMatchDetail();
+
+}
+
+function buildCarpoolRecapText(matchId) {
+
+    const match = state.matches[matchId];
+
+    if (!match) return '';
+
+    const matchPlayers = (match.convocations
+        ? state.players.filter(p => match.convocations[p.id] === 'convoke')
+        : []
+    );
+
+    const s = buildCarpoolSummary(match, matchPlayers);
+
+    const matchLabel =
+        (match.opponent || 'Match') +
+        (match.date ? ` (${match.date})` : '');
+
+    const rows = [];
+    rows.push(`🚗 Covoiturage — ${matchLabel}`);
+    rows.push('');
+    rows.push(`✅ Réponses : ${s.responses}/${s.totalConvoked}`);
+    rows.push(`🚗 Conducteurs : ${s.drivers}  🚘 Places : ${s.seats}`);
+    rows.push(`👤 Passagers : ${s.passengers}  📍 Direct : ${s.directs}  ❌ Absents : ${s.absents}`);
+    rows.push(s.pending > 0 ? `⏳ En attente : ${s.pending}` : '⏳ Tout le monde a répondu ✅');
+    rows.push('');
+
+    if (s.driverAssignments.length) {
+
+        rows.push('👤 → 🚗 Attribution :');
+
+        s.driverAssignments.forEach(a => {
+            rows.push(`• ${a.name} → ${a.passengerNames.length ? a.passengerNames.join(', ') : 'pas encore de passager'}`);
+        });
+
+        if (s.toPlaceList.length) {
+
+            rows.push('');
+            rows.push(`🚫 À placer : ${s.toPlaceList.join(', ')}`);
+
+        }
+
+    }
+
+    if (s.closed) {
+        rows.push('');
+        rows.push('🔒 Covoiturage confirmé par le coach');
+    }
+
+    if (s.transportStatus && !s.closed) {
+        rows.push('');
+        rows.push(s.transportStatus);
+    }
+
+    if (match.carpoolId) {
+
+        rows.push('');
+        rows.push(`🔗 Répondre : https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${match.carpoolId}`);
+
+    }
+
+    return rows.join('\n');
+
+}
+
+function copyCarpoolRecap(matchId) {
+
+    const text = buildCarpoolRecapText(matchId);
+
+    if (!text) return;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+
+        navigator.clipboard.writeText(text)
+            .then(() => showToast('Récap copié 📋 à coller dans WhatsApp'))
+            .catch(() => fallbackCopy(text));
+
+    } else {
+
+        fallbackCopy(text);
+
+    }
+
+}
+
+function fallbackCopy(text) {
+
+    const ta = document.createElement('textarea');
+
+    ta.value = text;
+
+    ta.style.position = 'fixed';
+
+    ta.style.opacity = '0';
+
+    document.body.appendChild(ta);
+
+    ta.select();
+
+    try {
+
+        document.execCommand('copy');
+
+        showToast('Récap copié 📋 à coller dans WhatsApp');
+
+    } catch (e) {
+
+        showToast('Impossible de copier automatiquement');
+
+    }
+
+    document.body.removeChild(ta);
+
+}
+
+function openCarpoolQR(matchId) {
+
+    const match = state.matches[matchId];
+
+    if (!match || !match.carpoolId) return;
+
+    const url = `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${match.carpoolId}`;
+
+    window.__carpoolUrl = url;
+
+    const urlEl = document.getElementById('carpool-qr-url');
+
+    if (urlEl) urlEl.textContent = url;
+
+    const canvas = document.getElementById('carpool-qr-canvas');
+
+    if (canvas) {
+
+        canvas.innerHTML = '';
+
+        if (typeof QRCode !== 'undefined') {
+
+            new QRCode(canvas, {
+                text: url,
+                width: 180,
+                height: 180
+            });
+
+        } else {
+
+            canvas.innerHTML = '<span class="text-xs text-slate-500">QR Code : le lien reste disponible ci-dessus.</span>';
+
+        }
+
+    }
+
+    toggleModal('modal-carpool-qr', true);
+
+}
+
+function copyCarpoolUrl() {
+
+    let url = window.__carpoolUrl || '';
+
+    if (!url) {
+
+        const match = state.matches[state.selectedMatchId];
+
+        url = match?.carpoolId ? `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${match.carpoolId}` : '';
+
+    }
+
+    if (!url) return;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+
+        navigator.clipboard.writeText(url)
+            .then(() => showToast('Lien copié 📋'))
+            .catch(() => fallbackCopy(url));
+
+    } else {
+
+        fallbackCopy(url);
+
+    }
+
+}
+
+window.carpoolAssignPassenger = carpoolAssignPassenger;
+window.carpoolRemovePassenger = carpoolRemovePassenger;
+window.setCarpoolClosed = setCarpoolClosed;
+window.buildCarpoolRecapText = buildCarpoolRecapText;
+window.copyCarpoolRecap = copyCarpoolRecap;
+window.openCarpoolQR = openCarpoolQR;
+window.copyCarpoolUrl = copyCarpoolUrl;
+window.buildCarpoolSummary = buildCarpoolSummary;
+window.openMatchWorkspace = openMatchWorkspace;
 
 function openMatchWorkspace(matchId) {
 
@@ -4475,7 +6220,6 @@ function renderCalendar() {
         return true;
 
     });
-``
 
     const trainings =
     Object.values(state.trainings || {})
@@ -4598,9 +6342,10 @@ const matches =
         )
             return false;
 
-        return true;
+return true;
 
     });
+
 
     const trainings =
     Object.values(state.trainings || {})
@@ -4692,7 +6437,10 @@ const matches =
 ">
 
                 <div class="flex items-center gap-2 flex-wrap">
-    <div class="font-bold 
+
+                    <div class="font-bold">
+                        ${training.title || ''}
+                    </div>
 
                 <div class="text-xs text-slate-600">
                     ${training.heure || '--'}
@@ -4715,11 +6463,7 @@ const matches =
     ⚽ ${state.teams?.[training.team]?.name || training.team}
 </span>
 
-        ${state.teams?.[training.team]?.name || training.team}
-
-    </span>
-
-</div>   
+            </div>
 
             </div>
         `;
@@ -4822,6 +6566,13 @@ function openEventModal(eventId = null) {
         .classList
         .remove('hidden');
 
+    document.getElementById('modal-event')._previouslyFocused =
+        document.activeElement;
+
+    const firstField =
+        document.querySelector('#modal-event input, #modal-event select, #modal-event button');
+    if (firstField) firstField.focus();
+
     if (!eventId) {
 
         document.getElementById('e-id').value = '';
@@ -4891,10 +6642,16 @@ if (event.teams) {
 
 function closeEventModal() {
 
-    document
-        .getElementById('modal-event')
-        .classList
-        .add('hidden');
+    const modal =
+        document
+        .getElementById('modal-event');
+
+    if (!modal) return;
+
+    modal.classList.add('hidden');
+
+    const el = modal._previouslyFocused;
+    if (el && typeof el.focus === 'function') el.focus();
 
 }
 
@@ -4978,28 +6735,98 @@ function generateWeeklyPlanning() {
         today.getDate() - today.getDay() + 1
     );
 
+    start.setHours(0, 0, 0, 0);
+
     const end = new Date(start);
 
     end.setDate(
         start.getDate() + 6
     );
 
+    end.setHours(23, 59, 59, 999);
+
 const teamLabel =
     selectedTeam === "all"
         ? "TOUTES ÉQUIPES"
         : (
-            state.teams?.[selectedTeam]?.name ||
-            selectedTeam.toUpperCase()
+            (state.teams?.[selectedTeam]?.name ||
+            selectedTeam).toUpperCase()
         );
 
-let text =
-`🔵⚪ RANGUEIL FC ${teamLabel} ⚪🔵
+    const cap = (str) =>
+        str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
 
-📅 PLANNING DE LA SEMAINE
+    const teamName = (team) =>
+        state.teams?.[team]?.name || team || '';
+
+    const dayNum = (d) => d.getDate();
+
+    const monthUp = (d) =>
+        d.toLocaleDateString('fr-FR', { month: 'long' }).toUpperCase();
+
+    const accents = {
+        'Coupe': { emoji: '🏆', week: 'SEMAINE DE COUPE', phrase: 'Go pour la coupe !' },
+        'Championnat': { emoji: '🏅', week: 'SEMAINE CHAMPIONNAT', phrase: 'Retour au championnat !' },
+        'Amical': { emoji: '🤝', week: 'SEMAINE AMICAL', phrase: 'Match amical' }
+    };
+
+    const weekTypes = [];
+
+    Object.values(state.matches || {})
+        .forEach(match => {
+
+            if (!match.date || !match.type) return;
+
+            if (
+    selectedTeam !== "all" &&
+    match.team !== selectedTeam
+) {
+    return;
+}
+
+            const d =
+                new Date(
+                    match.date + "T12:00:00"
+                );
+
+            if (
+                d >= start &&
+                d <= end
+            ) {
+
+                if (weekTypes.indexOf(match.type) === -1) {
+                    weekTypes.push(match.type);
+                }
+
+            }
+
+        });
+
+    weekTypes.sort();
+
+    const matchBanner =
+        weekTypes.length === 1
+            ? `${accents[weekTypes[0]]?.emoji || '⚽'} ${accents[weekTypes[0]]?.week || `SEMAINE ${weekTypes[0].toUpperCase()}`}`
+            : weekTypes.length > 1
+                ? `📌 SEMAINE MIXTE : ${weekTypes.join(' + ').toUpperCase()}`
+                : '';
+
+let text =
+`👋 Bonjour à tous !
+
+${matchBanner ? `*${matchBanner}*\n\n` : ''}🔵⚪ RANGUEIL FC — ${teamLabel} ⚪🔵
+
+📅 SEMAINE DU ${dayNum(start)} AU ${dayNum(end)} ${monthUp(end)}
 
 `;
 
     const items = [];
+
+    const matchLocation = (m) => {
+        const loc = (m.location || '').trim();
+        if (!loc) return '';
+        return ` 📍 ${/domicile|home/i.test(loc) ? 'Domicile' : cap(loc)}`;
+    };
 
     Object.values(state.matches || {})
         .forEach(match => {
@@ -5023,12 +6850,33 @@ let text =
                 d <= end
             ) {
 
+                const teamRef =
+                    selectedTeam === "all" && teamName(match.team)
+                        ? ` (match ${teamName(match.team)})`
+                        : '';
+
+                const parts = [`🆚 *${match.opponent}*${teamRef}`];
+
+                const accents = {
+                    'Coupe': { emoji: '🏆', phrase: 'Go pour la coupe !' },
+                    'Championnat': { emoji: '🏅', phrase: 'Retour au championnat !' },
+                    'Amical': { emoji: '🤝', phrase: 'Match amical' }
+                };
+
+                const accent = match.type ? accents[match.type] : null;
+
+                if (accent) parts.push(`${accent.emoji} *${match.type}*`);
+                else if (match.type) parts.push(`*${match.type}*`);
+
+                if (match.heure) parts.push(match.heure);
+
+                const loc = matchLocation(match);
+
+                if (loc) parts.push(loc.trim());
+
                 items.push({
                     date: match.date,
-                    message:
-`⚽ ${match.opponent}
-${match.heure || ""}
-`
+                    message: parts.join(' · ') + (accent ? `\n_${accent.phrase}_` : '')
                 });
 
             }
@@ -5057,14 +6905,16 @@ ${match.heure || ""}
                 d <= end
             ) {
 
-                items.push({
-    date: training.date,
-    message:
-`🏃 *${training.title || "Entraînement"}*
-⚽ ${state.teams?.[training.team]?.name || training.team || "Équipe"}
-🕒 ${training.heure || "18:00"}`
+                const lieu =
+                    (training.lieu || '').trim()
+                        ? ` 📍 ${training.lieu.trim()}`
+                        : '';
 
-});
+                items.push({
+                    date: training.date,
+                    message:
+`🏃 ${training.title || "Entraînement"} · ${training.heure || "18:00"} – 20:00${lieu}`
+                });
 
             }
 
@@ -5099,12 +6949,20 @@ ${match.heure || ""}
                 d <= end
             ) {
 
+                const lieu =
+                    (event.lieu || '').trim()
+                        ? ` 📍 ${event.lieu.trim()}`
+                        : '';
+
+                const parts = [`👥 ${event.title}`];
+
+                if (event.heure) parts.push(event.heure);
+
+                if (lieu) parts.push(lieu.trim());
+
                 items.push({
                     date: event.date,
-                    message:
-`👥 ${event.title}
-${event.heure || ""}
-`
+                    message: parts.join(' · ')
                 });
 
             }
@@ -5115,38 +6973,36 @@ ${event.heure || ""}
         a.date.localeCompare(b.date)
     );
 
-let currentDate = "";
+    let currentDate = "";
 
-items.forEach(item => {
+    items.forEach(item => {
 
-    const dateFr =
-        new Date(item.date + "T12:00:00")
-        .toLocaleDateString(
-            "fr-FR",
-            {
-                weekday: "long",
-                day: "numeric",
-                month: "long"
-            }
-        );
+        const d =
+            new Date(item.date + "T12:00:00");
 
-    if (currentDate !== dateFr) {
+        const dateFr =
+            cap(
+                d.toLocaleDateString(
+                    "fr-FR",
+                    {
+                        weekday: "long"
+                    }
+                )
+            ) + " " + dayNum(d);
 
-        text += `📍 ${dateFr}\n\n`;
+        if (currentDate !== dateFr) {
 
-        currentDate = dateFr;
+            if (currentDate !== "") text += "\n";
 
-    }
+            text += `🗓 *${dateFr}*\n`;
 
-    const formattedMessage =
-        item.message.replace(
-            /(\d{2}:\d{2})/,
-            '🕒 $1'
-        );
+            currentDate = dateFr;
 
-    text += `${formattedMessage}\n`;
+        }
 
-});
+        text += `${item.message}\n`;
+
+    });
 
 text += `
 💙 Bonne semaine à tous !
@@ -5163,6 +7019,36 @@ text += `
 
 }
 
+let calendarTeamDefaultedFor = null;
+
+function getDefaultCalendarTeam() {
+
+    const userTeam =
+        window.currentUserTeam || 'all';
+
+    if (userTeam === 'all') return 'all';
+
+    const scopes =
+        String(userTeam)
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+
+    for (const scope of scopes) {
+
+        if (
+            state.teams &&
+            state.teams[scope]
+        ) {
+            return scope;
+        }
+
+    }
+
+    return 'all';
+
+}
+
 function populateCalendarTeamFilter() {
 
     const select =
@@ -5172,8 +7058,31 @@ function populateCalendarTeamFilter() {
 
     if (!select) return;
 
-    const current =
-        select.value || "all";
+    const hasTeams =
+        state.teams &&
+        Object.keys(state.teams).length > 0;
+
+    const userTeam =
+        window.currentUserTeam || 'all';
+
+    let current;
+
+    if (
+        hasTeams &&
+        calendarTeamDefaultedFor !== userTeam
+    ) {
+
+        current = getDefaultCalendarTeam();
+
+        calendarTeamDefaultedFor = userTeam;
+
+    } else {
+
+        current =
+            select.value ||
+            getDefaultCalendarTeam();
+
+    }
 
     select.innerHTML = `
         <option value="all">
@@ -5253,63 +7162,6 @@ function deleteEvent(eventId) {
     );
 
 }
-function getEventTeamsLabel(event) {
-
-    if (
-        event.teams &&
-        event.teams.includes("all")
-    ) {
-        return "🌍 Toutes les équipes";
-    }
-
-    return (event.teams || [])
-        .map(teamKey => {
-
-            const team =
-                state.teams?.[teamKey];
-
-            return team
-                ? team.name
-                : teamKey;
-
-        })
-        .join(" • ");
-
-}
-
-function getTeamBadge(event) {
-
-    if (
-        event.teams &&
-        event.teams.includes("all")
-    ) {
-
-        return `
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                🌍 Club
-            </span>
-        `;
-
-    }
-
-    return (event.teams || [])
-        .map(teamKey => {
-
-            const teamName =
-                state.teams?.[teamKey]?.name ||
-                teamKey;
-
-            return `
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800">
-                    ${teamName}
-                </span>
-            `;
-
-        })
-        .join(' ');
-
-}
-
 function addFunctionBlock() {
 
     const template =
@@ -5595,6 +7447,14 @@ function openAdminModule(module) {
     renderAdminTeamsModule();
 
 }
+
+if (module === "fff") {
+
+    renderAdminFFFModule();
+
+    if (!window.__fffCalendar) refreshFFFCompetitions();
+
+}
 }
 
 function renderAdminTeamsModule() {
@@ -5870,6 +7730,790 @@ function closeAdminModule() {
     container.classList.add("hidden");
 
     container.innerHTML = "";
+}
+
+
+// ============================================================
+//  MODULE : SYNCHRONISATION FFF (api-dofa.fff.fr)
+//  Importe automatiquement les matchs officiels du club
+//  (calendrier FFF de Rangueil FC) et les scores.
+// ============================================================
+
+function fffNormalize(s) {
+    return String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+}
+
+function fffApiUrl(path) {
+    let base = (state.fffApiBase || "https://api-dofa.fff.fr/api").replace(/\/+$/, "");
+    if (typeof location !== "undefined" && location.hostname.indexOf("vercel.app") !== -1) {
+        base = "/fff";
+    }
+    if (String(path).startsWith("http")) return path;
+    let p = String(path);
+    if (base.endsWith("/api") && p.startsWith("/api/")) p = p.slice(4);
+    return base + (p.startsWith("/") ? "" : "/") + p;
+}
+
+function fffVercelProxyUrl(path) {
+    let p = String(path || "");
+    if (!p.startsWith("/")) p = "/" + p;
+    // Normalise : enlève le préfixe /api si présent car le proxy attend le path complet
+    const params = new URLSearchParams();
+    params.set("path", p);
+    const isFile = typeof location !== "undefined" && location.protocol === "file:";
+    if (isFile) {
+        return "https://app-gestion-git-main-rangueil.vercel.app/api/fff?" + params.toString();
+    }
+    return "/api/fff?" + params.toString();
+}
+
+async function fffFetchJsonRaw(url, timeoutMs = 20000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, {
+            headers: { "Accept": "application/json" },
+            signal: controller.signal
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const text = await res.text();
+        if (!text || !text.trim().startsWith("{")) {
+            throw new Error("Réponse bloquée (page HTML reçue)");
+        }
+        return JSON.parse(text);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function fffJsonp(url, callbackName, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+        const cbName = callbackName || "__fffJsonp_" + Date.now();
+        const script = document.createElement("script");
+        let done = false;
+        function cleanup() {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
+            if (script.parentNode) script.parentNode.removeChild(script);
+        }
+        const timer = setTimeout(function () {
+            cleanup();
+            reject(new Error("Timeout JSONP"));
+        }, timeoutMs || 25000);
+        window[cbName] = function (data) {
+            cleanup();
+            resolve(data);
+        };
+        script.onerror = function () {
+            cleanup();
+            reject(new Error("Erreur de chargement du script proxy"));
+        };
+        const sep = url.indexOf("?") === -1 ? "?" : "&";
+        script.src = url + sep + "callback=" + cbName;
+        document.head.appendChild(script);
+    });
+}
+
+function fffProxyRouteFor(url) {
+    const base = (state.fffProxyUrl || "").trim();
+    if (!base) return "";
+    const sep = base.includes("?") ? "&" : "?";
+    return base + sep + "url=" + encodeURIComponent(url);
+}
+
+async function fffFetchJson(path) {
+    // 1a) Proxy local Node — tente toujours localhost:3001 en premier (file:// ou http://localhost:3000)
+    //     Lance `node proxy-local.js` et laisse-le ouvert. Si absent, on bascule sur Vercel/Google.
+    try {
+        const localUrl = "http://localhost:3001?path=" + encodeURIComponent(path);
+        const lData = await fffFetchJsonRaw(localUrl, 12000);
+        return lData;
+    } catch (e) {
+        console.warn("FFF local proxy (localhost:3001) échoué :", e.message);
+    }
+    // 1b) Vercel proxy (prioritaire sur http) — fonctionne sur vercel.app ET en file:// via URL absolue
+    try {
+        const vercelUrl = fffVercelProxyUrl(path);
+        const vData = await fffFetchJsonRaw(vercelUrl, 20000);
+        return vData;
+    } catch (e) {
+        console.warn("FFF Vercel proxy échoué :", e.message);
+    }
+    // 2) Google Apps Script proxy si configuré (fetch + fallback JSONP)
+    const fullUrl = fffApiUrl(path);
+    state.fffApiBaseLastUrl = fullUrl;
+    const gUrl = fffProxyRouteFor(fullUrl);
+    if (gUrl) {
+        try {
+            const gData = await fffFetchJsonRaw(gUrl, 25000);
+            return gData;
+        } catch (e) {
+            console.warn("FFF Google proxy fetch échoué, essai JSONP :", e.message);
+            try {
+                const gData2 = await fffJsonp(gUrl, null, 25000);
+                return gData2;
+            } catch (e2) {
+                console.warn("FFF Google proxy JSONP échoué :", e2.message);
+            }
+        }
+    }
+    // 3) Dernier recours : direct (échouera en 403 sur file:// mais peut marcher sur vercel via rewrite /fff)
+    try {
+        const directUrl = fffApiUrl(path);
+        return await fffFetchJsonRaw(directUrl, 15000);
+    } catch (e) {
+        console.warn("FFF direct échoué :", e.message);
+        throw new Error("API FFF injoignable. Vérifiez le proxy Vercel (/api/fff) ou l'URL Google Apps Script. " + e.message);
+    }
+}
+
+async function fetchFFFCalendar() {
+    const clubNo = state.fffClubNo || 18707;
+    const now = new Date();
+    const seasonYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const seasonStart = seasonYear + "-06-01";
+
+    const params = new URLSearchParams();
+    params.set("ma_dat[after]", seasonStart);
+    params.set("itemsPerPage", "1000");
+
+    let currentPath = "/api/clubs/" + clubNo + "/calendrier?" + params.toString();
+    let matches = [];
+    let guard = 0;
+
+    while (currentPath && guard < 20) {
+        guard++;
+        const data = await fffFetchJson(currentPath);
+        matches = matches.concat(data["hydra:member"] || []);
+        const view = data["hydra:view"] || {};
+        currentPath = view["hydra:next"] || null;
+    }
+
+    return matches;
+}
+
+async function fetchFFFCompetitionMatches(cpNo) {
+    const now = new Date();
+    const seasonYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const seasonStart = seasonYear + "-06-01";
+    const params = new URLSearchParams();
+    params.set("competition.cp_no", String(cpNo));
+    params.set("ma_dat[after]", seasonStart);
+    params.set("itemsPerPage", "1000");
+    let currentPath = "/api/match_entities?" + params.toString();
+    let matches = [];
+    let guard = 0;
+    while (currentPath && guard < 20) {
+        guard++;
+        const data = await fffFetchJson(currentPath);
+        matches = matches.concat(data["hydra:member"] || []);
+        const view = data["hydra:view"] || {};
+        currentPath = view["hydra:next"] || null;
+    }
+    return matches;
+}
+
+function fffGroupCompetitions(matches) {
+    const clubNo = state.fffClubNo || 18707;
+    const map = new Map();
+    (matches || []).forEach(m => {
+        const comp = m.competition;
+        if (!comp) return;
+        const cpNo = comp.cp_no;
+        if (!map.has(cpNo)) {
+            map.set(cpNo, {
+                cp_no: cpNo,
+                name: comp.name,
+                tipo: comp.type,
+                level: comp.level,
+                season: comp.season || null,
+                matches: 0,
+                poule: "",
+                categories: []
+            });
+        }
+        const row = map.get(cpNo);
+        row.matches++;
+        if (!row.poule && m.poule && m.poule.name) row.poule = m.poule.name;
+        [m.home, m.away].forEach(side => {
+            if (side && side.club && side.club.cl_no === clubNo && side.category_label) {
+                if (!row.categories.includes(side.category_label)) {
+                    row.categories.push(side.category_label);
+                }
+            }
+        });
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "fr"));
+}
+
+function parseFFFTime(t) {
+    if (!t) return "";
+    const m = String(t).match(/(\d{1,2})H(\d{2})?/);
+    if (!m) return "";
+    const hh = String(parseInt(m[1], 10)).padStart(2, "0");
+    const mm = (m[2] || "00").padStart(2, "0");
+    return hh + ":" + mm;
+}
+
+function fffPelouseLabel(surface) {
+    const s = String(surface || "").toLowerCase();
+    if (s.includes("synth")) return "Synthétique";
+    if (s.includes("herbe")) return "Herbe";
+    if (s.includes("stabilis")) return "Stabilisé";
+    return surface || "";
+}
+
+function fffTypeLabel(compType) {
+    if (compType === "CP") return "Coupe";
+    if (compType === "CH") return "Championnat";
+    if (compType === "AC") return "Amical";
+    return "Coupe";
+}
+
+function fffOpponentName(side) {
+    if (!side) return "";
+    return side.short_name
+        || side.short_name_federation
+        || side.short_name_ligue
+        || "";
+}
+
+function fffFormatDate(ts) {
+    return new Date(ts).toLocaleString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+}
+
+function buildFFFMatch(evt) {
+    const clubNo = state.fffClubNo || 18707;
+    const isHome = evt.home && evt.home.club && evt.home.club.cl_no === clubNo;
+    const oppSide = isHome ? evt.away : evt.home;
+    const link = state.fffLinks && state.fffLinks[evt.competition.cp_no];
+    const teamKey = link ? link.team : "";
+    const homeScore = (evt.home_score !== null && evt.home_score !== undefined) ? String(evt.home_score) : "";
+    const awayScore = (evt.away_score !== null && evt.away_score !== undefined) ? String(evt.away_score) : "";
+    const scoreHome = isHome ? homeScore : awayScore;
+    const scoreAway = isHome ? awayScore : homeScore;
+
+    const fffBuilt = {
+        id: "fff-" + evt.ma_no,
+        opponent: fffOpponentName(oppSide),
+        adresse: [
+            evt.terrain && evt.terrain.address,
+            [evt.terrain && evt.terrain.zip_code, evt.terrain && evt.terrain.city].filter(Boolean).join(" ")
+        ].filter(Boolean).join(", "),
+        date: (evt.date || "").slice(0, 10),
+        heure: parseFFFTime(evt.time),
+        type: fffTypeLabel(evt.competition && evt.competition.type),
+        location: isHome ? "Domicile" : "Extérieur",
+        pelouse: fffPelouseLabel(evt.terrain && evt.terrain.libelle_surface),
+        team: teamKey,
+        carpoolId: "CP_FFF_" + evt.ma_no,
+        meetingPlace: "",
+        travelTime: 25,
+        arrivalMargin: 60,
+        securityMargin: 10,
+        scoreHome: scoreHome,
+        scoreAway: scoreAway,
+        convocations: {},
+        positions: {},
+        jerseys: {},
+        carpool: {},
+        matchStats: {},
+        debrief: "",
+        composition: {},
+        slotAssignments: {},
+        isValidated: false,
+        fff: {
+            ma_no: evt.ma_no,
+            cp_no: evt.competition ? evt.competition.cp_no : null,
+            competitionName: evt.competition ? evt.competition.name : "",
+            competitionType: evt.competition ? evt.competition.type : "",
+            poule: evt.poule ? evt.poule.name : "",
+            journee: evt.poule_journee ? ("Journée " + evt.poule_journee.number) : "",
+            phase: evt.phase ? evt.phase.name : "",
+            isHome: isHome
+        }
+    };
+    fffBuilt.rdvHeure = computeRdvHeure(
+        fffBuilt.heure,
+        fffBuilt.location,
+        fffBuilt.travelTime,
+        fffBuilt.arrivalMargin,
+        fffBuilt.securityMargin
+    );
+    return fffBuilt;
+}
+
+function applyFFFToExisting(existing, fffMatch) {
+    // Ne jamais écraser un match Amical manuel en Type coupe/championnat
+    const wasAmical = existing.type === "Amical" && !existing.fff;
+    existing.opponent = fffMatch.opponent;
+    existing.adresse = fffMatch.adresse;
+    existing.date = fffMatch.date;
+    existing.heure = fffMatch.heure;
+    if (!wasAmical) existing.type = fffMatch.type;
+    existing.location = fffMatch.location;
+    existing.pelouse = fffMatch.pelouse;
+    existing.team = fffMatch.team;
+    if (fffMatch.scoreHome !== "" && fffMatch.scoreAway !== "") {
+        existing.scoreHome = fffMatch.scoreHome;
+        existing.scoreAway = fffMatch.scoreAway;
+    }
+    existing.fff = fffMatch.fff;
+    existing.rdvHeure = fffMatch.rdvHeure;
+    existing.carpoolId = existing.carpoolId || fffMatch.carpoolId;
+    existing.convocations = existing.convocations || {};
+    existing.positions = existing.positions || {};
+    existing.jerseys = existing.jerseys || {};
+    existing.carpool = existing.carpool || {};
+    existing.matchStats = existing.matchStats || {};
+    existing.slotAssignments = existing.slotAssignments || {};
+    existing.composition = existing.composition || {};
+    existing.debrief = existing.debrief || "";
+}
+
+function findLinkedManualMatch(evt, teamKey) {
+    const clubNo = state.fffClubNo || 18707;
+    const isHome = evt.home && evt.home.club && evt.home.club.cl_no === clubNo;
+    const fffOpp = fffNormalize(fffOpponentName(isHome ? evt.away : evt.home));
+    if (!fffOpp) return null;
+    // Tolérant aux changements de date : on matche sur équipe + adversaire normalisé
+    // même si la date a bougé (report). On évite les Amicaux.
+    const candidates = Object.values(state.matches).filter(m =>
+        !m.fff
+        && m.team === teamKey
+        && m.type !== "Amical"
+        && fffNormalize(m.opponent) === fffOpp
+    );
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+    // Si plusieurs homonymes (même adversaire 2x dans la saison), prend le plus proche en date
+    const fffDate = (evt.date || "").slice(0, 10);
+    candidates.sort((a, b) => {
+        const da = a.date ? Math.abs(new Date(a.date) - new Date(fffDate)) : 9999;
+        const db = b.date ? Math.abs(new Date(b.date) - new Date(fffDate)) : 9999;
+        return da - db;
+    });
+    return candidates[0];
+}
+
+async function refreshFFFCompetitions() {
+    const btn = document.getElementById("fff-scan-btn");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyse en cours...';
+    }
+    try {
+        let calendar;
+        if (state.fffManualJson && state.fffManualJson.trim()) {
+            const obj = JSON.parse(state.fffManualJson);
+            calendar = Array.isArray(obj) ? obj : (obj["hydra:member"] || []);
+            if (calendar.length === 0) throw new Error("Le JSON collé ne contient aucun match");
+        } else {
+            calendar = await fetchFFFCalendar();
+        }
+        window.__fffCalendar = calendar;
+        window.__fffCompetitions = fffGroupCompetitions(calendar);
+        renderAdminFFFModule();
+    } catch (err) {
+        console.error("FFF analyse error:", err);
+        showToast("❌ Analyse FFF impossible : " + err.message, "error");
+        const statusEl = document.getElementById("fff-sync-status");
+        if (statusEl) statusEl.textContent = "❌ " + err.message;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Analyser le calendrier';
+        }
+    }
+}
+
+function syncFFFMatches(opts) {
+    opts = opts || {};
+    return (async () => {
+        if (window.__fffSyncing) return;
+        window.__fffSyncing = true;
+        const isManual = !!opts.manual;
+
+        const setSyncBtn = (html, disabled) => {
+            const b = document.getElementById("fff-sync-btn");
+            if (b) {
+                b.disabled = !!disabled;
+                if (html) b.innerHTML = html;
+            }
+        };
+
+        try {
+            if (isManual) setSyncBtn('<i class="fa-solid fa-spinner fa-spin"></i> Synchronisation en cours...', true);
+
+            const links = state.fffLinks || {};
+            const linkedEntries = Object.entries(links).filter(e => e[1] && e[1].team);
+            if (linkedEntries.length === 0) {
+                if (isManual) showToast("ℹ️ Liez d'abord vos équipes aux compétitions FFF", "info");
+                return;
+            }
+
+            let clubCalendar = window.__fffCalendar || [];
+            if (clubCalendar.length === 0) {
+                try {
+                    clubCalendar = await fetchFFFCalendar();
+                } catch (e) {
+                    console.warn("FFF: calendrier club indisponible, on utilisera uniquement les JSON collés par compétition", e);
+                }
+            }
+
+            const compJsonMap = {};
+            Object.entries(state.fffCompJson || {}).forEach(([cpNo, raw]) => {
+                if (!raw || !raw.trim()) return;
+                try {
+                    const obj = JSON.parse(raw);
+                    const arr = Array.isArray(obj) ? obj : (obj["hydra:member"] || []);
+                    if (Array.isArray(arr) && arr.length) compJsonMap[cpNo] = arr;
+                } catch (e) {
+                    console.warn("FFF: JSON collé ignoré pour la compétition " + cpNo, e);
+                }
+            });
+
+            let created = 0;
+            let updated = 0;
+            const missingComps = [];
+
+            for (const [cpNoStr, link] of linkedEntries) {
+                const cpNo = Number(cpNoStr);
+                const teamKey = link.team;
+                let compMatches = null;
+
+                // 1) Live FFF : saison complète (passés + à venir) par compétition
+                try {
+                    const live = await fetchFFFCompetitionMatches(cpNo);
+                    if (live && live.length) compMatches = live;
+                } catch (e) {
+                    console.warn("FFF live cp_no " + cpNo + " échoué :", e.message);
+                }
+                // 2) Fallback JSON collé par compétition (📥 Matchs)
+                if (!compMatches || !compMatches.length) {
+                    compMatches = compJsonMap[cpNoStr] || null;
+                }
+                // 3) Fallback calendrier club (prochains seulement)
+                if (!compMatches || !compMatches.length) {
+                    compMatches = (clubCalendar || []).filter(e => e && e.competition && Number(e.competition.cp_no) === cpNo);
+                }
+
+                if (!compMatches || !compMatches.length) {
+                    missingComps.push(link.competitionName || ("Compétition " + cpNo));
+                    continue;
+                }
+
+                for (const evt of compMatches) {
+                    const clubNoNow = state.fffClubNo || 18707;
+                    const involvesClub = evt && (
+                        (evt.home && evt.home.club && evt.home.club.cl_no === clubNoNow)
+                        || (evt.away && evt.away.club && evt.away.club.cl_no === clubNoNow)
+                    );
+                    if (!involvesClub) continue;
+                    const maNo = evt.ma_no;
+                    const fffMatch = buildFFFMatch(evt);
+
+                    let existing = Object.values(state.matches).find(m => m.fff && m.fff.ma_no === maNo);
+                    if (!existing && teamKey) existing = findLinkedManualMatch(evt, teamKey);
+
+                    if (existing) {
+                        applyFFFToExisting(existing, fffMatch);
+                        updated++;
+                    } else if (teamKey) {
+                        state.matches[fffMatch.id] = fffMatch;
+                        created++;
+                    }
+                }
+            }
+
+            state.fffLastSync = Date.now();
+            saveStateToFirebase();
+            renderAll();
+
+            if (isManual) {
+                const warnMsg = missingComps.length ? " · ⚠️ " + missingComps.length + " compétition(s) sans matchs (collez leur JSON : 📥 Matchs)" : "";
+                showToast("✅ " + created + " match(s) ajouté(s), " + updated + " mis à jour" + warnMsg, missingComps.length ? "info" : "success");
+            }
+            const statusEl = document.getElementById("fff-sync-status");
+            if (statusEl) statusEl.textContent = "Dernière synchro : " + fffFormatDate(new Date()) + " · " + created + " nouveau(x) · " + updated + " mis à jour" + (missingComps.length ? " · ⚠️ " + missingComps.length + " compétition(s) sans matchs" : "");
+            renderAdminFFFModule();
+        } catch (err) {
+            console.error("FFF sync error:", err);
+            if (isManual) showToast("❌ Sync FFF impossible : " + err.message, "error");
+            const statusEl = document.getElementById("fff-sync-status");
+            if (statusEl) statusEl.textContent = "❌ " + err.message;
+        } finally {
+            window.__fffSyncing = false;
+            if (isManual) setSyncBtn('<i class="fa-solid fa-arrows-rotate"></i> Synchroniser maintenant', false);
+        }
+    })();
+}
+
+function onFFFLinkChange(cpNo, teamKey) {
+    const compInfo = (window.__fffCompetitions || []).find(c => String(c.cp_no) === String(cpNo));
+    if (teamKey) {
+        state.fffLinks[cpNo] = {
+            team: teamKey,
+            competitionName: compInfo ? compInfo.name : "",
+            competitionType: compInfo ? compInfo.tipo : ""
+        };
+        showToast("🔗 Compétition liée à l'équipe");
+    } else {
+        delete state.fffLinks[cpNo];
+        showToast("🔓 Lien supprimé");
+    }
+    saveStateToFirebase();
+    renderAdminFFFModule();
+}
+
+function onFFFAutoSyncToggle(checked) {
+    state.fffAutoSync = !!checked;
+    saveStateToFirebase();
+    showToast(checked ? "✅ Synchronisation automatique activée" : "🛑 Synchronisation automatique désactivée");
+}
+
+function onFFFSaveProxy() {
+    const input = document.getElementById("fff-proxy-url");
+    const value = (input && input.value || "").trim();
+    state.fffProxyUrl = value;
+    window.__fffBestRoute = null;
+    saveStateToFirebase();
+    showToast(value ? "✅ Proxy enregistré" : "ℹ️ Proxy retiré, retour à l'accès direct");
+    renderAdminFFFModule();
+}
+
+function onFFFSaveManualJson() {
+    const ta = document.getElementById("fff-manual-json");
+    const value = (ta && ta.value || "").trim();
+    if (value) {
+        try {
+            const obj = JSON.parse(value);
+            const list = obj && (Array.isArray(obj) ? obj : obj["hydra:member"]);
+            if (!list || !Array.isArray(list)) throw new Error("Ce n'est pas le calendrier FFF attendu");
+        } catch (err) {
+            showToast("❌ JSON invalide : " + err.message, "error");
+            return;
+        }
+    }
+    state.fffManualJson = value;
+    saveStateToFirebase();
+    showToast(value ? "✅ JSON FFF enregistré" : "ℹ️ JSON manuel retiré");
+}
+
+function onFFFManualJsonClear() {
+    state.fffManualJson = "";
+    saveStateToFirebase();
+    showToast("ℹ️ JSON manuel effacé");
+    renderAdminFFFModule();
+}
+
+function onFFFToggleCompJson(cpNo) {
+    const box = document.getElementById("fff-comp-json-box-" + cpNo);
+    if (!box) return;
+    const willShow = box.classList.contains("hidden");
+    box.classList.toggle("hidden");
+    if (willShow) {
+        const ta = document.getElementById("fff-comp-json-" + cpNo);
+        if (ta) ta.focus();
+    }
+}
+
+function onFFFSaveCompJson(cpNo) {
+    const ta = document.getElementById("fff-comp-json-" + cpNo);
+    const value = (ta && ta.value || "").trim();
+    if (value) {
+        try {
+            const obj = JSON.parse(value);
+            const list = obj && (Array.isArray(obj) ? obj : obj["hydra:member"]);
+            if (!list || !Array.isArray(list) || list.length === 0) throw new Error("Aucun match dans ce JSON");
+        } catch (err) {
+            showToast("❌ JSON invalide : " + err.message, "error");
+            return;
+        }
+    }
+    state.fffCompJson = state.fffCompJson || {};
+    state.fffCompJson[cpNo] = value;
+    saveStateToFirebase();
+    renderAdminFFFModule();
+    showToast(value ? "✅ Matchs de la compétition enregistrés" : "ℹ️ JSON de la compétition retiré");
+}
+
+function renderAdminFFFModule() {
+    const container = document.getElementById("admin-module-container");
+    if (!container) return;
+    if (container.classList.contains("hidden")) return;
+    container.classList.remove("hidden");
+
+    const comps = window.__fffCompetitions || [];
+    const linkedCount = Object.keys(state.fffLinks || {}).length;
+    const lastSync = state.fffLastSync ? fffFormatDate(state.fffLastSync) : "Jamais";
+    const emptyTeamRow = Object.entries(state.teams || {}).length === 0;
+
+    let html = `
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-lg font-bold text-slate-800">🌐 Synchronisation FFF</h2>
+            <p class="text-xs text-slate-500 mt-1">Importe automatiquement les matchs officiels du club (n° ${state.fffClubNo || 18707}) depuis la Fédération Française de Football.</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="refreshFFFCompetitions()" id="fff-scan-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold">
+                <i class="fa-solid fa-magnifying-glass"></i> Analyser le calendrier
+            </button>
+            <button onclick="closeAdminModule()" class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold">← Retour</button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div class="bg-sky-50 border border-sky-200 rounded-xl p-3">
+            <div class="text-[11px] text-slate-500 font-semibold">Dernière synchro</div>
+            <div id="fff-sync-status" class="text-sm font-bold text-sky-800 mt-0.5">${lastSync}</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+            <div class="text-[11px] text-slate-500 font-semibold">Compétitions détectées</div>
+            <div class="text-sm font-bold text-emerald-800 mt-0.5">${comps.length}</div>
+        </div>
+        <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
+            <div class="text-[11px] text-slate-500 font-semibold">Liens équipe ↔ compétition</div>
+            <div class="text-sm font-bold text-violet-800 mt-0.5">${linkedCount}</div>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+        <button onclick="syncFFFMatches({manual:true})" id="fff-sync-btn" class="bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow">
+            <i class="fa-solid fa-arrows-rotate"></i> Synchroniser maintenant
+        </button>
+        <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" id="fff-auto-sync-toggle" ${state.fffAutoSync !== false ? "checked" : ""} onchange="onFFFAutoSyncToggle(this.checked)" class="w-4 h-4 accent-sky-600">
+            Synchronisation automatique au chargement
+        </label>
+    </div>
+
+    <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4">
+        <div class="flex flex-wrap items-center gap-2">
+            <div class="flex-1 min-w-[220px]">
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">URL du petit proxy (optionnel, en cas d'accès bloqué)</label>
+                <input type="text" id="fff-proxy-url" value="${state.fffProxyUrl || ""}" placeholder="https://script.google.com/macros/s/.../exec?url=" class="w-full border rounded-lg p-2 text-xs">
+            </div>
+            <div class="pt-4">
+                <button onclick="onFFFSaveProxy()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold">Enregistrer</button>
+            </div>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-2">
+            💡 L'API FFF bloque parfois les navigateurs (Akamai). Sans proxy, l'appli essaie 4 itinéraires automatiquement. Si tout échoue, collez ici l'URL d'un mini-proxy Google Apps Script (instructions à la demande) pour garantir l'accès.
+        </div>
+    </div>
+
+    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-4">
+        <div class="flex items-center justify-between gap-2 mb-1">
+            <label class="block text-[11px] font-semibold text-emerald-800">JSON FFF collé à la main — la méthode 100% fiable (Aucune protection ne bloque votre navigateur)</label>
+            <div class="flex gap-2 flex-shrink-0">
+                <button onclick="onFFFSaveManualJson()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Enregistrer</button>
+                <button onclick="onFFFManualJsonClear()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold">Effacer</button>
+            </div>
+        </div>
+        <textarea id="fff-manual-json" rows="5" placeholder="Collez ici le contenu de la page (voir le mode d'emploi ci-dessous)" class="w-full border rounded-lg p-2 text-xs font-mono">${(state.fffManualJson || "").replace(/</g, "\\u003c")}</textarea>
+        <div class="text-[11px] text-emerald-800 mt-2">
+            📋 <b>Mode d'emploi :</b> ① ouvrez l'URL ci-dessous dans un onglet → ② <b>Ctrl+A</b> puis <b>Ctrl+C</b> → ③ collez ici → ④ <b>Enregistrer</b> → ⑤ <b>Analyser</b> → ⑥ liez vos équipes → ⑦ <b>⚠️ Important :</b> cette page ne montre que les <b>prochains</b> matchs. Pour un <b>championnat au complet</b>, cliquez sur <b>📥 Matchs</b> d'une compétition liée et collez le JSON de <b>son</b> URL dédiée (l'API compétition contient toute la saison) → ⑧ <b>Synchroniser maintenant</b>.
+            <br>🔗 URL de détection (calendrier club) : <code class="break-all">https://api-dofa.fff.fr/api/clubs/${state.fffClubNo || 18707}/calendrier?itemsPerPage=1000</code>
+        </div>
+    </div>
+`;
+
+    if (comps.length === 0) {
+        html += `
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+            <i class="fa-solid fa-circle-info mr-1"></i>
+            Aucune compétition chargée pour le moment. Cliquez sur <b>« Analyser le calendrier »</b> pour détecter les compétitions officielles du club. Aucune donnée ne sera importée tant qu'aucun lien n'est créé.
+        </div>
+        `;
+    } else {
+        html += `<div class="text-xs font-bold text-slate-600 mb-2">🎯 Liez une compétition FFF à votre équipe :</div>`;
+        if (emptyTeamRow) {
+            html += `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-800 mb-3">
+                ⚠️ Créez d'abord vos équipes dans le module <b>Équipes</b> avant de les lier.
+            </div>
+            `;
+        }
+        comps.forEach(c => {
+            const link = state.fffLinks && state.fffLinks[c.cp_no];
+            const linked = link ? link.team : "";
+            const teamName = linked && state.teams && state.teams[linked] ? state.teams[linked].name : (linked || "");
+            const catLabel = c.categories.length ? c.categories[0] : "";
+            const typeBadge = c.tipo === "CH" ? "bg-blue-100 text-blue-700"
+                : c.tipo === "CP" ? "bg-fuchsia-100 text-fuchsia-700"
+                : "bg-amber-100 text-amber-700";
+            const compJsonRaw = ((state.fffCompJson || {})[c.cp_no] || "").trim();
+            let compJsonCount = 0;
+            if (compJsonRaw) {
+                try {
+                    const cj = JSON.parse(compJsonRaw);
+                    compJsonCount = Array.isArray(cj) ? cj.length : ((cj && cj["hydra:member"]) || []).length;
+                } catch (e) { compJsonCount = 0; }
+            }
+
+            html += `
+            <div class="bg-slate-50 border ${linked ? "border-emerald-300 bg-emerald-50/40" : "border-slate-200"} rounded-xl p-3 mb-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="font-bold text-sm text-slate-800">
+                            <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold mr-1.5 ${typeBadge}">${fffTypeLabel(c.tipo)}</span>
+                            ${c.name}
+                        </div>
+                        <div class="text-[11px] text-slate-500 mt-0.5">${catLabel} · ${c.matches} match(s)${c.poule ? " · " + c.poule : ""}${compJsonRaw ? " · 📥 JSON collé" : ""}</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        ${linked ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold">✓ ${teamName}</span>` : ""}
+                        <select onchange="onFFFLinkChange('${c.cp_no}', this.value)" class="border rounded-lg p-2 text-xs ${linked ? "border-emerald-300" : "border-slate-200"}">
+                            <option value="">— Ne pas lier —</option>
+                            ${Object.entries(state.teams || {}).map(([k, t]) => `<option value="${k}" ${linked === k ? "selected" : ""}>${t.name || k.toUpperCase()}</option>`).join("")}
+                        </select>
+                        ${linked ? `<button onclick="onFFFToggleCompJson('${c.cp_no}')" class="border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 px-2.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap">📥 Matchs</button>` : ""}
+                    </div>
+                </div>
+                ${linked ? `
+                <div id="fff-comp-json-box-${c.cp_no}" class="hidden mt-2 border-t border-violet-100 pt-2">
+                    <div class="text-[11px] text-slate-600 mb-1">
+                        <b>Compétition au complet :</b> collez ici le JSON de ses matchs (l'API club ne montre que les prochains matchs). Ouvrez l'URL ci-dessous dans un onglet, <b>Ctrl+A</b> puis <b>Ctrl+C</b>, et collez le tout.
+                    </div>
+                    <div class="text-[10px] bg-white rounded-lg p-2 mb-2 border border-violet-100 break-all font-mono">
+                        https://api-dofa.fff.fr/api/match_entities?competition.cp_no=${c.cp_no}&amp;ma_dat[after]=2026-06-01
+                    </div>
+                    <textarea id="fff-comp-json-${c.cp_no}" rows="4" placeholder="Collez ici le contenu de la page (voir l'URL ci-dessus)" class="w-full border rounded-lg p-2 text-xs font-mono">${(compJsonRaw || "").replace(/</g, "\\u003c")}</textarea>
+                    <div class="flex items-center gap-2 mt-1.5">
+                        <button onclick="onFFFSaveCompJson('${c.cp_no}')" class="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Enregistrer</button>
+                        ${compJsonCount ? `<span class="text-[11px] font-bold text-emerald-700">✓ ${compJsonCount} match(s) prêt(s) à importer</span>` : `<span class="text-[11px] text-slate-400">Aucun JSON collé pour l'instant</span>`}
+                    </div>
+                </div>
+                ` : ""}
+            </div>
+            `;
+        });
+    }
+
+    container.innerHTML = html;
+}
+
+function maybeAutoSyncFFF() {
+    if (window.__fffSyncing) return;
+    if (window.__fffAutoSynced) return;
+    if (state.fffAutoSync === false) return;
+    if (!state.fffLinks || Object.keys(state.fffLinks).length === 0) return;
+    window.__fffAutoSynced = true;
+    setTimeout(() => {
+        syncFFFMatches({ manual: false });
+    }, 2000);
 }
 
 
@@ -6641,6 +9285,34 @@ teamsHtml += `
 });
 
 }
+const POSTE_LIBELLES = {
+    AD: 'Ailier droit',
+    AG: 'Ailier gauche',
+    BU: 'Buteur',
+    DC: 'Défenseur central',
+    DD: 'Défenseur droit',
+    DG: 'Défenseur gauche',
+    MC: 'Milieu central',
+    MDC: 'Milieu défensif',
+    MD: 'Milieu défensif',
+    MO: 'Milieu offensif',
+    MOC: 'Milieu offensif central',
+    GB: 'Gardien',
+    Gardien: 'Gardien',
+    Remplaçant: 'Remplaçant'
+};
+
+function getPosteLabel(code) {
+    if (!code) return '';
+    const key = String(code).trim();
+    return POSTE_LIBELLES[key] || key;
+}
+
+function getFirstName(player) {
+    if (!player) return '';
+    return (player.name || '').split(' ').pop();
+}
+
 function renderMatchComposition() {
 
     const container =
@@ -6892,7 +9564,7 @@ ${getFormationSlots(
                     mt-1
                     text-center">
 
-                    ${player.name}
+                    ${getFirstName(player)}
 
                 </div>
 
@@ -6924,7 +9596,11 @@ ${terrainPlayers.map(player => {
                                 ">
 
                                 <div class="font-bold text-xs">
-                                    ${player.name}
+                                    ${getFirstName(player)}
+                                </div>
+
+                                <div class="text-[10px] text-sky-700 font-semibold">
+                                    ${getPosteLabel(player.poste1)}
                                 </div>
 
                                 <button
@@ -6960,7 +9636,11 @@ ${terrainPlayers.map(player => {
 
                             class="w-full bg-white border rounded-xl p-3 text-left hover:bg-sky-50">
 
-                            ${player.name}
+                            <span class="font-bold">${player.name}</span>
+
+                            <span class="ml-2 text-[10px] font-semibold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded">
+                                ${getPosteLabel(player.poste1)}
+                            </span>
 
                         </button>
 
@@ -7024,80 +9704,6 @@ function dropPlayer(event) {
     saveStateToFirebase();
 
     draggedPlayerId = null;
-
-    renderMatchComposition();
-}
-
-function selectCompositionPlayer(playerId) {
-
-    selectedCompositionPlayer = playerId;
-
-    showToast(
-        "Cliquez sur une zone du terrain"
-    );
-
-}
-
-function moveSelectedPlayer(event) {
-
-    if (!selectedCompositionPlayer) {
-        return;
-    }
-
-    const terrain =
-        document.getElementById(
-            'composition-terrain'
-        );
-
-    if (!terrain) return;
-
-    const rect =
-        terrain.getBoundingClientRect();
-
-    const x =
-        ((event.clientX - rect.left)
-        / rect.width) * 100;
-
-    const y =
-        ((event.clientY - rect.top)
-        / rect.height) * 100;
-
-    const match =
-        state.matches[
-            state.selectedMatchId
-        ];
-
-    match.composition[
-        selectedCompositionPlayer
-    ] = {
-        x,
-        y
-    };
-
-    saveStateToFirebase();
-
-    selectedCompositionPlayer = null;
-
-    renderMatchComposition();
-
-    showToast(
-        "Joueur déplacé"
-    );
-}
-
-function addPlayerToComposition(playerId) {
-
-    const match =
-        state.matches[state.selectedMatchId];
-
-    match.composition[playerId] = {
-
-        x: 50,
-        y: 50
-
-    };
-
-    saveStateToFirebase();
 
     renderMatchComposition();
 }
