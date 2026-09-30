@@ -100,6 +100,9 @@ function liveData() {
 
     const attr = [];
     const placed = new Set();
+    const passengerNames = [];
+    const directNames = [];
+    const absentNames = [];
 
     Object.entries(responses).forEach(([id, r]) => {
 
@@ -127,14 +130,17 @@ function liveData() {
         } else if (r.status === 'passenger') {
 
             passengers++;
+            passengerNames.push(playerShort(id));
 
         } else if (r.status === 'direct') {
 
             directs++;
+            directNames.push(playerShort(id));
 
         } else if (r.status === 'absent') {
 
             absents++;
+            absentNames.push(playerShort(id));
 
         }
 
@@ -159,7 +165,10 @@ function liveData() {
         pending,
         total: convokedPlayers().length,
         attr,
-        toPlace
+        toPlace,
+        passengerNames,
+        directNames,
+        absentNames
     };
 
 }
@@ -359,6 +368,33 @@ function renderLive() {
                 <span>⏳ ${d.pending}</span>
             </div>
 
+            ${d.passengerNames.length ? `
+                <div>
+                    <strong class="text-[11px] text-slate-500 uppercase">Passagers</strong>
+                    <div class="mt-1 text-sm">
+                        ${d.passengerNames.join(', ')}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${d.directNames.length ? `
+                <div>
+                    <strong class="text-[11px] text-slate-500 uppercase">Directs</strong>
+                    <div class="mt-1 text-sm">
+                        ${d.directNames.join(', ')}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${d.absentNames.length ? `
+                <div>
+                    <strong class="text-[11px] text-slate-500 uppercase">Absents</strong>
+                    <div class="mt-1 text-sm">
+                        ${d.absentNames.join(', ')}
+                    </div>
+                </div>
+            ` : ''}
+
             ${d.attr.length ? `
                 <div>
                     <strong class="text-[11px] text-slate-500 uppercase">Qui conduit qui</strong>
@@ -412,6 +448,7 @@ function renderAll() {
     renderMatchInfo();
     renderLockBanner();
     renderLive();
+    renderMyResponse();
     renderMyAssignment();
 
 }
@@ -593,6 +630,69 @@ function guestPassengerIds() {
         .filter(Boolean)
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
         .map(p => ({ id: p.id, name: p.name }));
+
+}
+
+function renderMyResponse() {
+
+    const container =
+        document.getElementById('my-response');
+
+    if (!container) return;
+
+    if (!me || closed) {
+
+        container.innerHTML = '';
+        return;
+
+    }
+
+    const r = myResponse();
+
+    if (!r) {
+
+        container.innerHTML = `
+            <div class="mb-5 p-4 rounded-xl bg-sky-50 border border-sky-200 text-sm text-sky-900">
+                👆 <strong>${playerShort(me)}</strong> n'a pas encore répondu.
+                Choisissez un mode de déplacement ci-dessous puis validez.
+            </div>
+        `;
+
+        return;
+
+    }
+
+    const labels = {
+        driver: '🚗 Je conduis',
+        passenger: '👤 Je suis passager',
+        direct: "📍 J'y vais directement",
+        absent: '❌ Absent'
+    };
+
+    const when = r.updatedAt
+        ? new Date(r.updatedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+            + ' à ' +
+            new Date(r.updatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        : '';
+
+    const seatsTxt = r.status === 'driver'
+        ? ' — ' + (r.seats || 0) + ' place(s)'
+        : '';
+
+    container.innerHTML = `
+        <div class="mb-5 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+            <div class="font-bold text-emerald-800 text-sm">
+                ✅ Votre réponse est bien prise en compte
+            </div>
+            <div class="mt-1 text-sm text-slate-700">
+                <strong>${playerShort(me)}</strong> : ${labels[r.status] || r.status}${seatsTxt}
+            </div>
+            ${when ? '<div class="mt-0.5 text-[11px] text-slate-500">Répondu le ' + when + '</div>' : ''}
+            <div class="mt-1 text-[11px] text-slate-500">
+                Pour modifier, changez votre choix ci-dessous puis validez.
+            </div>
+        </div>
+    `;
 
 }
 
@@ -841,6 +941,7 @@ function respondForAnother() {
 
     if (anotherBtn) anotherBtn.classList.add('hidden');
 
+    renderMyResponse();
     renderMyAssignment();
 
 }
@@ -979,6 +1080,8 @@ db.ref('rangueil_data/matches')
             </select>
 
         </div>
+
+        <div id="my-response"></div>
 
         <div id="my-assignment"></div>
 
