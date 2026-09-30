@@ -3410,48 +3410,189 @@ function generateCarpoolReminder() {
 
     if (!m) return;
 
-    const carpoolResponses =
-        state.carpoolResponses?.[
-            m.carpoolId
-        ] || {};
+    const summary = buildCarpoolSummary(m, state.players || []);
 
-    const pendingPlayers =
-        state.players.filter(
-            p =>
-                m.convocations?.[p.id] === 'convoke' &&
-                !carpoolResponses[p.id]
-        );
+    const target =
+        parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
 
-    const totalConvokedReminder =
-        state.players.filter(
-            p => m.convocations?.[p.id] === 'convoke'
-        ).length;
+    // Base du calcul transport : objectif équipe (inclut les futurs convoqués)
+    const base = Math.max(target, summary.totalConvoked);
+    const covered = summary.drivers + summary.seats;
+    const need = base - summary.directs - summary.absents;
+    const missing = need - covered;
+    const freeSeats = summary.seats - summary.passengers;
+    const pendingCount = summary.pendingList.length;
 
-    const respondedCount =
-        totalConvokedReminder - pendingPlayers.length;
+    const link =
+        `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpoolId}`;
 
-    let text =
+    const pl = (n, s) => n + ' ' + s + (n > 1 ? 's' : '');
+
+    // "NOM Prénom" → "Prénom N." (court, convivial, sans ambiguïté malgré les doublons)
+    const shortFirst = (full) => {
+        const w = String(full || '').trim().split(/\s+/).filter(Boolean);
+        if (w.length <= 1) return w[0] || '';
+        return w.slice(1).join(' ') + ' ' + (w[0][0] || '').toUpperCase() + '.';
+    };
+
+    // Libellé par joueur : surnom ("Prénom usuel" de la fiche) prioritaire,
+    // sinon "Prénom N." — unicité globale au message (collision → nom complet)
+    const byId = {};
+    (state.players || []).forEach(p => { if (p && p.id) byId[p.id] = p; });
+
+    const rawFor = (id, full) => {
+        const p = id ? byId[id] : null;
+        const nick = p && p.nickname ? String(p.nickname).trim() : '';
+        if (nick) return nick;
+        const nm = (p && p.name) || full || '';
+        return shortFirst(nm);
+    };
+    const canonFor = (id, full) => {
+        const p = id ? byId[id] : null;
+        return String((p && p.name) || full || '').trim();
+    };
+
+    const respMapAll = state.carpoolResponses?.[m.carpoolId] || {};
+    const pendingIdsAll = (state.players || [])
+        .filter(p => m.convocations?.[p.id] === 'convoke' && !respMapAll[p.id])
+        .map(p => p.id);
+    const passengerIdsAll = Object.entries(respMapAll)
+        .filter(([id, r]) => r && r.status === 'passenger')
+        .map(([id]) => id);
+    const nameOf = (id) => (byId[id] && byId[id].name) || id;
+
+    const labelSlots = []
+        .concat(summary.driverAssignments.map(a => ({ id: a.id, full: a.name })))
+        .concat(summary.driverAssignments.flatMap(a => (a.passengerIds || []).map(pid => ({ id: pid, full: nameOf(pid) }))))
+        .concat(passengerIdsAll.map(id => ({ id, full: nameOf(id) })))
+        .concat(pendingIdsAll.map(id => ({ id, full: nameOf(id) })));
+    const rawCounts = {};
+    labelSlots.forEach(s => {
+        const r = rawFor(s.id, s.full);
+        rawCounts[r] = (rawCounts[r] || 0) + 1;
+    });
+    const fmtSlot = (s) => {
+        const r = rawFor(s.id, s.full);
+        return rawCounts[r] > 1 ? canonFor(s.id, s.full) : r;
+    };
+
+    const driverShorts = summary.driverAssignments.map(a => fmtSlot({ id: a.id, full: a.name }));
+
+    const driverLines = summary.driverAssignments.map((a, i) =>
+        `• ${driverShorts[i]} — ${pl(a.seats, 'place')}`
+    ).join('\n');
+
+    const driverDetailLines = summary.driverAssignments.map((a, i) => {
+        const px = (a.passengerIds || []).map(pid => fmtSlot({ id: pid, full: nameOf(pid) }));
+        return `• ${driverShorts[i]} → ${px.length ? px.join(', ') : '—'}`;
+    }).join('\n');
+
+    const pendingShort = pendingIdsAll.map(id => fmtSlot({ id, full: nameOf(id) })).join(', ');
+    const passengersShort = passengerIdsAll.map(id => fmtSlot({ id, full: nameOf(id) })).join(', ');
+    const driversShort = driverShorts.join(' et ');
+
+    // Version URGENTE si match aujourd'hui ou demain et transport non bouclé
+    const todayD = new Date();
+    todayD.setHours(0, 0, 0, 0);
+    const matchD = m.date ? new Date(m.date + 'T12:00:00') : null;
+    if (matchD) matchD.setHours(0, 0, 0, 0);
+    const diffDays = matchD
+        ? Math.round((matchD - todayD) / 86400000)
+        : 99;
+    const isUrgent =
+        diffDays <= 1 && (pendingCount > 0 || missing > 0);
+
+    let text = '';
+
+    if (pendingCount === 0 && missing <= 0) {
+
+        // === VERSION COMPLÈTE : pur remerciement ===
+        text =
+`🔵⚪ RANGUEIL FC ⚪🔵
+
+✅ ${base}/${base} — TOUT LE MONDE A RÉPONDU, MERCI !
+
+🚗 Merci tout particulier à nos conducteurs :
+${driverDetailLines}
+
+🟢 Transport assuré. Bon match à tous 💙⚽`;
+
+    } else if (isUrgent) {
+
+        // === VERSION URGENTE (J-1 / jour J) ===
+        text =
+`🔵⚪ RANGUEIL FC — ⏰ DERNIER APPEL COVOITURAGE
+
+🙏 Merci aux parents qui ont répondu et à nos conducteurs ${driversShort || '—'} qui prennent leur voiture.
+
+🧮 Transport : ${summary.drivers} conducteurs — ${summary.seats} places → ${covered}/${base} joueurs couverts${missing > 0 ? `
+🔎 Il manque ${missing} place(s) !` : ''}
+
+❌ Sans réponse avant ce soir 18h, votre enfant sera noté SANS TRANSPORT et ne pourra pas être du déplacement.
+
+Il manque : ${pendingShort}
+
+👉 C'est ici : ${link}
+
+Merci de votre réactivité 💙`;
+
+    } else {
+
+        // === VERSION STANDARD ===
+        text =
 `🔵⚪ RANGUEIL FC ⚪🔵
 
 ⏳ RELANCE COVOITURAGE
-
-✅ ${respondedCount}/${totalConvokedReminder} ont déjà répondu — merci !
-
-Les joueurs suivants n'ont pas encore renseigné leur mode de déplacement :
-
 `;
 
-    pendingPlayers.forEach(p => {
-        text += `• ${p.name}\n`;
-    });
+        if (summary.totalConvoked < target) {
+            text += `
+📋 Liste encore provisoire : ${summary.totalConvoked} convoqués pour l'instant, ${pl(target - summary.totalConvoked, 'nom')} à venir.
+`;
+        }
 
-    text += `
+        text += `
+✅ ${summary.responses}/${summary.totalConvoked} ont déjà répondu — merci !
+`;
 
-🚗 Répondre ici :
-https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpoolId}
+        if (summary.drivers > 0) {
+            text += `
+🚗 Un grand merci à nos ${pl(summary.drivers, 'conducteur')} :
+${driverLines}
+`;
+        }
+
+        if (summary.passengers > 0) {
+            text += `
+👤 Merci aussi à ${passengersShort} qui ont répondu passagers —
+vos places sont réservées ✅ (${pl(freeSeats, 'place')} encore ${freeSeats > 1 ? 'libres' : 'libre'})
+`;
+        }
+
+        text += `
+🧮 Transport : ${pl(summary.drivers, 'conducteur')} — ${pl(summary.seats, 'place')} → ${covered}/${base} joueurs couverts
+${missing > 0 ? `🔎 Il manque ${pl(missing, 'place')} !` : `✅ Assez de places pour tout le monde.`}
+`;
+
+        text += `
+⚠️ MÊME LES PASSAGERS doivent répondre : sans votre clic,
+aucune place n'est réservée pour votre enfant.
+Un passager non déclaré = un enfant sans siège prévu.
+`;
+
+        if (pendingCount > 0) {
+            text += `
+⏳ Il manque encore la réponse de : ${pendingShort}
+`;
+        }
+
+        text += `
+👉 Répondre ici (30 secondes) : ${link}
 
 💙 Allez Rangueil !
 `;
+
+    }
 
     navigator.clipboard
         .writeText(text)
@@ -3922,6 +4063,7 @@ state.selectedMatchId = matchId;
                     document.getElementById('modal-player-title').innerText = "Modifier le Joueur";
                     document.getElementById('p-id').value = player.id;
                     document.getElementById('p-name').value = player.name || '';
+                    document.getElementById('p-nickname').value = player.nickname || '';
                     document.getElementById('p-licence').value = player.licence !== '-' ? player.licence : '';
                     document.getElementById('p-team').value = player.team || 'U14';
                     document.getElementById('p-poste1').value = (player.poste1 || '').replace('-', '');
@@ -3962,9 +4104,12 @@ if (role === 'responsable') {
         function handleSavePlayer(e) {
             e.preventDefault();
             const pId = document.getElementById('p-id').value;
+            const existingPlayer = pId ? state.players.find(p => p.id === pId) : null;
             const playerData = {
+    ...(existingPlayer || {}),
     id: pId || 'J_' + Date.now(),
     name: document.getElementById('p-name').value,
+    nickname: document.getElementById('p-nickname').value.trim(),
     licence: document.getElementById('p-licence').value.trim() || '-',
     team: document.getElementById('p-team').value,
     poste1: document.getElementById('p-poste1').value.trim() || '-',
