@@ -114,21 +114,23 @@ async function telechargerFeuillePDF() {
         });
 
         // ----- Dirigeants en haut à droite : Juge de touche = "Arbitre Asst 1", Délégué(s) = "Délégué(s)" -----
-        // Licence dans la colonne "n° licence ou CI" (juste après le libellé imprimé), NOM Prénom
-        // dans la colonne nom-prénom sur la même ligne, sans empiéter sur la case ben/off.
+        // Licence affichée DANS la colonne "n° licence ou CI" sur la même ligne que le libellé
+        // NOM Prénom dans la colonne nom-prénom
         const drg = pdfDirigeants(m);
-        const DROITE = { licX: 612, nomX: 700, nomW: 118, asst1Base: 53.5, asst2Base: 64.5, delBase: 86.5 };
+        const DROITE = { licX: 610, nomX: 720, nomW: 95, asst1Base: 53.5, asst2Base: 64.5, delBase: 106 };
         if (drg.asst1.length) {
             const lics = drg.asst1.map(s => String(s.licence || '').trim()).filter(Boolean).join('/');
-            if (lics) page1.drawText(lics, { x: DROITE.licX, y: H_PDF - DROITE.asst1Base, size: 7, font: helv, color: noire });
+            cadreLicence(page1, helv, noire, 48.5, lics);
             zone(page1, helv, noire, [{ t: drg.asst1.map(nomPrenomStaff).join(', '), x: DROITE.nomX, zoneW: DROITE.nomW, base: DROITE.asst1Base, taille: 8 }]);
         }
         if (drg.asst2.length) {
+            const lics = drg.asst2.map(s => String(s.licence || '').trim()).filter(Boolean).join('/');
+            if (lics) page1.drawText(lics, { x: DROITE.licX, y: H_PDF - DROITE.asst2Base, size: 7, font: helv, color: noire });
             zone(page1, helv, noire, [{ t: drg.asst2.map(nomPrenomStaff).join(', '), x: DROITE.nomX, zoneW: DROITE.nomW, base: DROITE.asst2Base, taille: 8 }]);
         }
         if (drg.delegue.length) {
             const lics = drg.delegue.map(s => String(s.licence || '').trim()).filter(Boolean).join('/');
-            if (lics) page1.drawText(lics, { x: DROITE.licX, y: H_PDF - DROITE.delBase, size: 7, font: helv, color: noire });
+            cadreLicence(page1, helv, noire, 101.1, lics, 2);
             zone(page1, helv, noire, [{ t: drg.delegue.map(nomPrenomStaff).join(', '), x: DROITE.nomX, zoneW: DROITE.nomW, base: DROITE.delBase, taille: 8 }]);
         }
 
@@ -218,6 +220,19 @@ function cellule(page, font, color, text, x, zoneW, topY, hauteur, tailleBase, a
             topOf += size * 1.05;
         }
     }
+}
+
+/* Cadre "n° licence ou CI" : 2 cases accolées (mesures de la feuille officielle),
+ * juste après le libellé ; le numéro est écrit dedans, centré. topY = origine haut. */
+function cadreLicence(page, font, color, topY, lics, decal) {
+    const boxA = { x: 642.4, w: 16.4 };
+    const boxB = { x: 658.9, w: 15.3 };
+    const boxH = 10.9;
+    const y0 = H_PDF - (topY + boxH);
+    for (const b of [boxA, boxB]) {
+        page.drawRectangle({ x: b.x, y: y0, width: b.w, height: boxH, borderColor: color, borderWidth: 0.75 });
+    }
+    if (lics) cellule(page, font, color, String(lics), boxA.x, boxA.w + boxB.w, topY - (decal || 0), boxH, 7, true);
 }
 
 /* Dessine un champ d'en-tête sur la ligne de base du libellé imprimé, sans dépasser. */

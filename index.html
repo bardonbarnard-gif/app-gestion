@@ -1151,6 +1151,7 @@
                 id="m-travel-time"
                 value="25"
                 min="0"
+                onchange="updateMeetingPreview();"
                 class="w-full p-2 border border-slate-200 rounded-lg">
         </div>
 
@@ -1164,6 +1165,7 @@
         id="m-arrival-margin"
         value="60"
         min="0"
+        onchange="updateMeetingPreview();"
         class="w-full p-2 border border-slate-200 rounded-lg">
 </div>
 
@@ -1177,6 +1179,7 @@
                 id="m-security-margin"
                 value="10"
                 min="0"
+                onchange="updateMeetingPreview();"
                 class="w-full p-2 border border-slate-200 rounded-lg">
         </div>
 
@@ -1222,7 +1225,7 @@
     required
     onchange="updateDeadlinePreview(); updateMeetingPreview();"
     class="w-full p-2 border border-slate-200 rounded-lg"></div>
-                <div><label class="block text-slate-600 font-semibold mb-1">Heure</label><input type="time" id="m-heure" value="14:30" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                <div><label class="block text-slate-600 font-semibold mb-1">Heure</label><input type="time" id="m-heure" value="14:30" onchange="updateMeetingPreview();" class="w-full p-2 border border-slate-200 rounded-lg"></div>
             </div>
             
             <div class="grid grid-cols-3 gap-2">

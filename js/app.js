@@ -1526,6 +1526,7 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
                             <div>📅 ${formattedDate} à ${m.heure || '14:30'}</div>
                             <div>🌿 ${m.pelouse || 'Synthétique'}</div>
                         </div>
+                        <div class="mt-1.5 text-[11px] font-bold text-sky-700">🕐 Rendez-vous : ${getRdvHeure(m) || '--'}${m.meetingPlace ? ' — ' + m.meetingPlace : ''}</div>
                     </div>
                 </div>`;
 
@@ -2948,12 +2949,62 @@ function openFeuilleDeMatch() {
             </div>
         </td>
         <td style="width: 35%; vertical-align: top; padding: 0;">
-            <table class="fm-header" style="width: 100%; margin: 0;">
-                <tr><td class="fm-header-label" style="padding: 0.5pt;">Arbitre :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
-                <tr><td class="fm-header-label" style="padding: 0.5pt;">Arbitre Asst 1 :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
-                <tr><td class="fm-header-label" style="padding: 0.5pt;">Arbitre Asst 2 :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
-                <tr><td class="fm-header-label" style="padding: 0.5pt;">Arbitre remplac. :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
-                <tr><td class="fm-header-label" style="padding: 0.5pt;">Délégué(s) :</td><td class="fm-header-value" style="padding: 0.5pt;">...................</td></tr>
+            <table class="fm-header" style="width: 100%; margin: 0; font-size: 6.5pt;">
+                <!-- En-tête -->
+                <tr style="background-color: #e8e8e8;">
+                    <td style="padding: 0.5pt; width: 50%; border-right: 0.5pt solid #000; font-weight: bold;">N° Licence ou CI</td>
+                    <td style="padding: 0.5pt; width: 10%; text-align: center; border-right: 0.5pt solid #000; font-weight: bold; font-size: 5.5pt;">Ben.</td>
+                    <td style="padding: 0.5pt; width: 10%; text-align: center; border-right: 0.5pt solid #000; font-weight: bold; font-size: 5.5pt;">Off.</td>
+                    <td style="padding: 0.5pt; width: 30%; font-weight: bold;">NOM Prénom</td>
+                </tr>
+                <!-- Arbitre -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">Arbitre : 2548062598</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;">BENTAHAR Soheib</td>
+                </tr>
+                <!-- Arbitre Assistant 1 -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">Arbitre Asst 1 : 2543210918</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☑</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;">TURAN Yusuf</td>
+                </tr>
+                <!-- Arbitre Assistant 2 -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">Arbitre Asst 2 : 9605327226</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☑</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;">GRECO Paolo</td>
+                </tr>
+                <!-- Arbitre remplaçant -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">Arbitre remplaçant :</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;">...................</td>
+                </tr>
+                <!-- Délégué(s) -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">Délégué(s)</td>
+                    <td colspan="2" style="padding: 0.5pt; border-right: 0.5pt solid #000;"></td>
+                    <td style="padding: 0.5pt;">...................</td>
+                </tr>
+                <!-- Délégué ligne 2 -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;">1856518106</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☑</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;">EON Lionel</td>
+                </tr>
+                <!-- Délégué ligne 3 vide -->
+                <tr>
+                    <td style="padding: 0.5pt; border-right: 0.5pt solid #000;"></td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt; text-align: center; border-right: 0.5pt solid #000;">☐</td>
+                    <td style="padding: 0.5pt;"></td>
+                </tr>
             </table>
         </td>
     </tr>
@@ -3252,6 +3303,12 @@ function formatDeadlineFr(deadlineText) {
     text +=
     `📅 *Date :* ${formatDateFr(m.date)}\n`;
 
+    text +=
+        `🚗 *Covoiturage — répondez en 30 secondes chrono :*\n`;
+
+    text +=
+        `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpoolId}\n\n`;
+
     if (
         m.location === 'Domicile'
     ) {
@@ -3288,10 +3345,7 @@ function formatDeadlineFr(deadlineText) {
     `🚗 *ORGANISATION DU DÉPLACEMENT*\n\n`;
 
 text +=
-    `👉 *Répondre au covoiturage :*\n`;
-
-text +=
-    `https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpoolId}\n\n`;
+    `👉 *Lien de réponse en haut du message ☝️*\n\n`;
 
 
 text +=
@@ -3307,7 +3361,7 @@ text +=
     }
 
     text +=
-        `🕐 *Rendez-vous :* ${document.getElementById('m-rdv-preview')?.innerText || '--'}\n`;
+        `🕐 *Rendez-vous :* ${getRdvHeure(m) || '--'}\n`;
 
     text +=
         `⚽ *Coup d'envoi :* ${m.heure || '--'}\n\n`;
@@ -3317,8 +3371,13 @@ text +=
 text +=
     `${getResponseDeadline(m.date)}\n\n`;
 
+    const targetConvocations =
+        parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
+
     text +=
-        `📋 *Joueurs convoqués (${convoked.length})*\n\n`;
+        (convoked.length < targetConvocations)
+        ? `📋 *Joueurs convoqués pour l'instant (${convoked.length}/${targetConvocations})*\n\n`
+        : `📋 *Joueurs convoqués (${convoked.length})*\n\n`;
 
     convoked.forEach((p, idx) => {
 
@@ -3363,12 +3422,20 @@ function generateCarpoolReminder() {
                 !carpoolResponses[p.id]
         );
 
+    const totalConvokedReminder =
+        state.players.filter(
+            p => m.convocations?.[p.id] === 'convoke'
+        ).length;
+
+    const respondedCount =
+        totalConvokedReminder - pendingPlayers.length;
+
     let text =
 `🔵⚪ RANGUEIL FC ⚪🔵
 
 ⏳ RELANCE COVOITURAGE
 
-Merci aux joueurs ayant déjà répondu ✅
+✅ ${respondedCount}/${totalConvokedReminder} ont déjà répondu — merci !
 
 Les joueurs suivants n'ont pas encore renseigné leur mode de déplacement :
 
@@ -3624,6 +3691,39 @@ https://app-gestion-git-main-rangueil.vercel.app/covoiturage.html?id=${m.carpool
             renderMatchDetail();
         }
 
+// Calcule l'heure de RDV : coup d'envoi - arrivée - (trajet + sécurité si extérieur)
+function computeRdvHeure(heureStr, location, travel, arrival, security) {
+    if (!heureStr || !String(heureStr).includes(':')) return '';
+    const parts = String(heureStr).split(':').map(Number);
+    const hours = parts[0] || 0;
+    const minutes = parts[1] || 0;
+    const arr = parseInt(arrival) || 60;
+    let totalMinutes;
+    if (location === 'Domicile') {
+        totalMinutes = (hours * 60) + minutes - arr;
+    } else {
+        totalMinutes = (hours * 60) + minutes - arr - (parseInt(travel) || 0) - (parseInt(security) || 0);
+    }
+    if (totalMinutes < 0) totalMinutes = 0;
+    const rdvHours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+    const rdvMinutes = String(totalMinutes % 60).padStart(2, '0');
+    return rdvHours + ':' + rdvMinutes;
+}
+
+// Heure RDV d'un match : champ persisté si présent, sinon recalculé depuis les marges
+// (couvre les matchs créés avant l'ajout du champ rdvHeure)
+function getRdvHeure(m) {
+    if (!m) return '';
+    if (m.rdvHeure) return m.rdvHeure;
+    return computeRdvHeure(
+        m.heure,
+        m.location,
+        m.travelTime != null ? m.travelTime : 25,
+        m.arrivalMargin != null ? m.arrivalMargin : 60,
+        m.securityMargin != null ? m.securityMargin : 10
+    );
+}
+
 function updateMeetingPreview() {
 
     const matchTime =
@@ -3644,46 +3744,13 @@ function updateMeetingPreview() {
     const location =
         document.getElementById('m-location').value;
 
-    const [hours, minutes] =
-        matchTime.split(':').map(Number);
-
     const arrival =
     parseInt(
         document.getElementById('m-arrival-margin').value
     ) || 60;
 
-let totalMinutes;
-
-if (location === 'Domicile') {
-
-    totalMinutes =
-        (hours * 60) +
-        minutes -
-        arrival;
-
-} else {
-
-    totalMinutes =
-        (hours * 60) +
-        minutes -
-        arrival -
-        travel -
-        security;
-
-}
-
-    if (totalMinutes < 0) totalMinutes = 0;
-
-    const rdvHours =
-        String(Math.floor(totalMinutes / 60))
-            .padStart(2, '0');
-
-    const rdvMinutes =
-        String(totalMinutes % 60)
-            .padStart(2, '0');
-
     document.getElementById('m-rdv-preview').innerText =
-        rdvHours + ':' + rdvMinutes;
+        computeRdvHeure(matchTime, location, travel, arrival, security) || '--';
 }
 
 function updateMatchLocationUI() {
@@ -3780,14 +3847,19 @@ function updateMatchLocationUI() {
     const matchId = document.getElementById('m-id').value || 'M' + Date.now();
     const existingMatch =
     state.matches[matchId] || {};
+    const saveHeure = document.getElementById('m-heure').value;
+    const saveLocation = document.getElementById('m-location').value;
+    const saveTravel = parseInt(document.getElementById('m-travel-time').value) || 25;
+    const saveArrival = parseInt(document.getElementById('m-arrival-margin').value) || 60;
+    const saveSecurity = parseInt(document.getElementById('m-security-margin').value) || 10;
     const matchData = {
         id: matchId,
         opponent: document.getElementById('m-opponent').value,
         adresse: document.getElementById('m-adresse').value,
         date: document.getElementById('m-date').value,
-        heure: document.getElementById('m-heure').value,
+        heure: saveHeure,
         type: document.getElementById('m-type').value,
-        location: document.getElementById('m-location').value,
+        location: saveLocation,
         pelouse: document.getElementById('m-pelouse').value,
         team: teamValue,
 
@@ -3799,23 +3871,17 @@ meetingPlace:
     document.getElementById('m-meeting-place').value,
 
 
-travelTime:
-    parseInt(
-        document.getElementById('m-travel-time').value
-    ) || 25,
+travelTime: saveTravel,
 
- arrivalMargin:
-    parseInt(
-        document.getElementById('m-arrival-margin').value
-    ) || 60,  
+ arrivalMargin: saveArrival,
 
-securityMargin:
-    parseInt(
-        document.getElementById('m-security-margin').value
-    ) || 10,
-        // Initialiser les champs optionnels
-        scoreHome: "",
-        scoreAway: "",
+securityMargin: saveSecurity,
+
+// Heure de RDV calculée et persistée (affichée page covoiturage + WhatsApp)
+rdvHeure: computeRdvHeure(saveHeure, saveLocation, saveTravel, saveArrival, saveSecurity),
+        // Conserver les scores existants (ne pas les effacer à l'édition)
+        scoreHome: existingMatch.scoreHome != null ? existingMatch.scoreHome : "",
+        scoreAway: existingMatch.scoreAway != null ? existingMatch.scoreAway : "",
         convocations: existingMatch.convocations || {},
 positions: existingMatch.positions || {},
 jerseys: existingMatch.jerseys || {},
@@ -5266,9 +5332,14 @@ function buildCarpoolSummary(m, playersForMatch) {
         transportStatus = '⏳ Aucune réponse pour l\'instant';
         transportClass = 'text-amber-700';
 
+    } else if (pendingList.length > 0) {
+
+        transportStatus = `⏳ En attente de ${pendingList.length} réponse(s)`;
+        transportClass = 'text-amber-700';
+
     } else {
 
-        transportStatus = '🟢 Transport assuré';
+        transportStatus = '🟢 Transport assuré — tout le monde a répondu';
         transportClass = 'text-emerald-700';
 
     }
@@ -7542,6 +7613,19 @@ function fffApiUrl(path) {
     return base + (p.startsWith("/") ? "" : "/") + p;
 }
 
+function fffVercelProxyUrl(path) {
+    let p = String(path || "");
+    if (!p.startsWith("/")) p = "/" + p;
+    // Normalise : enlève le préfixe /api si présent car le proxy attend le path complet
+    const params = new URLSearchParams();
+    params.set("path", p);
+    const isFile = typeof location !== "undefined" && location.protocol === "file:";
+    if (isFile) {
+        return "https://app-gestion-git-main-rangueil.vercel.app/api/fff?" + params.toString();
+    }
+    return "/api/fff?" + params.toString();
+}
+
 async function fffFetchJsonRaw(url, timeoutMs = 20000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -7598,43 +7682,50 @@ function fffProxyRouteFor(url) {
     return base + sep + "url=" + encodeURIComponent(url);
 }
 
-function fffTryRoutes() {
-    const url = state.fffApiBaseLastUrl || "";
-    const routes = [];
-    const proxyUrl = fffProxyRouteFor(url);
-    if (proxyUrl) routes.push({ id: "proxy", url: proxyUrl, jsonp: true });
-    routes.push({ id: "direct", url: url });
-    routes.push({ id: "allorigins", url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(url) });
-    routes.push({ id: "codetabs", url: "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) });
-    return routes;
-}
-
 async function fffFetchJson(path) {
-    const url = fffApiUrl(path);
-    state.fffApiBaseLastUrl = url;
-
-    const routes = fffTryRoutes();
-    const bestId = window.__fffBestRoute;
-    if (bestId) {
-        routes.sort((a, b) => {
-            if (a.id === bestId) return -1;
-            if (b.id === bestId) return 1;
-            return 0;
-        });
+    // 1a) Proxy local Node — tente toujours localhost:3001 en premier (file:// ou http://localhost:3000)
+    //     Lance `node proxy-local.js` et laisse-le ouvert. Si absent, on bascule sur Vercel/Google.
+    try {
+        const localUrl = "http://localhost:3001?path=" + encodeURIComponent(path);
+        const lData = await fffFetchJsonRaw(localUrl, 12000);
+        return lData;
+    } catch (e) {
+        console.warn("FFF local proxy (localhost:3001) échoué :", e.message);
     }
-
-    let lastErr = null;
-    for (const route of routes) {
+    // 1b) Vercel proxy (prioritaire sur http) — fonctionne sur vercel.app ET en file:// via URL absolue
+    try {
+        const vercelUrl = fffVercelProxyUrl(path);
+        const vData = await fffFetchJsonRaw(vercelUrl, 20000);
+        return vData;
+    } catch (e) {
+        console.warn("FFF Vercel proxy échoué :", e.message);
+    }
+    // 2) Google Apps Script proxy si configuré (fetch + fallback JSONP)
+    const fullUrl = fffApiUrl(path);
+    state.fffApiBaseLastUrl = fullUrl;
+    const gUrl = fffProxyRouteFor(fullUrl);
+    if (gUrl) {
         try {
-            const data = route.jsonp ? await fffJsonp(route.url) : await fffFetchJsonRaw(route.url);
-            if (route.id !== "direct") window.__fffBestRoute = route.id;
-            return data;
-        } catch (err) {
-            lastErr = err;
-            console.warn("FFF route '" + route.id + "' inaccessible :", err.message);
+            const gData = await fffFetchJsonRaw(gUrl, 25000);
+            return gData;
+        } catch (e) {
+            console.warn("FFF Google proxy fetch échoué, essai JSONP :", e.message);
+            try {
+                const gData2 = await fffJsonp(gUrl, null, 25000);
+                return gData2;
+            } catch (e2) {
+                console.warn("FFF Google proxy JSONP échoué :", e2.message);
+            }
         }
     }
-    throw new Error("API FFF injoignable depuis le navigateur. Vérifiez l'URL du petit proxy (script Google déployé). " + (lastErr ? lastErr.message : ""));
+    // 3) Dernier recours : direct (échouera en 403 sur file:// mais peut marcher sur vercel via rewrite /fff)
+    try {
+        const directUrl = fffApiUrl(path);
+        return await fffFetchJsonRaw(directUrl, 15000);
+    } catch (e) {
+        console.warn("FFF direct échoué :", e.message);
+        throw new Error("API FFF injoignable. Vérifiez le proxy Vercel (/api/fff) ou l'URL Google Apps Script. " + e.message);
+    }
 }
 
 async function fetchFFFCalendar() {
@@ -7659,6 +7750,27 @@ async function fetchFFFCalendar() {
         currentPath = view["hydra:next"] || null;
     }
 
+    return matches;
+}
+
+async function fetchFFFCompetitionMatches(cpNo) {
+    const now = new Date();
+    const seasonYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const seasonStart = seasonYear + "-06-01";
+    const params = new URLSearchParams();
+    params.set("competition.cp_no", String(cpNo));
+    params.set("ma_dat[after]", seasonStart);
+    params.set("itemsPerPage", "1000");
+    let currentPath = "/api/match_entities?" + params.toString();
+    let matches = [];
+    let guard = 0;
+    while (currentPath && guard < 20) {
+        guard++;
+        const data = await fffFetchJson(currentPath);
+        matches = matches.concat(data["hydra:member"] || []);
+        const view = data["hydra:view"] || {};
+        currentPath = view["hydra:next"] || null;
+    }
     return matches;
 }
 
@@ -7748,7 +7860,7 @@ function buildFFFMatch(evt) {
     const scoreHome = isHome ? homeScore : awayScore;
     const scoreAway = isHome ? awayScore : homeScore;
 
-    return {
+    const fffBuilt = {
         id: "fff-" + evt.ma_no,
         opponent: fffOpponentName(oppSide),
         adresse: [
@@ -7788,14 +7900,24 @@ function buildFFFMatch(evt) {
             isHome: isHome
         }
     };
+    fffBuilt.rdvHeure = computeRdvHeure(
+        fffBuilt.heure,
+        fffBuilt.location,
+        fffBuilt.travelTime,
+        fffBuilt.arrivalMargin,
+        fffBuilt.securityMargin
+    );
+    return fffBuilt;
 }
 
 function applyFFFToExisting(existing, fffMatch) {
+    // Ne jamais écraser un match Amical manuel en Type coupe/championnat
+    const wasAmical = existing.type === "Amical" && !existing.fff;
     existing.opponent = fffMatch.opponent;
     existing.adresse = fffMatch.adresse;
     existing.date = fffMatch.date;
     existing.heure = fffMatch.heure;
-    existing.type = fffMatch.type;
+    if (!wasAmical) existing.type = fffMatch.type;
     existing.location = fffMatch.location;
     existing.pelouse = fffMatch.pelouse;
     existing.team = fffMatch.team;
@@ -7804,6 +7926,7 @@ function applyFFFToExisting(existing, fffMatch) {
         existing.scoreAway = fffMatch.scoreAway;
     }
     existing.fff = fffMatch.fff;
+    existing.rdvHeure = fffMatch.rdvHeure;
     existing.carpoolId = existing.carpoolId || fffMatch.carpoolId;
     existing.convocations = existing.convocations || {};
     existing.positions = existing.positions || {};
@@ -7818,15 +7941,26 @@ function applyFFFToExisting(existing, fffMatch) {
 function findLinkedManualMatch(evt, teamKey) {
     const clubNo = state.fffClubNo || 18707;
     const isHome = evt.home && evt.home.club && evt.home.club.cl_no === clubNo;
-    const fffDate = (evt.date || "").slice(0, 10);
     const fffOpp = fffNormalize(fffOpponentName(isHome ? evt.away : evt.home));
     if (!fffOpp) return null;
-    return Object.values(state.matches).find(m =>
+    // Tolérant aux changements de date : on matche sur équipe + adversaire normalisé
+    // même si la date a bougé (report). On évite les Amicaux.
+    const candidates = Object.values(state.matches).filter(m =>
         !m.fff
         && m.team === teamKey
-        && (m.date || "") === fffDate
+        && m.type !== "Amical"
         && fffNormalize(m.opponent) === fffOpp
     );
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+    // Si plusieurs homonymes (même adversaire 2x dans la saison), prend le plus proche en date
+    const fffDate = (evt.date || "").slice(0, 10);
+    candidates.sort((a, b) => {
+        const da = a.date ? Math.abs(new Date(a.date) - new Date(fffDate)) : 9999;
+        const db = b.date ? Math.abs(new Date(b.date) - new Date(fffDate)) : 9999;
+        return da - db;
+    });
+    return candidates[0];
 }
 
 async function refreshFFFCompetitions() {
@@ -7909,23 +8043,39 @@ function syncFFFMatches(opts) {
             let updated = 0;
             const missingComps = [];
 
-            linkedEntries.forEach(([cpNoStr, link]) => {
+            for (const [cpNoStr, link] of linkedEntries) {
                 const cpNo = Number(cpNoStr);
                 const teamKey = link.team;
-                const compMatches = compJsonMap[cpNoStr] || (clubCalendar || []).filter(e => e && e.competition && Number(e.competition.cp_no) === cpNo);
+                let compMatches = null;
 
-                if (!compMatches.length) {
-                    missingComps.push(link.competitionName || ("Compétition " + cpNo));
-                    return;
+                // 1) Live FFF : saison complète (passés + à venir) par compétition
+                try {
+                    const live = await fetchFFFCompetitionMatches(cpNo);
+                    if (live && live.length) compMatches = live;
+                } catch (e) {
+                    console.warn("FFF live cp_no " + cpNo + " échoué :", e.message);
+                }
+                // 2) Fallback JSON collé par compétition (📥 Matchs)
+                if (!compMatches || !compMatches.length) {
+                    compMatches = compJsonMap[cpNoStr] || null;
+                }
+                // 3) Fallback calendrier club (prochains seulement)
+                if (!compMatches || !compMatches.length) {
+                    compMatches = (clubCalendar || []).filter(e => e && e.competition && Number(e.competition.cp_no) === cpNo);
                 }
 
-                compMatches.forEach(evt => {
+                if (!compMatches || !compMatches.length) {
+                    missingComps.push(link.competitionName || ("Compétition " + cpNo));
+                    continue;
+                }
+
+                for (const evt of compMatches) {
                     const clubNoNow = state.fffClubNo || 18707;
                     const involvesClub = evt && (
                         (evt.home && evt.home.club && evt.home.club.cl_no === clubNoNow)
                         || (evt.away && evt.away.club && evt.away.club.cl_no === clubNoNow)
                     );
-                    if (!involvesClub) return;
+                    if (!involvesClub) continue;
                     const maNo = evt.ma_no;
                     const fffMatch = buildFFFMatch(evt);
 
@@ -7939,8 +8089,8 @@ function syncFFFMatches(opts) {
                         state.matches[fffMatch.id] = fffMatch;
                         created++;
                     }
-                });
-            });
+                }
+            }
 
             state.fffLastSync = Date.now();
             saveStateToFirebase();
