@@ -1551,6 +1551,25 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             counterBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${convokedCount < targetConvoked ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`;
             counterBanner.innerHTML = `<div class="font-bold text-xs">Convocations : ${convokedCount} / ${targetConvoked}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${convokedCount < targetConvoked ? 'bg-amber-200' : 'bg-sky-200'}">${convokedCount < targetConvoked ? '⚠️ Incomplet' : '🔵 OK'}</span>`;
 
+            // Indisponibles banner
+            const indisponiblesList = playerItems
+                .filter(({ p }) => m.convocations[p.id] === 'indisponible')
+                .map(({ p }) => p.name);
+            const indisponiblesBanner = document.getElementById('indisponibles-banner');
+            if (indisponiblesBanner) {
+                if (indisponiblesList.length > 0) {
+                    indisponiblesBanner.classList.remove('hidden');
+                    indisponiblesBanner.innerHTML = `
+                        <div class="p-3 rounded-xl border bg-orange-50 border-orange-200 text-orange-900 flex items-center justify-between gap-2">
+                            <div class="font-bold text-xs">🟠 Indisponibles : ${indisponiblesList.length}</div>
+                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-orange-200">${indisponiblesList.join(', ')}</span>
+                        </div>`;
+                } else {
+                    indisponiblesBanner.classList.add('hidden');
+                    indisponiblesBanner.innerHTML = '';
+                }
+            }
+
     const summary = buildCarpoolSummary(m, playerItems.map(it => it.p));
 
 // (statuts et compteurs calculés par buildCarpoolSummary)
@@ -1692,6 +1711,7 @@ renderMatchSummary(m);
                                 <div class="inline-flex rounded-lg border p-0.5 bg-slate-100 shrink-0">
                                     <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
                                     <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
+                                    <button onclick="setMatchStatus('${m.id}', '${p.id}', 'indisponible')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'indisponible' ? 'active-indisponible bg-orange-600 text-white' : 'text-slate-600'}">Indispo</button>
                                 </div>
                                 ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                                 <div>
@@ -1758,11 +1778,12 @@ renderMatchSummary(m);
                             <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-14 p-1 border rounded text-center font-bold text-xs bg-white">
                         </td>
                         
-                        <td class="p-3 text-center">
-                            <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
-                                <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
-                                <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
-                            </div>
+<td class="p-3 text-center">
+                             <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
+                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
+                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
+                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'indisponible')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'indisponible' ? 'active-indisponible bg-orange-600 text-white' : 'text-slate-600'}">Indispo</button>
+                             </div>
                             ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                         </td>
                     </tr>
@@ -3291,6 +3312,11 @@ function formatDeadlineFr(deadlineText) {
             p => m.convocations[p.id] === 'convoke'
         );
 
+    const indisponibles =
+        state.players.filter(
+            p => m.convocations[p.id] === 'indisponible'
+        );
+
     let text =
         `🔵⚪ *RANGUEIL FC - CONVOCATION* ⚪🔵\n\n`;
 
@@ -3385,6 +3411,13 @@ text +=
             `${idx + 1}. ${p.name}\n`;
 
     });
+
+    if (indisponibles.length > 0) {
+        text += `\n🟠 *Indisponibles (${indisponibles.length})*\n\n`;
+        indisponibles.forEach((p, idx) => {
+            text += `${idx + 1}. ${p.name}\n`;
+        });
+    }
 
     text +=
         `\n💙 Allez Rangueil ! ⚽`;
