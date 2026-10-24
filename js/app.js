@@ -1184,6 +1184,16 @@ if (role === 'responsable') {
 }
     
 
+            // Bilan de convocations par équipe (calculé une seule fois par équipe)
+            const convocHistoryCache = {};
+            const getConvocationHistoryForTeam = (teamKey) => {
+                const key = String(teamKey || '').toLowerCase();
+                if (!convocHistoryCache[key]) {
+                    convocHistoryCache[key] = buildConvocationHistory(key);
+                }
+                return convocHistoryCache[key];
+            };
+
             const container = document.getElementById('effectif-full-container');
             container.innerHTML = playersToDisplay.map(p => {
                 const p1 = p.poste1 || '-', p2 = p.poste2 || '-', p3 = p.poste3 || '-';
@@ -1256,6 +1266,12 @@ Object.values(state.trainings).forEach(session => {
                 const attendanceBadge = presencePct !== null && presencePct < 50 ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-700">⚠️ Assiduité faible</span>' : '';
                 const presenceColor = presencePct === null ? 'text-slate-400' : presencePct >= 75 ? 'text-emerald-600' : presencePct >= 50 ? 'text-amber-600' : 'text-red-600';
 
+                // Bilan convocations sur les matchs passés de son équipe
+                const convocHistory = getConvocationHistoryForTeam(p.team || p.cat);
+                const matchStats = convocHistory.history[p.id] || emptyConvocationStats();
+                const matchPct = matchStats.total > 0 ? Math.round((matchStats.played / matchStats.total) * 100) : null;
+                const matchColor = matchPct === null ? 'text-slate-400' : matchPct >= 75 ? 'text-emerald-600' : matchPct >= 50 ? 'text-amber-600' : 'text-red-600';
+
                                 return `
                 <div class="p-3 ${teamColors.bg} border ${teamColors.border} rounded-xl flex flex-col justify-between space-y-3">
                     <div class="flex justify-between items-start">
@@ -1279,6 +1295,18 @@ Object.values(state.trainings).forEach(session => {
                             <span class="font-bold ${presenceColor}">
                                 ${presencePct !== null ? `${presencePct}% 📅 (${presences}/${totalSessions})` : '<span class="text-slate-400 font-normal italic">Aucune séance passée</span>'}
                             </span>
+                        </div>
+                        <div class="bg-white px-2.5 py-1.5 rounded border space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-500">Matchs :</span>
+                                <span class="font-bold ${matchColor}">
+                                    ${matchPct !== null ? `${matchPct}% ⚽ (${matchStats.played}/${matchStats.total})` : `<span class="text-slate-400 font-normal italic">${convocHistory.matches.length ? 'Aucun statut enregistré' : 'Aucun match passé'}</span>`}
+                                </span>
+                            </div>
+                            ${matchStats.total > 0 ? `<div class="flex flex-wrap items-center gap-1 text-[10px]">
+                                <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold" title="Disponible mais non retenu (choix du coach)">⚪ ${matchStats.choix} choix</span>
+                                <span class="px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 font-bold" title="S'était signalé indisponible">🟠 ${matchStats.indispo} indispo</span>
+                            </div>` : ''}
                         </div>
                         <div class="bg-white p-2 rounded border">
     <p class="text-[10px] text-slate-500 uppercase font-extrabold mb-1">
@@ -1418,6 +1446,11 @@ const userTeam = window.currentUserTeam || 'all';
 }
 
             if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) {
+                // Éviter d'afficher les panneaux du match précédent
+                ['convoc-history-panel', 'bench-order-panel'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = '';
+                });
                 tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Aucun match disponible.</td></tr>`;
               if (infoCard) infoCard.style.display = 'none';
 if (counterBanner) counterBanner.style.display = 'none';
@@ -1468,6 +1501,9 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             if (!m.positions) m.positions = {};
             if (!m.jerseys) m.jerseys = {};
             if (!m.carpool) m.carpool = {};
+
+            // Bilan des convocations sur les matchs passés de cette équipe
+            const convocHistory = buildConvocationHistory(m.team);
 
             if (inviteSearchBlock) {
                 inviteSearchBlock.classList.toggle('hidden', role !== 'coach' && role !== 'responsable');
@@ -1548,8 +1584,9 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
                 totalSeats += parseInt(m.carpool[p.id]) || 0;
             });
 
-            counterBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${convokedCount < targetConvoked ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`;
-            counterBanner.innerHTML = `<div class="font-bold text-xs">Convocations : ${convokedCount} / ${targetConvoked}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${convokedCount < targetConvoked ? 'bg-amber-200' : 'bg-sky-200'}">${convokedCount < targetConvoked ? '⚠️ Incomplet' : '🔵 OK'}</span>`;
+            const isOverTarget = convokedCount > targetConvoked;
+            counterBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${isOverTarget ? 'bg-red-50 border-red-200 text-red-900' : convokedCount < targetConvoked ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`;
+            counterBanner.innerHTML = `<div class="font-bold text-xs">Convocations : ${convokedCount} / ${targetConvoked}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${isOverTarget ? 'bg-red-200' : convokedCount < targetConvoked ? 'bg-amber-200' : 'bg-sky-200'}">${isOverTarget ? '⚠️ Trop de convoqués' : convokedCount < targetConvoked ? '⚠️ Incomplet' : '🔵 OK'}</span>`;
 
             // Indisponibles banner
             const indisponiblesList = playerItems
@@ -1717,6 +1754,7 @@ renderMatchSummary(m);
                                 <div>
                                     <div class="font-bold text-slate-800 text-xs">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}</div>
                                     <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
+                                    ${convocationBadgeHtml(convocHistory.history[p.id])}
                                 </div>
                             </div>
                         </div>
@@ -1760,6 +1798,7 @@ renderMatchSummary(m);
                         <td class="p-3 pl-4">
                             <div class="font-bold text-slate-800">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}</div>
                             <div class="text-[10px] text-slate-400">Poste favori : ${p.poste1 || '-'}</div>
+                            ${convocationBadgeHtml(convocHistory.history[p.id])}
                         </td>
                         <td class="p-3">
                             <div class="flex items-center space-x-1.5">
@@ -1804,6 +1843,12 @@ renderMatchSummary(m);
             if (tbody) {
                 tbody.innerHTML = htmlTableRows + staffTableRows;
             }
+
+            // Panneau récapitulatif des convocations (matchs passés)
+            renderConvocationHistory(m, playerItems, convocHistory);
+
+            // Classement des remplaçants (banc)
+            renderBenchOrderPanel(m);
 }
 
         // ============================================================
@@ -3757,6 +3802,281 @@ Un passager non déclaré = un enfant sans siège prévu.
             renderEffectif();
         }
 
+        // ============================================================
+        // BILAN DES CONVOCATIONS — matchs passés de l'équipe
+        //   played  = convoqué
+        //   choix   = disponible mais non retenu (choix du coach)
+        //   indispo = s'était signalé indisponible
+        // ============================================================
+        function getTodayStr() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function emptyConvocationStats() {
+            return { played: 0, choix: 0, indispo: 0, total: 0 };
+        }
+
+        function buildConvocationHistory(teamKey) {
+            const todayStr = getTodayStr();
+            const team = String(teamKey || '').toLowerCase();
+
+            const pastMatches = Object.values(state.matches || {}).filter(m =>
+                m && m.date && m.date <= todayStr &&
+                String(m.team || '').toLowerCase() === team
+            );
+
+            const history = {};
+            pastMatches.forEach(m => {
+                Object.entries(m.convocations || {}).forEach(([pId, status]) => {
+                    let bucket = null;
+                    if (status === 'convoke') bucket = 'played';
+                    else if (status === 'nonconvoke') bucket = 'choix';
+                    else if (status === 'indisponible') bucket = 'indispo';
+                    if (!bucket) return;
+                    if (!history[pId]) history[pId] = emptyConvocationStats();
+                    history[pId][bucket]++;
+                    history[pId].total++;
+                });
+            });
+
+            return { matches: pastMatches, history };
+        }
+
+        function convocationBadgeHtml(stats) {
+            const s = stats || emptyConvocationStats();
+            if (!s.total) {
+                return `<div class="mt-1 text-[10px] text-slate-400 italic" title="Aucun match passé avec cette équipe">— aucun match</div>`;
+            }
+            const pct = Math.round((s.played / s.total) * 100);
+            return `<div class="flex flex-wrap items-center gap-1 mt-1" title="${s.played} convoqué(s) · ${s.choix} choix du coach · ${s.indispo} indisponible(s) sur ${s.total} match(s) passé(s)">
+                        <span class="px-1.5 py-0.5 rounded border border-sky-100 bg-sky-50 text-sky-700 font-bold">✅ ${s.played}</span>
+                        <span class="px-1.5 py-0.5 rounded border border-orange-100 bg-orange-50 text-orange-700 font-bold">🟠 ${s.indispo}</span>
+                        <span class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-600 font-bold">⚪ ${s.choix}</span>
+                        <span class="text-[10px] font-extrabold text-slate-400">${pct}%</span>
+                    </div>`;
+        }
+
+        function renderConvocationHistory(m, playerItems, convocHistory) {
+            const container = document.getElementById('convoc-history-panel');
+            if (!container) return;
+
+            const data = convocHistory || buildConvocationHistory(m.team);
+            const teamName = state.teams?.[m.team]?.name || (m.team ? String(m.team).toUpperCase() : 'Équipe');
+
+            const teamKey = String(m.team || '').toLowerCase();
+
+            const rows = (playerItems || [])
+                .filter(item => !item.invite)
+                // On garde les joueurs de l'équipe + les surclassés déjà convoqués
+                .filter(({ p }) => {
+                    const ownTeam = String(p.team || p.cat || '').toLowerCase() === teamKey;
+                    const s = data.history[p.id];
+                    return ownTeam || (s && s.total > 0);
+                })
+                .map(({ p }) => ({ p, s: data.history[p.id] || emptyConvocationStats() }))
+                .sort((a, b) =>
+                    (b.s.played - a.s.played) ||
+                    (a.s.choix - b.s.choix) ||
+                    a.p.name.localeCompare(b.p.name)
+                );
+
+            if (!data.matches.length) {
+                container.innerHTML = `
+                <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
+                    <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-simple mr-1 text-sky-600"></i>Bilan des convocations</h3>
+                    <p class="text-xs text-slate-500 mt-1">Aucun match passé pour ${teamName} : le bilan apparaîtra dès le premier match joué.</p>
+                </div>`;
+                return;
+            }
+
+            const rowsHtml = rows.map(({ p, s }) => {
+                const pct = s.total ? Math.round((s.played / s.total) * 100) : 0;
+                return `<div class="flex items-center justify-between gap-2 px-4 py-2">
+                        <div class="min-w-0">
+                            <p class="font-bold text-xs text-slate-800 truncate">${p.name}</p>
+                            <p class="text-[10px] text-slate-400">${p.poste1 || '-'}</p>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="px-1.5 py-0.5 rounded border border-sky-100 bg-sky-50 text-sky-700 text-[10px] font-bold" title="Convoqué">✅ ${s.played}</span>
+                            <span class="px-1.5 py-0.5 rounded border border-orange-100 bg-orange-50 text-orange-700 text-[10px] font-bold" title="Indisponible">🟠 ${s.indispo}</span>
+                            <span class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-600 text-[10px] font-bold" title="Non retenu (choix)">⚪ ${s.choix}</span>
+                            <div class="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden hidden sm:block" title="${pct}% de convocations">
+                                <div class="h-full bg-sky-500" style="width:${pct}%"></div>
+                            </div>
+                            <span class="w-8 text-right text-[10px] font-extrabold text-slate-500">${pct}%</span>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            container.innerHTML = `
+            <div class="bg-white rounded-xl card-shadow border border-slate-100">
+                <div class="flex items-start justify-between gap-2 p-4 pb-2">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-simple mr-1 text-sky-600"></i>Bilan des convocations</h3>
+                        <p class="text-[11px] text-slate-500">${teamName} · ${data.matches.length} match(s) passé(s) · ✅ convoqué · 🟠 indispo · ⚪ choix</p>
+                    </div>
+                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">${rows.length} joueurs</span>
+                </div>
+                <div class="divide-y divide-slate-100 max-h-80 overflow-y-auto">${rowsHtml}</div>
+            </div>`;
+        }
+
+        // ============================================================
+        // ORDRE DES REMPLAÇANTS (banc) — classement par flèches
+        // ============================================================
+        function sortByBenchOrder(m, players) {
+            const saved = Array.isArray(m && m.benchOrder) ? m.benchOrder : [];
+            const rank = new Map();
+            saved.forEach((id, i) => rank.set(id, i));
+            return (players || []).slice().sort((a, b) => {
+                const ra = rank.has(a.id) ? rank.get(a.id) : Number.MAX_SAFE_INTEGER;
+                const rb = rank.has(b.id) ? rank.get(b.id) : Number.MAX_SAFE_INTEGER;
+                return ra - rb;
+            });
+        }
+
+        function getMatchSubstitutePlayers(m) {
+            if (!m) return [];
+            const byId = new Map();
+            (state.players || []).forEach(p => byId.set(p.id, p));
+            Object.values(m.extraPlayers || {}).forEach(p => {
+                if (p && p.id) byId.set(p.id, p);
+            });
+
+            const positions = m.positions || {};
+            const subs = [];
+            byId.forEach(p => {
+                if (positions[p.id] === 'Remplaçant') subs.push(p);
+            });
+
+            return sortByBenchOrder(m, subs);
+        }
+
+        function moveBenchPlayer(mId, pId, dir) {
+            const m = state.matches[mId];
+            if (!m) return;
+
+            const ids = getMatchSubstitutePlayers(m).map(p => p.id);
+            const from = ids.indexOf(pId);
+            if (from === -1) return;
+
+            const to = dir === 'up' ? from - 1 : from + 1;
+            if (to < 0 || to >= ids.length) return;
+
+            ids.splice(to, 0, ids.splice(from, 1)[0]);
+            m.benchOrder = ids;
+
+            saveStateToFirebase();
+            renderMatchDetail();
+        }
+
+        // Banc de l'onglet Composition = joueurs convoqués non placés sur le terrain
+        function getCompositionBenchPlayers(m) {
+            if (!m) return [];
+            const assigned = Object.values(m.slotAssignments || {});
+            const bench = (state.players || []).filter(p =>
+                (m.convocations || {})[p.id] === 'convoke' &&
+                !assigned.includes(p.id)
+            );
+            return sortByBenchOrder(m, bench);
+        }
+
+        function moveCompositionBenchPlayer(mId, pId, dir) {
+            const m = state.matches[mId];
+            if (!m) return;
+
+            const ids = getCompositionBenchPlayers(m).map(p => p.id);
+            const from = ids.indexOf(pId);
+            if (from === -1) return;
+
+            const to = dir === 'up' ? from - 1 : from + 1;
+            if (to < 0 || to >= ids.length) return;
+
+            ids.splice(to, 0, ids.splice(from, 1)[0]);
+            m.benchOrder = ids;
+
+            saveStateToFirebase();
+            renderMatchComposition();
+        }
+
+        function renderBenchOrderPanel(m) {
+            const container = document.getElementById('bench-order-panel');
+            if (!container || !m) return;
+
+            const subs = getMatchSubstitutePlayers(m);
+
+            if (!subs.length) {
+                container.innerHTML = `
+                <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
+                    <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-list-ol mr-1 text-sky-600"></i>Ordre des remplaçants</h3>
+                    <p class="text-xs text-slate-500 mt-1">Aucun remplaçant pour ce match : passez un joueur en « Remplaçant » dans la colonne Poste pour définir l'ordre d'entrée.</p>
+                </div>`;
+                return;
+            }
+
+            const statusCfg = {
+                convoke: ['Conv.', 'bg-sky-100 text-sky-700 border-sky-200'],
+                nonconvoke: ['Non', 'bg-slate-100 text-slate-500 border-slate-200'],
+                indisponible: ['Indispo', 'bg-orange-100 text-orange-700 border-orange-200'],
+                none: ['—', 'bg-slate-50 text-slate-400 border-slate-200']
+            };
+
+            const targetConvoked = parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
+            const maxSubsOnSheet = Math.max(0, targetConvoked - 11);
+
+            const rows = subs.map((p, i) => {
+                const status = (m.convocations || {})[p.id] || 'none';
+                const cfg = statusCfg[status] || statusCfg.none;
+                const isFirst = i === 0;
+                const isLast = i === subs.length - 1;
+                const horsFeuille = i >= maxSubsOnSheet;
+
+                const divider = (i === maxSubsOnSheet && subs.length > maxSubsOnSheet)
+                    ? `<div class="flex items-center gap-2 px-3 pt-3 pb-1">
+                           <span class="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Hors feuille de match</span>
+                           <span class="flex-1 h-px bg-slate-200"></span>
+                       </div>`
+                    : '';
+
+                return `${divider}<div class="flex items-center justify-between gap-2 px-3 py-2 ${horsFeuille ? 'opacity-60' : ''}">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="w-6 h-6 shrink-0 rounded-full bg-sky-600 text-white text-[11px] font-extrabold flex items-center justify-center" title="Position ${i + 1} sur le banc">${i + 1}</span>
+                            <div class="min-w-0">
+                                <p class="font-bold text-xs text-slate-800 truncate">${p.name}</p>
+                                <p class="text-[10px] text-slate-400">${p.poste1 || '-'}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="px-1.5 py-0.5 rounded border text-[10px] font-bold ${cfg[1]}">${cfg[0]}</span>
+                            <button onclick="moveBenchPlayer('${m.id}', '${p.id}', 'up')" ${isFirst ? 'disabled' : ''}
+                                class="w-9 h-9 rounded-lg border border-slate-200 text-slate-600 flex items-center justify-center text-[13px] font-bold ${isFirst ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                aria-label="Monter ${p.name}" title="Monter">▲</button>
+                            <button onclick="moveBenchPlayer('${m.id}', '${p.id}', 'down')" ${isLast ? 'disabled' : ''}
+                                class="w-9 h-9 rounded-lg border border-slate-200 text-slate-600 flex items-center justify-center text-[13px] font-bold ${isLast ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                aria-label="Descendre ${p.name}" title="Descendre">▼</button>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            container.innerHTML = `
+            <div class="bg-white rounded-xl card-shadow border border-slate-100">
+                <div class="flex items-start justify-between gap-2 p-4 pb-2">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-list-ol mr-1 text-sky-600"></i>Ordre des remplaçants</h3>
+                        <p class="text-[11px] text-slate-500">Ordre d'entrée · ${maxSubsOnSheet} sur la feuille · ▲ ▼ pour classer · reprise dans Composition</p>
+                    </div>
+                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">${subs.length}</span>
+                </div>
+                <div class="divide-y divide-slate-100">
+                    ${subs.length > maxSubsOnSheet ? `<div class="flex items-center gap-2 px-3 pt-2 pb-1">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wide text-emerald-600">Sur la feuille (${maxSubsOnSheet})</span>
+                        <span class="flex-1 h-px bg-emerald-100"></span>
+                    </div>` : ''}
+                    ${rows}
+                </div>
+            </div>`;
+        }
+
         function setMatchStatus(mId, pId, status) {
             if (!state.matches[mId].convocations) state.matches[mId].convocations = {};
             state.matches[mId].convocations[pId] = status;
@@ -3768,6 +4088,8 @@ Un passager non déclaré = un enfant sans siège prévu.
             if (!state.matches[mId].positions) state.matches[mId].positions = {};
             state.matches[mId].positions[pId] = position;
             saveStateToFirebase();
+            // Rafraîchit aussitôt le bloc « Ordre des remplaçants »
+            renderMatchDetail();
         }
 
         function setMatchJersey(mId, pId, jersey) {
@@ -9401,12 +9723,19 @@ function renderMatchComposition() {
     );
 
 const benchPlayers =
-    players.filter(
-        p =>
-            !assignedPlayers.includes(
-                p.id
-            )
+    sortByBenchOrder(
+        match,
+        players.filter(
+            p =>
+                !assignedPlayers.includes(
+                    p.id
+                )
+        )
     );
+
+// Nombre de remplaçants autorisés sur la feuille (14 convoqués par défaut = 11 + 3)
+const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
+const maxSubsOnSheet = Math.max(0, targetConvoked - 11);
 
     container.innerHTML = `
 
@@ -9656,28 +9985,66 @@ ${terrainPlayers.map(player => {
 
             <div>
 
-                <h3 class="font-bold mb-3">
+                <h3 class="font-bold mb-1">
                     🔄 Banc
                 </h3>
 
+                <p class="text-[10px] mb-2 ${players.length > targetConvoked ? 'text-red-600 font-bold' : 'text-slate-500'}">
+                    ${players.length} convoqué(s) / ${targetConvoked} · ${maxSubsOnSheet} remplaçant(s) sur la feuille${players.length > targetConvoked ? ' · ⚠️ trop de convoqués' : ''}
+                </p>
+
                 <div class="space-y-2">
 
-                    ${benchPlayers.map(player => `
+                    ${benchPlayers.length > maxSubsOnSheet ? `<div class="flex items-center gap-2 pb-1">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wide text-emerald-600">Sur la feuille (${maxSubsOnSheet})</span>
+                        <span class="flex-1 h-px bg-emerald-100"></span>
+                    </div>` : ''}
 
-                        <button
-                            onclick="selectBenchPlayer('${player.id}')"
+                    ${benchPlayers.map((player, benchIdx) => {
 
-                            class="w-full bg-white border rounded-xl p-3 text-left hover:bg-sky-50">
+                        const horsFeuille = benchIdx >= maxSubsOnSheet;
 
-                            <span class="font-bold">${player.name}</span>
+                        const divider = (benchIdx === maxSubsOnSheet && benchPlayers.length > maxSubsOnSheet)
+                            ? `<div class="flex items-center gap-2 pt-3 pb-1">
+                                   <span class="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Hors feuille de match</span>
+                                   <span class="flex-1 h-px bg-slate-200"></span>
+                               </div>`
+                            : '';
 
-                            <span class="ml-2 text-[10px] font-semibold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded">
-                                ${getPosteLabel(player.poste1)}
-                            </span>
+                        return `${divider}
 
-                        </button>
+                        <div class="flex items-center gap-1 ${horsFeuille ? 'opacity-60' : ''}">
 
-                    `).join('')}
+                            <span class="w-5 shrink-0 text-center text-[10px] font-extrabold ${horsFeuille ? 'text-slate-300' : 'text-slate-400'}" title="Position ${benchIdx + 1} sur le banc">${benchIdx + 1}</span>
+
+                            <button
+                                onclick="selectBenchPlayer('${player.id}')"
+
+                                class="flex-1 min-w-0 bg-white border rounded-xl p-3 text-left hover:bg-sky-50 ${horsFeuille ? 'border-dashed' : ''}">
+
+                                <span class="font-bold">${player.name}</span>
+
+                                <span class="ml-2 text-[10px] font-semibold ${horsFeuille ? 'text-slate-500 bg-slate-100' : 'text-sky-700 bg-sky-50'} px-1.5 py-0.5 rounded">
+                                    ${getPosteLabel(player.poste1)}
+                                </span>
+
+                            </button>
+
+                            <button
+                                onclick="moveCompositionBenchPlayer('${match.id}', '${player.id}', 'up')"
+                                ${benchIdx === 0 ? 'disabled' : ''}
+                                class="w-9 h-9 shrink-0 rounded-lg border border-slate-200 text-slate-600 flex items-center justify-center text-[13px] font-bold ${benchIdx === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                aria-label="Monter ${player.name}" title="Monter">▲</button>
+
+                            <button
+                                onclick="moveCompositionBenchPlayer('${match.id}', '${player.id}', 'down')"
+                                ${benchIdx === benchPlayers.length - 1 ? 'disabled' : ''}
+                                class="w-9 h-9 shrink-0 rounded-lg border border-slate-200 text-slate-600 flex items-center justify-center text-[13px] font-bold ${benchIdx === benchPlayers.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                aria-label="Descendre ${player.name}" title="Descendre">▼</button>
+
+                        </div>`;
+
+                    }).join('')}
 
                 </div>
 
