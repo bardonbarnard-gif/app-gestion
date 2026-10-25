@@ -175,22 +175,36 @@
                         <p class="mt-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-90">Matchs</p>
                     </div>
                 </div>
-                <div class="grad-card grad-card-emerald">
+                <div class="grad-card grad-card-emerald cursor-pointer transition hover:brightness-105 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500"
+                     role="button" tabindex="0"
+                     onclick="openDashboardBilan()"
+                     onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDashboardBilan(); }"
+                     aria-label="Voir le détail des résultats">
                     <div class="grad-card-content flex flex-col">
                         <div class="flex items-center justify-between">
                             <i class="fa-solid fa-chart-line text-lg opacity-90" aria-hidden="true"></i>
                             <p class="text-base sm:text-lg font-extrabold drop-shadow-sm" id="stat-bilan-vdn">0 - 0 - 0</p>
                         </div>
-                        <p class="mt-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-90">Bilan V-N-D</p>
+                        <p class="mt-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center justify-between gap-1">
+                            <span>Bilan V-N-D</span>
+                            <i class="fa-solid fa-chevron-right text-[9px] opacity-80" aria-hidden="true"></i>
+                        </p>
                     </div>
                 </div>
-                <div class="grad-card grad-card-red">
+                <div class="grad-card grad-card-red cursor-pointer transition hover:brightness-105 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
+                     role="button" tabindex="0"
+                     onclick="openDashboardCards()"
+                     onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDashboardCards(); }"
+                     aria-label="Voir le détail des cartons par joueur">
                     <div class="grad-card-content flex flex-col">
                         <div class="flex items-center justify-between">
                             <span class="text-sm opacity-90"><i class="fa-solid fa-square text-amber-300 mr-0.5" aria-hidden="true"></i><i class="fa-solid fa-square text-white/80" aria-hidden="true"></i></span>
                             <p class="text-xl font-extrabold drop-shadow-sm" id="stat-total-cards">0</p>
                         </div>
-                        <p class="mt-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-90">Cartons</p>
+                        <p class="mt-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center justify-between gap-1">
+                            <span>Cartons</span>
+                            <i class="fa-solid fa-chevron-right text-[9px] opacity-80" aria-hidden="true"></i>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -244,6 +258,71 @@
                     <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center space-x-2"><i class="fa-solid fa-handshake text-sky-500"></i><span>Top Passeurs 🎯</span></h3>
                     <div id="dashboard-top-passers" class="space-y-2"></div>
                 </div>
+            </div>
+        </section>
+
+        <section id="sec-dashboard-cards" class="space-y-4 hidden">
+            <div class="flex items-center justify-between gap-2">
+                <button onclick="closeDashboardCards()"
+                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 card-shadow hover:bg-slate-50 active:bg-slate-100 transition">
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                    <span>Tableau de bord</span>
+                </button>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Discipline</span>
+            </div>
+
+            <div class="grad-card grad-card-red">
+                <div class="grad-card-content flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-extrabold drop-shadow-sm">Cartons</h2>
+                        <p class="text-[11px] font-medium opacity-90" id="dashboard-cards-subtitle">—</p>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <p class="text-2xl font-extrabold drop-shadow-sm" id="dashboard-cards-total">0</p>
+                        <p class="text-[11px] font-bold opacity-90" id="dashboard-cards-detail">0 🟨 · 0 🟥</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dashboard-cards-alerts" class="space-y-2"></div>
+
+            <div class="bg-white rounded-xl card-shadow border border-slate-100">
+                <div class="p-4 pb-2">
+                    <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-clipboard-list text-red-600 mr-1"></i>Classement par joueur</h3>
+                    <p class="text-[11px] text-slate-500">Du plus sanctionné au moins sanctionné · tous les matchs</p>
+                </div>
+                <div id="dashboard-cards-list" class="divide-y divide-slate-100"></div>
+                <div class="p-3 border-t border-slate-100">
+                    <p class="text-[10px] text-slate-400 leading-relaxed">
+                        <i class="fa-solid fa-circle-info mr-1" aria-hidden="true"></i>
+                        3 cartons jaunes sur 3 mois glissants (championnat et coupe) = suspension du match suivant.
+                        Les cartons d'amicaux restent visibles mais ne comptent pas. Les rouges sont signalés sans durée : la commission décide.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-dashboard-bilan" class="space-y-4 hidden">
+            <div class="flex items-center justify-between gap-2">
+                <button onclick="closeDashboardBilan()"
+                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 card-shadow hover:bg-slate-50 active:bg-slate-100 transition">
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                    <span>Tableau de bord</span>
+                </button>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Résultats</span>
+            </div>
+
+            <div id="bilan-team-filter" class="flex flex-wrap gap-1.5"></div>
+
+            <div id="bilan-global"></div>
+            <div id="bilan-competitions" class="space-y-2"></div>
+
+            <div class="bg-white rounded-xl card-shadow border border-slate-100">
+                <div class="p-4 pb-2">
+                    <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-list-check text-emerald-600 mr-1"></i>Détail des matchs joués</h3>
+                    <p class="text-[11px] text-slate-500">Seuls les matchs avec un score saisi sont comptés</p>
+                </div>
+                <div id="bilan-matches" class="divide-y divide-slate-100"></div>
             </div>
         </section>
 
