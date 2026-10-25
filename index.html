@@ -1447,7 +1447,11 @@
             </div>
             <form id="form-player" onsubmit="handleSavePlayer(event)" class="space-y-3 text-xs">
                 <input type="hidden" id="p-id">
-                <div><label class="block text-slate-600 font-semibold mb-1">Nom & Prénom</label><input type="text" id="p-name" required placeholder="Ex: DUPONT Jean" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-slate-600 font-semibold mb-1">Prénom</label><input type="text" id="p-prenom" placeholder="Ex: Jean" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                    <div><label class="block text-slate-600 font-semibold mb-1">Nom</label><input type="text" id="p-nom" placeholder="Ex: DUPONT" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                </div>
+                <p class="text-[10px] text-slate-400 -mt-1">Le nom est enregistré en majuscules. L'ordre d'affichage (Prénom avant Nom) se règle par équipe dans Administration.</p>
                 <div><label class="block text-slate-600 font-semibold mb-1">Prénom usuel (messages)</label><input type="text" id="p-nickname" placeholder="Ex: Paul R. (si différent)" class="w-full p-2 border border-slate-200 rounded-lg"></div>
                 <div><label class="block text-slate-600 font-semibold mb-1">N° Licence</label><input type="text" id="p-licence" placeholder="Ex: 9603227294" class="w-full p-2 border border-slate-200 rounded-lg"></div>
                 <div>
@@ -1673,6 +1677,13 @@
                 <input type="number" id="team-target" min="1" max="25" value="14" class="w-full p-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-400">
                 <p class="text-[10px] text-sky-700 mt-1.5 flex items-start gap-1"><i class="fa-solid fa-circle-info mt-0.5"></i>Nombre de joueurs à convoquer pour un match de cette équipe.</p>
             </div>
+            <label class="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3 cursor-pointer">
+                <input type="checkbox" id="team-name-order" class="mt-0.5">
+                <span>
+                    <span class="block text-slate-700 font-semibold">Afficher Prénom avant Nom</span>
+                    <span class="block text-[10px] text-slate-500 mt-0.5">Ex : « Ibrahim BOUAJAJ » au lieu de « BOUAJAJ Ibrahim ». S'applique à tous les écrans et à la feuille de match.</span>
+                </span>
+            </label>
             <div class="flex justify-end space-x-2 pt-2">
                 <button type="button" onclick="toggleModal('modal-team', false)" class="px-3 py-2 bg-slate-100 text-slate-600 font-semibold rounded-lg">Annuler</button>
                 <button type="submit" class="px-4 py-2 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700">Enregistrer</button>

@@ -455,6 +455,7 @@ if (
     state.selectedMatchId = null;
 } 
 
+                applyPlayerNameDisplay();
                 renderSection(activeSection);
                 maybeAutoSyncFFF();
             } catch(err) {
@@ -467,7 +468,7 @@ function saveStateToFirebase() {
     recalculateGlobalStats();
 
  const dataToSave = {
-    players: state.players,
+    players: getPlayersForStorage(),
     matches: state.matches,
     trainings: state.trainings,
     cards: state.cards,
@@ -509,6 +510,7 @@ db.ref('rangueil_data').update(dataToSave);
         window.logoutUser = logoutUser;
 
         function renderAll() {
+            applyPlayerNameDisplay();
             renderDashboard();
             renderTeamFilters();
             renderEffectif();
@@ -822,6 +824,97 @@ if (subTabId === 'composition') {
             const p2 = p.poste2 || '-';
             const p3 = p.poste3 || '-';
             return [p1, p2, p3].filter(x => x && x !== '-');
+        }
+
+        // --- Ordre d'affichage des noms (Prénom avant Nom) ---
+        // Le nom reste stocké au format « NOM Prénom » : seul l'affichage change.
+        function splitPlayerName(rawName) {
+            const name = String(rawName || '').trim().replace(/\s+/g, ' ');
+            if (!name) return { prenom: '', nom: '' };
+
+            const words = name.split(' ');
+            let cut = 0;
+            // Le nom s'arrête au premier mot qui n'est pas entièrement en majuscules
+            while (cut < words.length && words[cut] === words[cut].toUpperCase() && /\p{Lu}/u.test(words[cut])) cut++;
+
+            if (cut === 0) {
+                if (words.length === 1) return { prenom: name, nom: '' };
+                return { prenom: words.slice(0, -1).join(' '), nom: words[words.length - 1] };
+            }
+            if (cut >= words.length) return { prenom: '', nom: name };
+            return { prenom: words.slice(cut).join(' '), nom: words.slice(0, cut).join(' ') };
+        }
+
+        function getPlayerNameParts(p) {
+            if (!p) return { prenom: '', nom: '' };
+            const prenom = String(p.prenom || '').trim();
+            const nom = String(p.nom || '').trim();
+            if (prenom || nom) return { prenom, nom };
+            return splitPlayerName(p.nameCanonical || p.name || '');
+        }
+
+        function isFirstNameFirst(teamKey) {
+            const key = String(teamKey || '').trim();
+            if (!key) return false;
+            const team = state.teams?.[key] || state.teams?.[key.toLowerCase()];
+            return !!(team && team.nameOrder === 'first');
+        }
+
+        function formatPlayerName(p) {
+            if (!p) return '';
+            const { prenom, nom } = getPlayerNameParts(p);
+            if (!prenom && !nom) return p.nameCanonical || p.name || '';
+            const firstFirst = isFirstNameFirst(p.team || p.cat);
+            return firstFirst
+                ? [prenom, nom].filter(Boolean).join(' ')
+                : [nom, prenom].filter(Boolean).join(' ');
+        }
+
+        // Recalcule le nom affiché sans toucher au nom de stockage
+        function applyPlayerNameDisplay() {
+            (state.players || []).forEach(p => {
+                if (!p) return;
+                if (typeof p.nameCanonical !== 'string' || !p.nameCanonical) {
+                    p.nameCanonical = p.name || '';
+                }
+                p.name = formatPlayerName(p);
+            });
+        }
+
+        // À l'enregistrement, on réécrit le nom canonique « NOM Prénom »
+        function getPlayersForStorage() {
+            return (state.players || []).map(p => {
+                const copy = { ...p };
+                if (copy.nameCanonical) copy.name = copy.nameCanonical;
+                delete copy.nameCanonical;
+                return copy;
+            });
+        }
+
+        // Garde les joueurs groupés par équipe, en triant par prénom là où l'option est active
+        function sortPlayersForDisplay(players) {
+            const groups = new Map();
+            const order = [];
+
+            (players || []).forEach(p => {
+                const key = String(p.team || p.cat || '').toLowerCase();
+                if (!groups.has(key)) {
+                    groups.set(key, []);
+                    order.push(key);
+                }
+                groups.get(key).push(p);
+            });
+
+            const result = [];
+            order.forEach(key => {
+                const list = groups.get(key);
+                if (isFirstNameFirst(key)) {
+                    list.sort((a, b) => formatPlayerName(a).localeCompare(formatPlayerName(b), 'fr', { sensitivity: 'base' }));
+                }
+                result.push(...list);
+            });
+
+            return result;
         }
 
         function getTotalTeamCards() {
@@ -1999,6 +2092,9 @@ if (role === 'responsable') {
     );
 }
     
+
+            // Tri par prénom pour les équipes en affichage « Prénom Nom »
+            playersToDisplay = sortPlayersForDisplay(playersToDisplay);
 
             // Bilan de convocations par équipe (calculé une seule fois par équipe)
             const convocHistoryCache = {};
@@ -5236,7 +5332,9 @@ state.selectedMatchId = matchId;
                 if (player) {
                     document.getElementById('modal-player-title').innerText = "Modifier le Joueur";
                     document.getElementById('p-id').value = player.id;
-                    document.getElementById('p-name').value = player.name || '';
+                    const nameParts = getPlayerNameParts(player);
+                    document.getElementById('p-prenom').value = nameParts.prenom || '';
+                    document.getElementById('p-nom').value = nameParts.nom || '';
                     document.getElementById('p-nickname').value = player.nickname || '';
                     document.getElementById('p-licence').value = player.licence !== '-' ? player.licence : '';
                     document.getElementById('p-team').value = player.team || 'U14';
@@ -5279,10 +5377,24 @@ if (role === 'responsable') {
             e.preventDefault();
             const pId = document.getElementById('p-id').value;
             const existingPlayer = pId ? state.players.find(p => p.id === pId) : null;
+
+            const prenom = document.getElementById('p-prenom').value.trim().replace(/\s+/g, ' ');
+            const nom = document.getElementById('p-nom').value.trim().replace(/\s+/g, ' ').toUpperCase();
+
+            if (!prenom && !nom) {
+                alert("Renseignez au moins le prénom ou le nom du joueur.");
+                return;
+            }
+
+            // Stockage toujours au format « NOM Prénom »
+            const canonicalName = [nom, prenom].filter(Boolean).join(' ');
+
             const playerData = {
     ...(existingPlayer || {}),
     id: pId || 'J_' + Date.now(),
-    name: document.getElementById('p-name').value,
+    name: canonicalName,
+    prenom: prenom,
+    nom: nom,
     nickname: document.getElementById('p-nickname').value.trim(),
     licence: document.getElementById('p-licence').value.trim() || '-',
     team: document.getElementById('p-team').value,
@@ -5296,6 +5408,9 @@ if (role === 'responsable') {
     phoneMere: document.getElementById('p-phone-mere').value || '-',
     phoneJoueur: document.getElementById('p-phone-joueur').value || '-'
 };
+            // Le nom canonique vient d'être recalculé : on écarte l'ancien cache d'affichage
+            delete playerData.nameCanonical;
+
             if (pId) {
                 const idx = state.players.findIndex(p => p.id === pId);
                 if (idx !== -1) state.players[idx] = playerData;
@@ -9714,6 +9829,8 @@ function openModalTeam(teamId = null) {
         }
         if (nameInput) nameInput.value = team.name || '';
         if (targetInput) targetInput.value = team.targetConvocations || 14;
+        const orderInputTeam = document.getElementById('team-name-order');
+        if (orderInputTeam) orderInputTeam.checked = team.nameOrder === 'first';
 
     } else {
 
@@ -9724,6 +9841,8 @@ function openModalTeam(teamId = null) {
             keyInput.disabled = false;
         }
         if (targetInput) targetInput.value = 14;
+        const orderInputNew = document.getElementById('team-name-order');
+        if (orderInputNew) orderInputNew.checked = false;
 
     }
 
@@ -9747,9 +9866,14 @@ function handleSaveTeamModal(event) {
 
     if (!key || !name) return;
 
+    const orderInputSave = document.getElementById('team-name-order');
+    const nameOrder = orderInputSave && orderInputSave.checked ? 'first' : 'last';
+
     firebase.database().ref('teams/' + key).set({
+        ...(state.teams?.[key] || {}),
         name: name,
-        targetConvocations: target
+        targetConvocations: target,
+        nameOrder: nameOrder
     }, (error) => {
         if (error) {
             showToast("Erreur lors de l'enregistrement de l'équipe.", "error");

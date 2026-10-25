@@ -46,11 +46,14 @@ async function telechargerFeuillePDF() {
 
     const targetConvoked = parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
     const rows = convoques.slice(0, Math.min(targetConvoked, 16)).map(p => {
-        const parts = (p.name || ' ').split(' ');
+        // La feuille officielle garde deux colonnes Nom / Prénom, dans cet ordre
+        const nameParts = (typeof getPlayerNameParts === 'function')
+            ? getPlayerNameParts(p)
+            : { nom: (p.name || '').split(' ')[0] || '', prenom: (p.name || '').split(' ').slice(1).join(' ') };
         return {
             licence: p.licence || '',
-            nom: (parts[0] || '').toUpperCase(),
-            prenom: parts.slice(1).join(' ')
+            nom: (nameParts.nom || '').toUpperCase(),
+            prenom: nameParts.prenom || ''
         };
     });
 

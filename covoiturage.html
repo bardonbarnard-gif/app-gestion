@@ -38,6 +38,65 @@ let closed = false;
 let me = '';
 let chosenStatus = '';
 let chosenSeats = 0;
+let teamsConfig = {};
+
+// Même règle que l'app principale : le nom s'arrête au premier mot non majuscules
+function splitCovoitName(raw) {
+
+    const name =
+        String(raw || '').trim().replace(/\s+/g, ' ');
+
+    if (!name) return { prenom: '', nom: '' };
+
+    const words = name.split(' ');
+
+    let cut = 0;
+
+    while (
+        cut < words.length &&
+        words[cut] === words[cut].toUpperCase() &&
+        /\p{Lu}/u.test(words[cut])
+    ) cut++;
+
+    if (cut === 0) {
+        if (words.length === 1) return { prenom: name, nom: '' };
+        return {
+            prenom: words.slice(0, -1).join(' '),
+            nom: words[words.length - 1]
+        };
+    }
+
+    if (cut >= words.length) return { prenom: '', nom: name };
+
+    return {
+        prenom: words.slice(cut).join(' '),
+        nom: words.slice(0, cut).join(' ')
+    };
+
+}
+
+function applyCovoitDisplayNames() {
+
+    (players || []).forEach(p => {
+
+        if (!p) return;
+
+        const teamKey = String(p.team || p.cat || '');
+
+        const team =
+            teamsConfig[teamKey] || teamsConfig[teamKey.toLowerCase()];
+
+        if (!team || team.nameOrder !== 'first') return;
+
+        const parts = (p.prenom || p.nom)
+            ? { prenom: p.prenom || '', nom: p.nom || '' }
+            : splitCovoitName(p.name);
+
+        p.name = [parts.prenom, parts.nom].filter(Boolean).join(' ');
+
+    });
+
+}
 
 function shortName(n) {
 
@@ -828,11 +887,20 @@ db.ref('rangueil_data/matches')
         matchKey = entry[0];
         match = entry[1];
 
-        db.ref('rangueil_data/players')
+        db.ref('teams')
             .once('value')
+            .then(teamSnapshot => {
+
+                teamsConfig = teamSnapshot.val() || {};
+
+                return db.ref('rangueil_data/players').once('value');
+
+            })
             .then(playerSnapshot => {
 
                 players = playerSnapshot.val() || [];
+
+                applyCovoitDisplayNames();
 
                 renderMatchInfo();
 
