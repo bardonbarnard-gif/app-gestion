@@ -44,12 +44,12 @@ body {
 .team-chip {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 
-    margin: 4px;
-    padding: 8px 14px;
+    margin: 0;
+    padding: 5px 11px;
 
-    border-radius: 12px;
+    border-radius: 999px;
     border: 1px solid #dbe3eb;
 
     background: white;
@@ -57,14 +57,17 @@ body {
 
     font-size: 12px;
     font-weight: 600;
+    line-height: 1.4;
 
     cursor: pointer;
-    transition: .2s;
+    flex-shrink: 0;
+    white-space: nowrap;
+    transition: border-color .18s ease, background .18s ease, color .18s ease;
 }
 
 .team-chip:hover {
     border-color: #0284c7;
-    transform: translateY(-1px);
+    color: #0369a1;
 }
 
 .team-chip.active {
@@ -78,16 +81,16 @@ body {
     align-items: center;
     justify-content: center;
 
-    min-width: 22px;
-    height: 22px;
-    padding: 0 6px;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
 
     border-radius: 999px;
 
     background: #e2e8f0;
     color: #334155;
 
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
 }
 
@@ -518,10 +521,11 @@ body {
     position: relative;
     z-index: 1;
 }
-.grad-card-sky     { background: linear-gradient(135deg, #38bdf8, #0284c7); }
-.grad-card-blue    { background: linear-gradient(135deg, #60a5fa, #2563eb); }
-.grad-card-emerald { background: linear-gradient(135deg, #34d399, #059669); }
-.grad-card-red     { background: linear-gradient(135deg, #f87171, #dc2626); }
+/* Dégradés assombris : contraste ≥ 4,5:1 avec le texte blanc (lisibilité au soleil) */
+.grad-card-sky     { background: linear-gradient(135deg, #0284c7, #075985); }
+.grad-card-blue    { background: linear-gradient(135deg, #2563eb, #1e3a8a); }
+.grad-card-emerald { background: linear-gradient(135deg, #047857, #064e3b); }
+.grad-card-red     { background: linear-gradient(135deg, #dc2626, #7f1d1d); }
 
 /* ==== FEUILLE DE MATCH A4 ==== */
 .feuille-modal { display:none; position:fixed; inset:0; z-index:100; background:rgba(15,23,42,.72); overflow:auto; align-items:flex-start; justify-content:center; }
@@ -531,6 +535,275 @@ body {
 .feuille-toolbar .btn-print { background:#0284c7; }
 .feuille-toolbar .btn-pdf { background:#16a34a; }
 .a4-sheet { width:297mm; min-height:210mm; background:#fff; color:#000; box-shadow:0 12px 48px rgba(0,0,0,.4); margin:4px auto 48px; padding:7mm 8mm 9mm; border-radius:2px; }
+
+/* ============================================================
+   SOCLE VISUEL — jetons, typographie, cartes
+   ============================================================ */
+:root {
+    --brand: #0284c7;
+    --brand-strong: #075985;
+    --ink: #0f172a;
+    --ink-soft: #334155;
+    --muted: #64748b;
+    --muted-light: #94a3b8;
+    --line: #e2e8f0;
+    --surface: #ffffff;
+
+    --radius-xs: 8px;
+    --radius-sm: 10px;
+    --radius: 14px;
+    --radius-lg: 18px;
+
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 26px -20px rgba(15, 23, 42, .35);
+    --shadow-raised: 0 2px 6px rgba(15, 23, 42, .06), 0 18px 40px -24px rgba(15, 23, 42, .45);
+}
+
+/* Seuil de lisibilité : aucun texte d'interface sous 11 px */
+body .text-\[9px\]  { font-size: 10.5px; }
+body .text-\[10px\] { font-size: 11.5px; }
+body .text-\[11px\] { font-size: 12px; }
+
+@media (min-width: 768px) {
+    body .text-\[10px\] { font-size: 12px; }
+    body .text-\[11px\] { font-size: 12.5px; }
+}
+
+/* Barres de défilement discrètes pour les rangées horizontales */
+.no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Carte standard */
+.card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+}
+
+.card-pad { padding: 16px; }
+
+/* Titre de carte : un seul style pour toute l'application */
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    line-height: 1.2;
+}
+
+.card-title i {
+    font-size: 12px;
+    color: var(--brand);
+}
+
+.card-sub {
+    font-size: 12px;
+    color: var(--muted-light);
+    margin-top: 2px;
+}
+
+/* Titre d'écran */
+.screen-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -.01em;
+    color: var(--ink);
+    line-height: 1.2;
+}
+
+.screen-sub {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+/* Indicateur compact */
+.stat-mini {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: #f8fafc;
+    border: 1px solid var(--line);
+}
+
+.stat-mini-value {
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--ink);
+}
+
+.stat-mini-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+}
+
+/* ===== LIGNE JOUEUR (effectif) ===== */
+.player-row {
+    display: flex;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-left-width: 4px;
+    border-radius: var(--radius-sm);
+    transition: box-shadow .18s ease, border-color .18s ease;
+}
+
+.player-row:hover {
+    box-shadow: var(--shadow-card);
+}
+
+.player-avatar {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .02em;
+}
+
+.player-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.3;
+}
+
+.player-meta {
+    font-size: 11.5px;
+    color: var(--muted);
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 5px 8px;
+    border-radius: var(--radius-xs);
+    background: #f8fafc;
+    border: 1px solid #eef2f7;
+}
+
+.metric-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted-light);
+}
+
+.metric-value {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--ink-soft);
+}
+
+.player-details > summary {
+    list-style: none;
+    cursor: pointer;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--brand);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 0;
+}
+
+.player-details > summary::-webkit-details-marker { display: none; }
+
+.player-details > summary i {
+    font-size: 10px;
+    transition: transform .2s ease;
+}
+
+.player-details[open] > summary i {
+    transform: rotate(90deg);
+}
+
+/* ===== SÉLECTEUR DE STATUT (convocations) ===== */
+.status-btn {
+    padding: 5px 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    border-radius: 7px;
+    color: #475569;
+    background: transparent;
+    border: 1px solid transparent;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+    white-space: nowrap;
+}
+
+.status-btn.status-convoke:not(.active-convoke) {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+    color: #0369a1;
+}
+
+.status-btn.status-nonconvoke:not(.active-nonconvoke) {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #64748b;
+}
+
+.status-btn.status-indisponible:not(.active-indisponible) {
+    background: #fff7ed;
+    border-color: #fed7aa;
+    color: #c2410c;
+}
+
+.status-btn.active-convoke {
+    background: #0284c7;
+    border-color: #0284c7;
+    color: #fff;
+}
+
+.status-btn.active-nonconvoke {
+    background: #475569;
+    border-color: #475569;
+    color: #fff;
+}
+
+.status-btn.active-indisponible {
+    background: #ea580c;
+    border-color: #ea580c;
+    color: #fff;
+}
+
+/* Évite qu'un select à libellé long élargisse la page sur mobile */
+select {
+    max-width: 100%;
+}
+
+.flex > select.flex-1 {
+    min-width: 0;
+}
+
+/* Accessibilité clavier */
+:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+}
 
 @media print {
     body * { visibility: hidden; }

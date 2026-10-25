@@ -1827,16 +1827,14 @@ dashboardMatches.forEach(m => {
     }
 });
             document.getElementById('stat-bilan-vdn').innerHTML =
-    `<span class="text-emerald-600">${wins}V</span> -
-     <span class="text-slate-700">${draws}N</span> -
-     <span class="text-red-600">${losses}D</span>`;
+    `<span class="text-emerald-100">${wins}V</span><span class="opacity-50 px-1">·</span><span class="text-white">${draws}N</span><span class="opacity-50 px-1">·</span><span class="text-rose-100">${losses}D</span>`;
 
             
             const teamCards =
     role === 'coach'
         ? getTeamCards(dashboardMatches)
         : getTotalTeamCards();
-document.getElementById('stat-total-cards').innerHTML = `<span class="text-amber-500">${teamCards.yellows}🟨</span> <span class="text-red-600">${teamCards.reds}🟥</span>`;
+document.getElementById('stat-total-cards').innerHTML = `<span>${teamCards.yellows}🟨</span> <span>${teamCards.reds}🟥</span>`;
 
             // Alerte Licences
             const missingLicences = dashboardPlayers.filter(
@@ -2184,58 +2182,87 @@ Object.values(state.trainings).forEach(session => {
                 const matchPct = matchStats.total > 0 ? Math.round((matchStats.played / matchStats.total) * 100) : null;
                 const matchColor = matchPct === null ? 'text-slate-400' : matchPct >= 75 ? 'text-emerald-600' : matchPct >= 50 ? 'text-amber-600' : 'text-red-600';
 
-                                return `
-                <div class="p-3 ${teamColors.bg} border ${teamColors.border} rounded-xl flex flex-col justify-between space-y-3">
-                    <div class="flex justify-between items-start">
-                        <div>
-    <h3 class="font-bold text-xs ${teamColors.textBold}">${p.name}</h3>
-    ${attendanceBadge}
-    <p class="text-[11px] ${hasLicence ? teamColors.textLight : 'text-amber-700 font-bold'}">
-        Licence: ${hasLicence ? p.licence : '⚠️ Manquante'}
-        ${blessureBadge}
-    </p>
-</div>
-                        <div class="flex items-center space-x-1.5">${catBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 ${teamColors.textLight} hover:${teamColors.textBold}" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
-                    </div>
-                    <div class="text-xs space-y-2 pt-2 border-t ${teamColors.border}">
-                        <div class="grid grid-cols-2 gap-2">
-                            <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between"><span class="text-slate-500">Stats:</span><span class="font-bold text-slate-700">${pStats.goals}⚽ ${pStats.assists}🎯</span></div>
-                            <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between"><span class="text-slate-500">Cartons:</span><span class="font-bold"><span class="text-amber-600">${cards.yellows}🟨</span> <span class="text-red-600">${cards.reds}🟥</span></span></div>
-                        </div>
-                        <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between items-center">
-                            <span class="text-slate-500">Entraînements :</span>
-                            <span class="font-bold ${presenceColor}">
-                                ${presencePct !== null ? `${presencePct}% 📅 (${presences}/${totalSessions})` : '<span class="text-slate-400 font-normal italic">Aucune séance passée</span>'}
-                            </span>
-                        </div>
-                        <div class="bg-white px-2.5 py-1.5 rounded border space-y-1">
-                            <div class="flex justify-between items-center">
-                                <span class="text-slate-500">Matchs :</span>
-                                <span class="font-bold ${matchColor}">
-                                    ${matchPct !== null ? `${matchPct}% ⚽ (${matchStats.played}/${matchStats.total})` : `<span class="text-slate-400 font-normal italic">${convocHistory.matches.length ? 'Aucun statut enregistré' : 'Aucun match passé'}</span>`}
-                                </span>
+                                const initials = (p.name || '?')
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map(w => w.charAt(0).toUpperCase())
+                    .join('');
+
+                const matchHint = matchPct !== null
+                    ? `${matchStats.played} convoqué(s) sur ${matchStats.total} match(s)`
+                    : (convocHistory.matches.length ? 'Aucun statut enregistré' : 'Aucun match passé');
+
+                return `
+                <article class="player-row border-slate-200">
+                    <div class="player-avatar ${teamColors.badge}" aria-hidden="true">${initials}</div>
+
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <h3 class="player-name truncate">${p.name}</h3>
+                                <p class="player-meta truncate">
+                                    ${p1 !== '-' ? p1 : 'Poste non défini'}
+                                    <span class="text-slate-300 px-1">·</span>
+                                    <span class="${hasLicence ? '' : 'text-amber-700 font-bold'}">${hasLicence ? 'Lic. ' + p.licence : '⚠️ Licence manquante'}</span>
+                                </p>
                             </div>
-                            ${matchStats.total > 0 ? `<div class="flex flex-wrap items-center gap-1 text-[10px]">
-                                <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold" title="Disponible mais non retenu (choix du coach)">⚪ ${matchStats.choix} choix</span>
-                                <span class="px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 font-bold" title="S'était signalé indisponible">🟠 ${matchStats.indispo} indispo</span>
-                            </div>` : ''}
-                        </div>
-                        <div class="bg-white p-2 rounded border">
-    <p class="text-[10px] text-slate-500 uppercase font-extrabold mb-1">
-        Niveau :
-    </p>
-    ${niveauBadge}
-</div>
-                        <div class="bg-white p-2 rounded border space-y-1">
-                            <p class="text-[10px] text-slate-500 uppercase font-extrabold">Postes :</p>
-                            <div class="flex items-center space-x-1.5 text-[11px]">
-                                <span class="font-bold px-2 py-0.5 rounded bg-sky-100 text-sky-900">1. ${p1}</span>
-                                ${p2 !== '-' ? `<span class="font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800">2. ${p2}</span>` : ''}
-                                ${p3 !== '-' ? `<span class="font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800">3. ${p3}</span>` : ''}
+
+                            <div class="flex items-center gap-1 shrink-0">
+                                <span class="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-extrabold ${teamColors.badge}">${teamName}</span>
+                                <button onclick="openModalPlayer('${p.id}')" class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs" aria-hidden="true"></i></button>
+                                <button onclick="deletePlayer('${p.id}')" class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs" aria-hidden="true"></i></button>
                             </div>
                         </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2.5">
+                            <div class="metric" title="${matchHint}">
+                                <span class="metric-label">Matchs</span>
+                                <span class="metric-value ${matchColor}">${matchPct !== null ? matchPct + '%' : '—'}</span>
+                            </div>
+                            <div class="metric" title="${presencePct !== null ? presences + ' présence(s) sur ' + totalSessions + ' séance(s)' : 'Aucune séance passée'}">
+                                <span class="metric-label">Séances</span>
+                                <span class="metric-value ${presenceColor}">${presencePct !== null ? presencePct + '%' : '—'}</span>
+                            </div>
+                            <div class="metric" title="${pStats.goals} but(s), ${pStats.assists} passe(s) décisive(s)">
+                                <span class="metric-label">Buts</span>
+                                <span class="metric-value">${pStats.goals}⚽ ${pStats.assists}🎯</span>
+                            </div>
+                            <div class="metric" title="${cards.yellows} jaune(s), ${cards.reds} rouge(s)">
+                                <span class="metric-label">Cartons</span>
+                                <span class="metric-value"><span class="text-amber-600">${cards.yellows}🟨</span> <span class="text-red-600">${cards.reds}🟥</span></span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-1 mt-2">
+                            ${niveauBadge}
+                            ${blessureBadge}
+                            ${attendanceBadge}
+                        </div>
+
+                        <details class="player-details mt-2">
+                            <summary><i class="fa-solid fa-chevron-right" aria-hidden="true"></i>Détails et postes</summary>
+                            <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
+                                    <span class="text-slate-500">Postes :</span>
+                                    <span class="font-bold text-slate-800">${p1}${p2 !== '-' ? ' · ' + p2 : ''}${p3 !== '-' ? ' · ' + p3 : ''}</span>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
+                                    <span class="text-slate-500">Convocations :</span>
+                                    <span class="font-bold text-slate-800">${matchStats.total > 0 ? `${matchStats.played} retenu(s) · ${matchStats.choix} choix · ${matchStats.indispo} indispo` : '—'}</span>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
+                                    <span class="text-slate-500">Entraînements :</span>
+                                    <span class="font-bold text-slate-800">${presencePct !== null ? `${presences}/${totalSessions} séances` : '—'}</span>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
+                                    <span class="text-slate-500">Équipe :</span>
+                                    <span class="font-bold text-slate-800">${teamName}</span>
+                                </div>
+                            </div>
+                        </details>
                     </div>
-                </div>`;
+                </article>`;
             }).join('');
 
             renderStaffEffectif();
@@ -2318,6 +2345,23 @@ Object.values(state.trainings).forEach(session => {
             renderMatchDetail();
         }
 
+        function setConvocViews(hasMatch) {
+            const rows = document.getElementById('convoc-rows');
+            const empty = document.getElementById('convoc-empty-state');
+
+            if (rows) rows.classList.toggle('hidden', !hasMatch);
+            if (empty) empty.classList.toggle('hidden', hasMatch);
+
+            if (!hasMatch) {
+                const tbody = document.getElementById('match-convocation-tbody');
+                if (tbody) tbody.innerHTML = '';
+                ['convoc-history-panel', 'bench-order-panel'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = '';
+                });
+            }
+        }
+
         function renderMatchDetail() {
             const role = window.currentUserRole || 'public';
 const userTeam = window.currentUserTeam || 'all';
@@ -2331,21 +2375,7 @@ const userTeam = window.currentUserTeam || 'all';
 
            if (!state.selectedMatchId) {
 
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="6" class="p-8 text-center text-slate-400">
-                <div class="flex flex-col items-center space-y-2">
-                    <i class="fa-solid fa-calendar-days text-3xl"></i>
-                    <p class="font-bold">
-                        Aucun match sélectionné
-                    </p>
-                    <p>
-                        Sélectionnez ou créez un match pour gérer les convocations.
-                    </p>
-                </div>
-            </td>
-        </tr>
-    `;
+    setConvocViews(false);
 
     infoCard.style.display = 'none';
     counterBanner.style.display = 'none';
@@ -2363,7 +2393,7 @@ const userTeam = window.currentUserTeam || 'all';
                     const el = document.getElementById(id);
                     if (el) el.innerHTML = '';
                 });
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Aucun match disponible.</td></tr>`;
+                setConvocViews(false);
               if (infoCard) infoCard.style.display = 'none';
 if (counterBanner) counterBanner.style.display = 'none';
 if (carpoolBanner) carpoolBanner.style.display = 'none';  
@@ -2656,52 +2686,52 @@ renderMatchSummary(m);
 
                 // --- HTML POUR MOBILE (Cartes) ---
                 htmlMobileCards += `
-                    <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 shadow-sm space-y-3 mb-2.5">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2.5">
-                                <div class="inline-flex rounded-lg border p-0.5 bg-slate-100 shrink-0">
-                                    <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
-                                    <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
-                                    <button onclick="setMatchStatus('${m.id}', '${p.id}', 'indisponible')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'indisponible' ? 'active-indisponible bg-orange-600 text-white' : 'text-slate-600'}">Indispo</button>
-                                </div>
-                                ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
-                                <div>
-                                    <div class="font-bold text-slate-800 text-xs">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}</div>
-                                    <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
-                                    ${convocationBadgeHtml(convocHistory.history[p.id])}
-                                </div>
+                    <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 shadow-sm space-y-2.5 mb-2.5">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="font-bold text-slate-800 text-[13px]">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}</div>
+                                <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
+                                ${convocationBadgeHtml(convocHistory.history[p.id])}
                             </div>
+                            ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg shrink-0" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                         </div>
-                        <div class="grid grid-cols-1 gap-2 pt-2 border-t border-slate-100 text-xs">
-                            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
-                                <span class="text-[10px] text-slate-500 uppercase font-bold">Licence :</span>
+
+                        <div class="grid grid-cols-3 gap-1 bg-slate-100 rounded-lg p-0.5">
+                            <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn status-convoke text-center ${currentStatus === 'convoke' ? 'active-convoke' : ''}">Conv.</button>
+                            <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn status-nonconvoke text-center ${currentStatus === 'nonconvoke' ? 'active-nonconvoke' : ''}">Non</button>
+                            <button onclick="setMatchStatus('${m.id}', '${p.id}', 'indisponible')" class="status-btn status-indisponible text-center ${currentStatus === 'indisponible' ? 'active-indisponible' : ''}">Indispo</button>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-1.5 text-xs pt-2 border-t border-slate-100">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Licence</span>
                                 <div class="flex items-center space-x-1.5">
-                                    <span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border text-xs">${hasLicence ? p.licence : '⚠️ Manquante'}</span>
-                                    ${hasLicence ? `<button onclick="copyLicence('${p.licence}')" class="p-1 bg-white hover:bg-sky-100 text-slate-500 rounded border"><i class="fa-solid fa-copy text-xs"></i></button>` : ''}
+                                    <span class="font-mono font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border text-xs">${hasLicence ? p.licence : '⚠️ Manquante'}</span>
+                                    ${hasLicence ? `<button onclick="copyLicence('${p.licence}')" class="p-1.5 bg-white hover:bg-sky-50 text-slate-500 rounded border" aria-label="Copier la licence"><i class="fa-solid fa-copy text-xs"></i></button>` : ''}
                                 </div>
                             </div>
-                            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
-                                <span class="text-[10px] text-slate-500 uppercase font-bold">Poste :</span>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Poste</span>
                                 <select onchange="setMatchPosition('${m.id}', '${p.id}', this.value)" class="bg-white border border-sky-300 font-bold text-xs text-sky-900 py-1 px-2 rounded-lg">
                                     ${postes.map(pos => `<option value="${pos}" ${pos === selectedPosition ? 'selected' : ''}>${pos}</option>`).join('')}
                                     <option value="Gardien" ${selectedPosition === 'Gardien' ? 'selected' : ''}>Gardien</option>
                                     <option value="Remplaçant" ${selectedPosition === 'Remplaçant' ? 'selected' : ''}>Remplaçant</option>
                                 </select>
                             </div>
-                            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
-                                <span class="text-[10px] text-slate-500 uppercase font-bold">Maillot N° :</span>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Maillot</span>
                                 <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-16 p-1 border rounded text-center font-bold text-xs bg-white">
                             </div>
-                        </div>
-                        <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-xs bg-slate-50/50 p-2 rounded-lg">
-                            <span class="text-[10px] text-slate-500 uppercase font-bold">Covoiturage :</span>
-                            <select onchange="setMatchCarpool('${m.id}', '${p.id}', this.value)" class="bg-white border font-bold text-xs py-1 px-2 rounded-lg">
-                                <option value="0" ${carpoolSeats == 0 ? 'selected' : ''}>0 place</option>
-                                <option value="2" ${carpoolSeats == 2 ? 'selected' : ''}>🚗 2 places</option>
-                                <option value="3" ${carpoolSeats == 3 ? 'selected' : ''}>🚗 3 places</option>
-                                <option value="4" ${carpoolSeats == 4 ? 'selected' : ''}>🚗 4 places</option>
-                                <option value="5" ${carpoolSeats == 5 ? 'selected' : ''}>🚗 5 places</option>
-                            </select>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Covoiturage</span>
+                                <select onchange="setMatchCarpool('${m.id}', '${p.id}', this.value)" class="bg-white border font-bold text-xs py-1 px-2 rounded-lg">
+                                    <option value="0" ${carpoolSeats == 0 ? 'selected' : ''}>0 place</option>
+                                    <option value="2" ${carpoolSeats == 2 ? 'selected' : ''}>🚗 2 places</option>
+                                    <option value="3" ${carpoolSeats == 3 ? 'selected' : ''}>🚗 3 places</option>
+                                    <option value="4" ${carpoolSeats == 4 ? 'selected' : ''}>🚗 4 places</option>
+                                    <option value="5" ${carpoolSeats == 5 ? 'selected' : ''}>🚗 5 places</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -2733,9 +2763,9 @@ renderMatchSummary(m);
                         
 <td class="p-3 text-center">
                              <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
-                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
-                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
-                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'indisponible')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'indisponible' ? 'active-indisponible bg-orange-600 text-white' : 'text-slate-600'}">Indispo</button>
+                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn status-convoke ${currentStatus === 'convoke' ? 'active-convoke' : ''}">Conv.</button>
+                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn status-nonconvoke ${currentStatus === 'nonconvoke' ? 'active-nonconvoke' : ''}">Non</button>
+                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'indisponible')" class="status-btn status-indisponible ${currentStatus === 'indisponible' ? 'active-indisponible' : ''}">Indispo</button>
                              </div>
                             ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                         </td>
@@ -2757,6 +2787,8 @@ renderMatchSummary(m);
             if (tbody) {
                 tbody.innerHTML = htmlTableRows + staffTableRows;
             }
+
+            setConvocViews(true);
 
             // Panneau récapitulatif des convocations (matchs passés)
             renderConvocationHistory(m, playerItems, convocHistory);
@@ -2798,7 +2830,7 @@ if (role === 'coach') {
 
             if (sessions.length === 0) {
                 container.innerHTML = `<div class="flex flex-col items-center justify-center py-12 text-slate-400">
-                    <i class="fa-solid fa-whistle text-4xl mb-3 opacity-30"></i>
+                    <i class="fa-solid fa-person-running text-4xl mb-3 opacity-30"></i>
                     <p class="text-sm font-semibold">Aucune séance enregistrée</p>
                     <p class="text-xs mt-1">Créez votre première séance avec le bouton ci-dessus</p>
                 </div>`;
@@ -2853,14 +2885,14 @@ const nbTotal = playersForTraining.length;
      class="p-3.5 ${cardBg} border ${teamColors.border} border-l-4 rounded-xl cursor-pointer transition-all group">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-xl ${isPast ? 'bg-slate-400' : 'bg-gradient-to-br from-sky-500 to-blue-600'} text-white flex items-center justify-center shadow-sm">
-                                <i class="fa-solid fa-whistle text-sm"></i>
+                            <div class="w-9 h-9 shrink-0 rounded-xl ${isPast ? 'bg-slate-100 text-slate-500' : 'bg-gradient-to-br from-sky-500 to-sky-700 text-white'} flex items-center justify-center">
+                                <i class="fa-solid fa-person-running text-sm" aria-hidden="true"></i>
                             </div>
                             <div>
                                 <div class="flex items-center space-x-2">
                                     ${statusDot}
                                     <div>
-    <p class="font-bold text-slate-800 text-xs">
+    <p class="font-bold text-slate-800 text-xs capitalize">
         ${s.title || 'Séance sans titre'}
     </p>
 
@@ -2874,7 +2906,12 @@ const nbTotal = playersForTraining.length;
                                 <p class="text-[11px] text-sky-600 font-semibold">${s.theme || 'Thème non défini'}</p>
                             </div>
                         </div>
-                        <div class="flex items-center space-x-3">
+                        <div class="flex items-center space-x-3 shrink-0">
+                            ${isPast
+                                ? (isComplete
+                                    ? '<span class="hidden sm:inline px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-extrabold whitespace-nowrap">Saisie complète</span>'
+                                    : '<span class="hidden sm:inline px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-extrabold whitespace-nowrap">À compléter</span>')
+                                : '<span class="hidden sm:inline px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-100 text-[10px] font-extrabold whitespace-nowrap">À venir</span>'}
                             <div class="text-right">
                                 <p class="font-extrabold text-sm ${pctColor}">${nbPresent}/${nbTotal}</p>
                                 <p class="text-[10px] text-slate-400">présents</p>
@@ -2930,15 +2967,15 @@ const nbTotal = playersForTraining.length;
             const bar = document.getElementById('training-stats-bar');
             if (!bar) return;
             bar.innerHTML = `
-                <div class="bg-white p-3 rounded-xl border border-slate-100 card-shadow text-center">
+                <div class="card p-3 text-center">
                     <p class="text-2xl font-extrabold text-sky-600">${nbSessions}</p>
                     <p class="text-[11px] text-slate-500 mt-0.5">Séances</p>
                 </div>
-                <div class="bg-white p-3 rounded-xl border border-slate-100 card-shadow text-center">
+                <div class="card p-3 text-center">
                     <p class="text-2xl font-extrabold ${avgColor}">${avgPct === null ? '—' : avgPct + '%'}</p>
                     <p class="text-[11px] text-slate-500 mt-0.5">Présence moy.</p>
                 </div>
-                <div class="bg-white p-3 rounded-xl border border-slate-100 card-shadow text-center">
+                <div class="card p-3 text-center">
                     <p class="text-2xl font-extrabold text-slate-700">${totalPresences}</p>
                     <p class="text-[11px] text-slate-500 mt-0.5">Présences tot.</p>
                 </div>`;
@@ -4796,9 +4833,9 @@ Un passager non déclaré = un enfant sans siège prévu.
 
             if (!data.matches.length) {
                 container.innerHTML = `
-                <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
-                    <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-simple mr-1 text-sky-600"></i>Bilan des convocations</h3>
-                    <p class="text-xs text-slate-500 mt-1">Aucun match passé pour ${teamName} : le bilan apparaîtra dès le premier match joué.</p>
+                <div class="card card-pad">
+                    <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations</h3>
+                    <p class="card-sub">Aucun match passé pour ${teamName} : le bilan apparaîtra dès le premier match joué.</p>
                 </div>`;
                 return;
             }
@@ -4823,15 +4860,20 @@ Un passager non déclaré = un enfant sans siège prévu.
             }).join('');
 
             container.innerHTML = `
-            <div class="bg-white rounded-xl card-shadow border border-slate-100">
-                <div class="flex items-start justify-between gap-2 p-4 pb-2">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-simple mr-1 text-sky-600"></i>Bilan des convocations</h3>
-                        <p class="text-[11px] text-slate-500">${teamName} · ${data.matches.length} match(s) passé(s) · ✅ convoqué · 🟠 indispo · ⚪ choix</p>
-                    </div>
-                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">${rows.length} joueurs</span>
-                </div>
-                <div class="divide-y divide-slate-100 max-h-80 overflow-y-auto">${rowsHtml}</div>
+            <div class="card overflow-hidden">
+                <details class="group">
+                    <summary class="list-none cursor-pointer p-4 flex items-start justify-between gap-2 hover:bg-slate-50 transition-colors">
+                        <div>
+                            <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations</h3>
+                            <p class="card-sub">${teamName} · ${data.matches.length} match(s) passé(s) · ✅ convoqué · 🟠 indispo · ⚪ choix</p>
+                        </div>
+                        <span class="flex items-center gap-2 shrink-0">
+                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">${rows.length} joueurs</span>
+                            <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true"></i>
+                        </span>
+                    </summary>
+                    <div class="divide-y divide-slate-100 border-t border-slate-100 max-h-[60vh] overflow-y-auto">${rowsHtml}</div>
+                </details>
             </div>`;
         }
 
@@ -5707,7 +5749,7 @@ if (role === 'responsable') {
                     <div class="bg-white border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
                         <div class="font-bold text-slate-700 text-xs">${label}</div>
                         <div class="flex items-center space-x-2">
-                            <select id="entourage-coach-select-${m.id}-${field}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1">
+                            <select id="entourage-coach-select-${m.id}-${field}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1 min-w-0">
                                 ${staffSelectOptions(sortedStaff, current ? staffId(current) : '', true)}
                             </select>
                             <button onclick="ajouterCoach('${m.id}','${field}','mobile')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold shrink-0">OK</button>
@@ -5744,7 +5786,7 @@ if (role === 'responsable') {
                 <div class="bg-white border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
                     <div class="font-bold text-slate-700 text-xs">Ajouter un dirigeant</div>
                     <div class="flex items-center space-x-2">
-                        <select id="entourage-dirigeant-select-${m.id}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1">
+                        <select id="entourage-dirigeant-select-${m.id}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1 min-w-0">
                             ${staffSelectOptions(sortedStaff, '', false)}
                         </select>
                         <button onclick="addMatchDirigeant('${m.id}','mobile')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold shrink-0">Ajouter</button>
@@ -5922,22 +5964,35 @@ if (role === 'responsable') {
 
         function setFilterCat(cat) {
             currentCatFilter = cat;
-            document.querySelectorAll('.cat-filter-btn').forEach(btn => {
-                btn.classList.remove('bg-sky-600', 'text-white', 'bg-blue-600', 'bg-purple-600');
-                btn.classList.add('bg-slate-100', 'text-slate-600');
-            });
+
             document
-    .querySelectorAll('.team-chip')
-    .forEach(btn => btn.classList.remove('active'));
+                .querySelectorAll('.team-chip')
+                .forEach(btn => btn.classList.remove('active'));
 
-const active =
-    document.getElementById(
-        'filter-' + cat
-    );
+            const active =
+                document.getElementById(
+                    'filter-' + cat
+                );
 
-if (active) {
-    active.classList.add('active');
-}
+            if (active) {
+                active.classList.add('active');
+
+                const row = active.parentElement;
+
+                if (row && row.scrollWidth > row.clientWidth) {
+                    const offset =
+                        active.getBoundingClientRect().left -
+                        row.getBoundingClientRect().left +
+                        row.scrollLeft -
+                        12;
+
+                    row.scrollLeft = Math.max(0, offset);
+                }
+            }
+
+            const select = document.getElementById('effectif-team-select');
+            if (select) select.value = cat;
+
             filterPlayers();
         }
 
@@ -6066,6 +6121,8 @@ if (role === 'responsable') {
     const container = document.getElementById('effectif-full-container');
     const cards = Array.from(container.children);
 
+    let visibleCount = 0;
+
     cards.forEach((card, i) => {
 
         const player = playersSource[i];
@@ -6080,11 +6137,18 @@ if (role === 'responsable') {
             currentCatFilter === 'all' ||
             player.team === currentCatFilter;
 
-        card.style.display =
-            (matchText && matchCat)
-                ? 'block'
-                : 'none';
+        const visible = matchText && matchCat;
+
+        if (visible) visibleCount++;
+
+        // Une chaîne vide restaure le display défini par la feuille de styles
+        card.style.display = visible ? '' : 'none';
     });
+
+    const countEl = document.getElementById('effectif-total-count');
+    if (countEl) {
+        countEl.textContent = `${visibleCount} joueur${visibleCount > 1 ? 's' : ''}`;
+    }
 }
 
 function renderTeamFilters() {
@@ -6114,7 +6178,18 @@ function renderTeamFilters() {
         );
     }
 
-    const totalPlayers = state.players.length;
+    const visibleTeamKeys = new Set(
+        teamsToDisplay.map(([key]) => String(key).toLowerCase())
+    );
+
+    const totalPlayers = state.players.filter(p =>
+        visibleTeamKeys.has(String(p.team || p.cat || '').toLowerCase())
+    ).length;
+
+    const countEl = document.getElementById('effectif-total-count');
+    if (countEl) {
+        countEl.textContent = `${totalPlayers} joueur${totalPlayers > 1 ? 's' : ''}`;
+    }
 
     function getGroup(teamName) {
 
@@ -6187,49 +6262,20 @@ function renderTeamFilters() {
     });
 
     let html = `
-    <div class="bg-white rounded-xl border p-4 mb-4 card-shadow">
-        ...
-    </div>
-`;
-
-if (role === 'admin') {
-    html += `
-        ${role === 'admin' ? `
-<div class="team-group">
-    <button
-        onclick="setFilterCat('all')"
-        id="filter-all"
-        class="team-chip active">
-
-        Toutes
-
-        <span class="count">
-            ${totalPlayers}
-        </span>
-    </button>
-</div>
-` : ''}
-
-
-                <span class="count">
-                    ${totalPlayers}
-                </span>
+        <div class="flex flex-nowrap sm:flex-wrap items-center gap-1.5 overflow-x-auto sm:overflow-visible no-scrollbar pb-1 -mb-1">
+            <button
+                onclick="setFilterCat('all')"
+                id="filter-all"
+                class="team-chip${currentCatFilter === 'all' ? ' active' : ''}">
+                <i class="fa-solid fa-users" aria-hidden="true"></i>
+                Toutes
+                <span class="count">${totalPlayers}</span>
             </button>
-        </div>
     `;
-}
 
     Object.entries(groups).forEach(([groupName, teams]) => {
 
         if (!teams.length) return;
-
-        html += `
-            <div class="team-group">
-
-                <div class="team-group-title">
-                    ${groupName}
-                </div>
-        `;
 
         teams
             .sort((a, b) => {
@@ -6241,11 +6287,16 @@ if (role === 'admin') {
 })
             .forEach(team => {
 
+                const isActive =
+                    String(currentCatFilter).toLowerCase() ===
+                    String(team.key).toLowerCase();
+
                 html += `
                     <button
                         onclick="setFilterCat('${team.key}')"
                         id="filter-${team.key}"
-                        class="team-chip cat-filter-btn">
+                        title="${groupName}"
+                        class="team-chip cat-filter-btn${isActive ? ' active' : ''}">
 
                         ${team.name}
 
@@ -6256,11 +6307,25 @@ if (role === 'admin') {
                     </button>
                 `;
             });
-
-        html += `</div>`;
     });
 
+    html += `</div>`;
+
     container.innerHTML = html;
+
+    // Garde le filtre actif visible dans la rangée horizontale du mobile
+    const row = container.firstElementChild;
+    const activeChip = container.querySelector('.team-chip.active');
+
+    if (row && activeChip && row.scrollWidth > row.clientWidth) {
+        const offset =
+            activeChip.getBoundingClientRect().left -
+            row.getBoundingClientRect().left +
+            row.scrollLeft -
+            12;
+
+        row.scrollLeft = Math.max(0, offset);
+    }
 }
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
 function applyPermissions() {
