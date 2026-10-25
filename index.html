@@ -1442,6 +1442,25 @@
    
 
 
+    <div id="modal-pick-player" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pick-player-title">
+        <div class="modal-card max-w-md p-5 space-y-4 accent-sky">
+            <div class="flex justify-between items-start border-b pb-2 gap-2">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-sm" id="pick-player-title">Choisir un joueur</h3>
+                    <p class="text-[11px] text-slate-500" id="pick-player-slot">—</p>
+                </div>
+                <button onclick="toggleModal('modal-pick-player', false)" class="text-slate-400 hover:text-slate-600" aria-label="Fermer"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            </div>
+
+            <div id="pick-player-current"></div>
+
+            <div>
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">Joueurs convoqués disponibles</p>
+                <div id="pick-player-list" class="space-y-1.5 max-h-72 overflow-y-auto no-scrollbar"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-player" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-player-title">
         <div class="modal-card max-w-md p-5 space-y-4 accent-indigo">
             <div class="flex justify-between items-center border-b pb-2">

@@ -870,6 +870,17 @@ if (subTabId === 'composition') {
                 : [nom, prenom].filter(Boolean).join(' ');
         }
 
+        // Nom affiché sur le terrain : prénom usuel (champ « Prénom usuel » de la fiche),
+        // sinon le prénom, sinon le nom complet
+        function getPitchDisplayName(p) {
+            if (!p) return '';
+            const nick = String(p.nickname || '').trim();
+            if (nick) return nick;
+            const { prenom } = getPlayerNameParts(p);
+            if (prenom) return prenom;
+            return formatPlayerName(p);
+        }
+
         // Recalcule le nom affiché sans toucher au nom de stockage
         function applyPlayerNameDisplay() {
             (state.players || []).forEach(p => {
@@ -2447,6 +2458,7 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             // Bilan des convocations sur les matchs passés de cette équipe
             const convocHistory = buildConvocationHistory(m.team);
             const cardsIndex = getCardsByPlayerIndex();
+            const jerseysForMatch = computeMatchJerseys(m);
 
             if (inviteSearchBlock) {
                 inviteSearchBlock.classList.toggle('hidden', role !== 'coach' && role !== 'responsable');
@@ -2678,7 +2690,7 @@ renderMatchSummary(m);
             playerItems.forEach(({ p, invite }) => {
                 const currentStatus = m.convocations[p.id] || 'none';
                 const selectedPosition = m.positions[p.id] || p.poste1 || '-';
-                const jerseyNumber = m.jerseys[p.id] || '';
+                const jerseyNumber = jerseysForMatch[p.id]?.number ?? '';
                 const carpoolSeats = m.carpool[p.id] || 0;
                 const disciplineChip = renderDisciplineChip(computePlayerDiscipline(p.id, cardsIndex));
                 const postes = getPlayerPostesList(p);
@@ -5050,8 +5062,45 @@ Un passager non déclaré = un enfant sans siège prévu.
         }
 
         function setMatchJersey(mId, pId, jersey) {
-            if (!state.matches[mId].jerseys) state.matches[mId].jerseys = {};
-            state.matches[mId].jerseys[pId] = jersey;
+            const match = state.matches[mId];
+            if (!match) return;
+
+            if (!match.jerseys) match.jerseys = {};
+
+            const value = String(jersey == null ? '' : jersey).trim();
+            const auto = computeAutoJerseyMap(match)[pId];
+
+            // Vide ou identique au numéro automatique : aucune surcharge stockée
+            if (!value || (auto != null && parseInt(value, 10) === auto)) {
+                delete match.jerseys[pId];
+                saveStateToFirebase();
+                return;
+            }
+
+            const number = parseInt(value, 10);
+            const isStarter = Object.values(match.slotAssignments || {}).includes(pId);
+            const min = isStarter ? 1 : 12;
+            const max = isStarter ? 11 : 14;
+
+            if (!number || number < min || number > max) {
+                showToast(
+                    isStarter
+                        ? 'Un titulaire prend un numéro de 1 à 11'
+                        : 'Un remplaçant prend un numéro de 12 à 14',
+                    'error'
+                );
+                return;
+            }
+
+            const clash = Object.entries(computeMatchJerseys(match))
+                .find(([id, j]) => id !== pId && j.number === number);
+
+            if (clash) {
+                showToast('Le numéro ' + number + ' est déjà pris', 'error');
+                return;
+            }
+
+            match.jerseys[pId] = String(number);
             saveStateToFirebase();
         }
 
@@ -10676,392 +10725,581 @@ function getFirstName(player) {
     return (player.name || '').split(' ').pop();
 }
 
-function renderMatchComposition() {
+    /* ============================================================
+       TERRAIN DE COMPOSITION — tracé, joueurs, numérotation
+       ============================================================ */
 
-    const container =
-        document.getElementById(
-            'match-composition-container'
+    const PITCH_W = 68;   // largeur, touche à touche (m)
+    const PITCH_L = 105;  // longueur, but à but (m)
+
+    const SLOT_LABELS = {
+        GB: 'Gardien',
+        DG: 'Latéral gauche',
+        DD: 'Latéral droit',
+        DC1: 'Défenseur central gauche',
+        DC2: 'Défenseur central',
+        DC3: 'Défenseur central droit',
+        MG: 'Milieu gauche',
+        MD: 'Milieu droit',
+        MC1: 'Milieu central',
+        MC2: 'Milieu central',
+        MC3: 'Milieu central',
+        MDF: 'Milieu défensif',
+        MDF1: 'Milieu défensif gauche',
+        MDF2: 'Milieu défensif droit',
+        MOG: 'Ailier gauche',
+        MOD: 'Ailier droit',
+        MOC: 'Meneur offensif',
+        AT1: 'Attaquant gauche',
+        AT2: 'Attaquant droit',
+        BU: 'Buteur',
+        AG: 'Ailier gauche',
+        AD: 'Ailier droit'
+    };
+
+    function getSlotLabel(slot) {
+        return SLOT_LABELS[slot] || slot;
+    }
+
+    const TEAM_HEX = {
+        sky: '#0ea5e9', blue: '#3b82f6', indigo: '#6366f1', violet: '#8b5cf6',
+        purple: '#a855f7', fuchsia: '#d946ef', pink: '#ec4899', rose: '#f43f5e',
+        red: '#ef4444', orange: '#f97316', amber: '#f59e0b', yellow: '#eab308',
+        lime: '#84cc16', green: '#22c55e', emerald: '#10b981', teal: '#14b8a6',
+        cyan: '#06b6d4', slate: '#64748b', gray: '#6b7280', zinc: '#71717a',
+        neutral: '#737373', stone: '#78716c',
+        skyDark: '#0369a1', blueDark: '#1d4ed8'
+    };
+
+    function getTeamHex(teamKey) {
+        const color = state.teams?.[teamKey]?.color || 'slate';
+        return TEAM_HEX[color] || TEAM_HEX[String(color).replace(/Dark$/, '')] || '#475569';
+    }
+
+    // Tracé du terrain : dessiné dans un repère « longueur verticale »
+    // (x = largeur 68 m, y = longueur 105 m), puis pivoté pour l'affichage PC.
+    function buildPitchSVG(orientation) {
+        const W = PITCH_W;
+        const L = PITCH_L;
+        const isPortrait = orientation === 'portrait';
+        const uid = isPortrait ? 'p' : 'l';
+        const line = 'rgba(255,255,255,.82)';
+        const sw = 0.3;
+
+        let stripes = '';
+        const bands = 12;
+        for (let i = 0; i < bands; i++) {
+            const h = L / bands;
+            stripes += '<rect x="0" y="' + (i * h).toFixed(2) + '" width="' + W + '" height="' + (h + 0.06).toFixed(2) + '" fill="' + (i % 2 ? '#37b24d' : '#2f9e44') + '"/>';
+        }
+
+        const boxW = 40.32;
+        const boxD = 16.5;
+        const goalW = 18.32;
+        const goalD = 5.5;
+        const spot = 11;
+        const bx = (W - boxW) / 2;
+        const gx = (W - goalW) / 2;
+        const mouth = (W - 7.32) / 2;
+
+        const body =
+            stripes +
+            '<g fill="none" stroke="' + line + '" stroke-width="' + sw + '">' +
+                '<rect x="' + (sw / 2) + '" y="' + (sw / 2) + '" width="' + (W - sw) + '" height="' + (L - sw) + '"/>' +
+                '<line x1="0" y1="' + (L / 2) + '" x2="' + W + '" y2="' + (L / 2) + '"/>' +
+                '<circle cx="' + (W / 2) + '" cy="' + (L / 2) + '" r="9.15"/>' +
+                '<rect x="' + bx + '" y="0" width="' + boxW + '" height="' + boxD + '"/>' +
+                '<rect x="' + bx + '" y="' + (L - boxD) + '" width="' + boxW + '" height="' + boxD + '"/>' +
+                '<rect x="' + gx + '" y="0" width="' + goalW + '" height="' + goalD + '"/>' +
+                '<rect x="' + gx + '" y="' + (L - goalD) + '" width="' + goalW + '" height="' + goalD + '"/>' +
+                '<path d="M0 1 A1 1 0 0 1 1 0"/>' +
+                '<path d="M' + (W - 1) + ' 0 A1 1 0 0 1 ' + W + ' 1"/>' +
+                '<path d="M' + W + ' ' + (L - 1) + ' A1 1 0 0 1 ' + (W - 1) + ' ' + L + '"/>' +
+                '<path d="M1 ' + L + ' A1 1 0 0 1 0 ' + (L - 1) + '"/>' +
+            '</g>' +
+            '<circle cx="' + (W / 2) + '" cy="' + (L / 2) + '" r="0.42" fill="' + line + '"/>' +
+            '<circle cx="' + (W / 2) + '" cy="' + spot + '" r="0.42" fill="' + line + '"/>' +
+            '<circle cx="' + (W / 2) + '" cy="' + (L - spot) + '" r="0.42" fill="' + line + '"/>' +
+            '<defs>' +
+                '<clipPath id="pc-' + uid + '-a"><rect x="0" y="' + boxD + '" width="' + W + '" height="' + (L - boxD) + '"/></clipPath>' +
+                '<clipPath id="pc-' + uid + '-b"><rect x="0" y="0" width="' + W + '" height="' + (L - boxD) + '"/></clipPath>' +
+            '</defs>' +
+            '<g fill="none" stroke="' + line + '" stroke-width="' + sw + '">' +
+                '<circle cx="' + (W / 2) + '" cy="' + spot + '" r="9.15" clip-path="url(#pc-' + uid + '-a)"/>' +
+                '<circle cx="' + (W / 2) + '" cy="' + (L - spot) + '" r="9.15" clip-path="url(#pc-' + uid + '-b)"/>' +
+            '</g>' +
+            '<g fill="rgba(255,255,255,.12)" stroke="' + line + '" stroke-width="' + sw + '">' +
+                '<rect x="' + mouth + '" y="0" width="7.32" height="1.7"/>' +
+                '<rect x="' + mouth + '" y="' + (L - 1.7) + '" width="7.32" height="1.7"/>' +
+            '</g>' +
+            // Filets des buts
+            '<g stroke="rgba(255,255,255,.45)" stroke-width="0.16">' +
+            Array.from({ length: 7 }, (_, i) => {
+                const x = mouth + (i * 7.32) / 6;
+                return '<line x1="' + x + '" y1="0" x2="' + x + '" y2="1.7"/>' +
+                       '<line x1="' + x + '" y1="' + (L - 1.7) + '" x2="' + x + '" y2="' + L + '"/>';
+            }).join('') +
+            Array.from({ length: 2 }, (_, i) => {
+                const y = (i + 1) * 0.56;
+                return '<line x1="' + mouth + '" y1="' + y + '" x2="' + (mouth + 7.32) + '" y2="' + y + '"/>' +
+                       '<line x1="' + mouth + '" y1="' + (L - y) + '" x2="' + (mouth + 7.32) + '" y2="' + (L - y) + '"/>';
+            }).join('') +
+            '</g>';
+
+        if (isPortrait) {
+            return '<svg class="pitch-svg md:hidden" viewBox="0 0 ' + W + ' ' + L + '" preserveAspectRatio="none" aria-hidden="true">' + body + '</svg>';
+        }
+
+        return '<svg class="pitch-svg hidden md:block" viewBox="0 0 ' + L + ' ' + W + '" preserveAspectRatio="none" aria-hidden="true">' +
+            '<g transform="translate(' + L + ',0) rotate(90)">' + body + '</g>' +
+            '</svg>';
+    }
+
+    // Numérotation classique : un numéro par poste, selon le système de jeu.
+    const FORMATION_JERSEYS = {
+        // 4-3-3 : meneur offensif (le plus haut) 10, relayeur 8, milieu défensif 6
+        '433':  { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MC1: 6, MC2: 10, MC3: 8, AG: 11, BU: 9, AD: 7 },
+        '442':  { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MG: 11, MC1: 6, MC2: 8, MD: 7, AT1: 9, AT2: 10 },
+        '352':  { GB: 1, DC1: 4, DC2: 5, DC3: 6, MG: 2, MC1: 8, MC2: 10, MC3: 11, MD: 3, AT1: 9, AT2: 7 },
+        '4231': { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MDF1: 6, MDF2: 8, MOG: 11, MOC: 10, MOD: 7, BU: 9 },
+        '4141': { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MDF: 6, MG: 11, MC1: 8, MC2: 10, MD: 7, BU: 9 },
+        '451':  { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MG: 11, MC1: 6, MC2: 10, MC3: 8, MD: 7, BU: 9 },
+        '343':  { GB: 1, DC1: 4, DC2: 5, DC3: 6, MG: 2, MC1: 8, MC2: 10, MD: 3, AG: 11, BU: 9, AD: 7 },
+        '532':  { GB: 1, DG: 3, DC1: 4, DC2: 5, DC3: 6, DD: 2, MC1: 8, MC2: 10, MC3: 7, AT1: 9, AT2: 11 },
+        '541':  { GB: 1, DG: 3, DC1: 4, DC2: 5, DC3: 6, DD: 2, MG: 11, MC1: 8, MC2: 10, MD: 7, BU: 9 },
+        '4312': { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MC1: 6, MC2: 8, MC3: 11, MOC: 10, AT1: 9, AT2: 7 },
+        '4222': { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MDF1: 6, MDF2: 8, MOG: 11, MOD: 7, AT1: 9, AT2: 10 }
+    };
+
+    // Utilisé seulement si un poste inconnu apparaît dans une formation
+    const SLOT_JERSEY = {
+        GB: 1, DD: 2, DG: 3, DC1: 4, DC2: 5, DC3: 6,
+        MDF: 6, MDF1: 6, MDF2: 8, MC1: 6, MC2: 10, MC3: 8,
+        MOC: 10, MD: 7, MG: 11, MOD: 7, MOG: 11, AD: 7, AG: 11,
+        BU: 9, AT1: 9, AT2: 10
+    };
+
+    // Numéros automatiques : titulaires selon leur poste, banc 12-14
+    function computeAutoJerseyMap(match) {
+        const map = {};
+        if (!match) return map;
+
+        const formationKey = match.currentFormation || '433';
+        const slots = getFormationSlots(formationKey);
+        const table = FORMATION_JERSEYS[formationKey] || FORMATION_JERSEYS['433'];
+        const assigned = match.slotAssignments || {};
+        const used = new Set();
+
+        const firstFree = () => {
+            for (let n = 1; n <= 11; n++) if (!used.has(n)) return n;
+            return null;
+        };
+
+        slots.forEach(s => {
+            const pid = assigned[s.slot];
+            if (!pid || map[pid] != null) return;
+
+            let number = table[s.slot];
+            if (!number || used.has(number)) number = SLOT_JERSEY[s.slot];
+            if (!number || used.has(number)) number = firstFree();
+            if (number == null) return;
+
+            used.add(number);
+            map[pid] = number;
+        });
+
+        // Trois remplaçants au maximum sur la feuille : 12, 13 puis 14,
+        // dans l'ordre du banc. Au-delà, pas de numéro.
+        const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
+        const maxSubs = Math.min(3, Math.max(0, targetConvoked - 11));
+
+        getCompositionBenchPlayers(match).forEach((p, i) => {
+            map[p.id] = i < maxSubs ? 12 + i : null;
+        });
+
+        return map;
+    }
+
+    // Numéros affichés : titulaires 1-11, remplaçants 12-14, surcharge manuelle encadrée
+    function computeMatchJerseys(match) {
+        const autoMap = computeAutoJerseyMap(match);
+        const out = {};
+
+        Object.entries(autoMap).forEach(([pid, number]) => {
+            out[pid] = { number: number, auto: true, duplicate: false, ignored: false };
+        });
+
+        const assigned = Object.values(match?.slotAssignments || {});
+        const used = new Set(
+            Object.values(out).map(j => j.number).filter(n => n != null)
         );
 
-    if (!container) return;
+        Object.entries(match?.jerseys || {}).forEach(([pid, value]) => {
+            const n = parseInt(value, 10);
+            if (!n) return;
 
-    if (
-        !state.selectedMatchId ||
-        !state.matches[state.selectedMatchId]
-    ) {
+            const starter = assigned.includes(pid);
+            const min = starter ? 1 : 12;
+            const max = starter ? 11 : 14;
+
+            if (!out[pid]) out[pid] = { number: null, auto: false, duplicate: false, ignored: false };
+
+            // Le numéro déjà attribué automatiquement : on garde l'automatique
+            if (out[pid].number === n) return;
+
+            // Hors de la plage du rôle, ou déjà pris ailleurs : on ignore la surcharge
+            if (n < min || n > max || used.has(n)) {
+                out[pid].ignored = true;
+                return;
+            }
+
+            if (out[pid].number != null) used.delete(out[pid].number);
+
+            out[pid].number = n;
+            out[pid].auto = false;
+            used.add(n);
+        });
+
+        const counts = {};
+        Object.values(out).forEach(j => {
+            if (j.number != null) counts[j.number] = (counts[j.number] || 0) + 1;
+        });
+        Object.values(out).forEach(j => {
+            j.duplicate = j.number != null && counts[j.number] > 1;
+        });
+
+        return out;
+    }
+
+    function getJerseyNumber(match, playerId) {
+        const jersey = computeMatchJerseys(match)[playerId];
+        return jersey && jersey.number != null ? jersey.number : '';
+    }
+
+    const FORMATIONS = [
+        { key: '433', label: '4-3-3' },
+        { key: '442', label: '4-4-2' },
+        { key: '352', label: '3-5-2' },
+        { key: '4231', label: '4-2-3-1' },
+        { key: '4141', label: '4-1-4-1' },
+        { key: '451', label: '4-5-1' },
+        { key: '343', label: '3-4-3' },
+        { key: '532', label: '5-3-2' },
+        { key: '541', label: '5-4-1' },
+        { key: '4312', label: '4-3-1-2' },
+        { key: '4222', label: '4-2-2-2' }
+    ];
+
+    const JERSEY_PATH = 'M25 6 Q32 12 39 6 L52 13 L58 29 L46 35 L46 58 Q46 62 42 62 L22 62 Q18 62 18 58 L18 35 L6 29 L12 13 Z';
+
+    // Un numéro doit rester lisible : on choisit blanc ou encre selon la clarté du maillot
+    function isLightColor(hex) {
+        const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+        if (!m) return false;
+        const n = parseInt(m[1], 16);
+        const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62;
+    }
+
+    function jerseyMarkup(teamHex, number, duplicate) {
+        const ink = isLightColor(teamHex) ? '#0f172a' : '#ffffff';
+        return `
+            <span class="jersey-box" style="color:${teamHex}" data-ink="${ink}">
+                <svg viewBox="0 0 64 64" class="jersey-svg" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="jersey-light" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0" stop-color="#ffffff" stop-opacity=".32"/>
+                            <stop offset=".55" stop-color="#ffffff" stop-opacity="0"/>
+                            <stop offset="1" stop-color="#000000" stop-opacity=".22"/>
+                        </linearGradient>
+                        <clipPath id="jersey-clip"><path d="${JERSEY_PATH}"/></clipPath>
+                    </defs>
+                    <path d="${JERSEY_PATH}" fill="currentColor" stroke="rgba(15,23,42,.35)" stroke-width="2"/>
+                    <path d="${JERSEY_PATH}" fill="url(#jersey-light)"/>
+                    <g clip-path="url(#jersey-clip)" fill="none" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.6">
+                        <path d="M25 7 Q32 14 39 7"/>
+                        <path d="M18 34 L18 60"/>
+                        <path d="M46 34 L46 60"/>
+                    </g>
+                    <path d="${JERSEY_PATH}" fill="none" stroke="rgba(255,255,255,.28)" stroke-width=".8"/>
+                </svg>
+                <span class="jersey-num" style="color:${ink};text-shadow:0 1px 2px ${ink === '#ffffff' ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.45)'}">${number != null && number !== '' ? number : ''}</span>
+                ${duplicate ? '<span class="jersey-dup" title="Numéro en double">!</span>' : ''}
+            </span>`;
+    }
+
+    // Une place qui n'existe plus dans la formation courante doit renvoyer le joueur au banc
+    function pruneSlotAssignments(match) {
+        if (!match) return;
+
+        const valid = new Set(
+            getFormationSlots(match.currentFormation || '433').map(s => s.slot)
+        );
+
+        Object.keys(match.slotAssignments || {}).forEach(slot => {
+            if (!valid.has(slot)) delete match.slotAssignments[slot];
+        });
+    }
+
+    function renderMatchComposition() {
+
+        const container = document.getElementById('match-composition-container');
+        if (!container) return;
+
+        if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) {
+            container.innerHTML = `
+                <div class="card card-pad text-center py-10">
+                    <div class="w-12 h-12 mx-auto rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mb-3">
+                        <i class="fa-solid fa-chess-board text-lg" aria-hidden="true"></i>
+                    </div>
+                    <p class="font-bold text-slate-800 text-sm">Aucun match sélectionné</p>
+                    <p class="screen-sub max-w-sm mx-auto">Choisis un match pour composer l'équipe.</p>
+                </div>`;
+            return;
+        }
+
+        const match = state.matches[state.selectedMatchId];
+        if (!match.slotAssignments) match.slotAssignments = {};
+        pruneSlotAssignments(match);
+
+        const formation = match.currentFormation || '433';
+        const slots = getFormationSlots(formation);
+        const jerseys = computeMatchJerseys(match);
+        const teamHex = getTeamHex(match.team);
+
+        const convoked = state.players.filter(p => (match.convocations || {})[p.id] === 'convoke');
+        const bench = getCompositionBenchPlayers(match);
+        const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
+        const maxSubs = Math.min(3, Math.max(0, targetConvoked - 11));
+        const placedCount = slots.filter(s => match.slotAssignments[s.slot]).length;
+
+        const duplicates = Object.entries(jerseys)
+            .filter(([, j]) => j.duplicate)
+            .map(([id]) => state.players.find(p => p.id === id))
+            .filter(Boolean)
+            .map(p => formatPlayerName(p));
+
+        const slotHTML = (pos) => {
+            const playerId = match.slotAssignments[pos.slot];
+            const player = playerId ? state.players.find(p => p.id === playerId) : null;
+            const jersey = player ? jerseys[player.id] : null;
+            const label = getSlotLabel(pos.slot);
+            const style = `--px:${pos.x}%;--py:${pos.y}%;--lx:${(100 - pos.y).toFixed(2)}%;--ly:${pos.x}%;`;
+
+            if (!player) {
+                return `
+                <button type="button" class="pitch-slot" style="${style}"
+                        onclick="openPlayerPicker('${pos.slot}')"
+                        aria-label="Placer un joueur : ${label}">
+                    <span class="slot-empty"><i class="fa-solid fa-plus" aria-hidden="true"></i></span>
+                    <span class="pitch-name">${label}</span>
+                </button>`;
+            }
+
+            return `
+                <button type="button" class="pitch-slot" style="${style}"
+                        onclick="openPlayerPicker('${pos.slot}')"
+                        title="${formatPlayerName(player)}"
+                        aria-label="Changer ${formatPlayerName(player)} : ${label}">
+                    ${jerseyMarkup(teamHex, jersey ? jersey.number : null, jersey && jersey.duplicate)}
+                    <span class="pitch-name">${getPitchDisplayName(player)}</span>
+                </button>`;
+        };
+
+        const benchHTML = bench.length
+            ? bench.map((p, i) => {
+                const off = i >= maxSubs;
+                const jersey = jerseys[p.id] || {};
+                const number = jersey.number;
+                const divider = (i === maxSubs && bench.length > maxSubs)
+                    ? `<div class="flex items-center gap-2 pt-2">
+                           <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Hors feuille</span>
+                           <span class="flex-1 h-px bg-slate-200"></span>
+                       </div>`
+                    : '';
+
+                return `${divider}
+                <div class="flex items-center gap-2 ${off ? 'opacity-60' : ''}">
+                    <span class="bench-num ${number ? '' : 'is-off'}" ${number ? 'style="background:' + teamHex + '"' : ''}>${number || '—'}</span>
+                    <div class="min-w-0 flex-1">
+                        <p class="font-bold text-[12.5px] text-slate-800 truncate">${formatPlayerName(p)}${jersey.duplicate ? ' <span class="text-red-600">!</span>' : ''}</p>
+                        <p class="text-[10.5px] text-slate-500 truncate">${getPosteLabel(p.poste1)}</p>
+                    </div>
+                    <div class="flex flex-col gap-0.5">
+                        <button onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'up')" ${i === 0 ? 'disabled' : ''}
+                                class="w-7 h-7 rounded-md border border-slate-200 text-slate-600 flex items-center justify-center text-[10px] ${i === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                aria-label="Monter ${formatPlayerName(p)}">▲</button>
+                        <button onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'down')" ${i === bench.length - 1 ? 'disabled' : ''}
+                                class="w-7 h-7 rounded-md border border-slate-200 text-slate-600 flex items-center justify-center text-[10px] ${i === bench.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                aria-label="Descendre ${formatPlayerName(p)}">▼</button>
+                    </div>
+                </div>`;
+            }).join('')
+            : '<p class="text-xs text-slate-400 italic">Aucun remplaçant : tous les convoqués sont sur le terrain.</p>';
 
         container.innerHTML = `
-            <div class="text-center py-8 text-slate-400">
+        <div class="space-y-3">
 
-                ⚽
+            <div class="flex flex-wrap items-center gap-1.5">
+                ${FORMATIONS.map(f => `
+                    <button onclick="applyFormation('${f.key}')"
+                            class="formation-btn ${formation === f.key ? 'is-active' : ''}">${f.label}</button>
+                `).join('')}
+                <button onclick="resetComposition()"
+                        class="formation-btn ml-auto"
+                        style="border-color:#fecaca;color:#b91c1c">
+                    <i class="fa-solid fa-rotate-left mr-1" aria-hidden="true"></i>Tout au banc
+                </button>
+            </div>
 
-                <div>
-                    Sélectionnez un match
+            ${duplicates.length ? `
+                <div class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11.5px] text-red-800 flex items-start gap-2">
+                    <i class="fa-solid fa-triangle-exclamation mt-0.5" aria-hidden="true"></i>
+                    <span>Numéro en double : <strong>${duplicates.join(', ')}</strong>. Ouvre le joueur pour changer son numéro.</span>
+                </div>` : ''}
+
+            <div class="grid lg:grid-cols-4 gap-3">
+
+                <div class="lg:col-span-3">
+                    <div class="pitch-wrap" id="composition-terrain">
+                        ${buildPitchSVG('portrait')}
+                        ${buildPitchSVG('landscape')}
+                        ${slots.map(slotHTML).join('')}
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-slate-500">
+                        <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>
+                        <span>Touche une position pour y placer un joueur.</span>
+                        <span class="ml-auto font-bold text-slate-600">${placedCount}/11 titulaires</span>
+                    </div>
                 </div>
 
-            </div>
-        `;
+                <aside class="card card-pad space-y-3">
+                    <div>
+                        <h3 class="card-title"><i class="fa-solid fa-arrows-up-down"></i>Banc</h3>
+                        <p class="card-sub" ${convoked.length > targetConvoked ? 'style="color:#dc2626;font-weight:700"' : ''}>
+                            ${convoked.length} convoqué(s) / ${targetConvoked} · ${maxSubs} remplaçant(s)
+                        </p>
+                    </div>
+                    <div class="space-y-1.5">${benchHTML}</div>
+                </aside>
 
-        return;
+            </div>
+        </div>`;
     }
 
-    const match =
-        state.matches[state.selectedMatchId];
+    /* ---- Choix du joueur pour une position ---- */
 
-    if (!match.composition) {
-        match.composition = {};
+    let pickingSlot = null;
+
+    function openPlayerPicker(slot) {
+        const match = state.matches[state.selectedMatchId];
+        if (!match) return;
+        pickingSlot = slot;
+
+        const sub = document.getElementById('pick-player-slot');
+        if (sub) sub.textContent = getSlotLabel(slot);
+
+        renderPlayerPicker();
+        toggleModal('modal-pick-player', true);
     }
 
-    const players =
-        state.players.filter(
-            p =>
-                match.convocations?.[p.id] ===
-                'convoke'
-        );
-
-    const terrainPlayers =
-        players.filter(
-            p =>
-                match.composition[p.id]
-        );
-
-    const assignedPlayers =
-    Object.values(
-        match.slotAssignments || {}
-    );
-
-const benchPlayers =
-    sortByBenchOrder(
-        match,
-        players.filter(
-            p =>
-                !assignedPlayers.includes(
-                    p.id
-                )
-        )
-    );
-
-// Nombre de remplaçants autorisés sur la feuille (14 convoqués par défaut = 11 + 3)
-const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
-const maxSubsOnSheet = Math.max(0, targetConvoked - 11);
-
-    container.innerHTML = `
-
-        <div class="flex flex-wrap gap-2 mb-4">
-
-            <button
-                onclick="applyFormation('433')"
-                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-
-                4-3-3
-
-            </button>
-
-            <button
-                onclick="applyFormation('442')"
-                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-
-                4-4-2
-
-            </button>
-
-            <button
-                onclick="applyFormation('352')"
-                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-
-                3-5-2
-
-            </button>
-
-            <button onclick="applyFormation('4231')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    4-2-3-1
-</button>
-
-<button onclick="applyFormation('4141')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    4-1-4-1
-</button>
-
-<button onclick="applyFormation('451')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    4-5-1
-</button>
-
-<button onclick="applyFormation('343')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    3-4-3
-</button>
-
-<button onclick="applyFormation('532')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    5-3-2
-</button>
-
-<button onclick="applyFormation('541')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    5-4-1
-</button>
-
-<button onclick="applyFormation('4312')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    4-3-1-2
-</button>
-
-<button onclick="applyFormation('4222')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    4-2-2-2
-</button>
-
-            <button
-    onclick="resetComposition()"
-    class="px-3 py-2 bg-red-600 text-white rounded-lg text-xs font-bold">
-
-    🔄 Tout au banc
-
-</button>
-
-        </div>
-
-        <div class="grid lg:grid-cols-4 gap-4">
-
-            <div class="lg:col-span-3">
-
-                <div
-                    id="composition-terrain"
-                    ondragover="allowDrop(event)"
-                    ondrop="dropPlayer(event)"
-                    class="
-                    relative
-                    bg-green-600
-                    rounded-2xl
-                    min-h-[700px]
-                    overflow-hidden">
-
-                    <div class="absolute inset-4 border-2 border-white/60 rounded-xl"></div>
-
-                    <div class="absolute left-0 right-0 top-1/2 border-t border-white/40"></div>
-
-                   <div class="absolute left-1/2 top-1/2 w-24 h-24 border-2 border-white/40 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-
-${getFormationSlots(
-    match.currentFormation || "433"
-).map(pos => {
-
-    const playerId =
-        match.slotAssignments?.[pos.slot];
-
-    const player =
-        state.players.find(
-            p => p.id === playerId
-        );
-
-        const jersey =
-    player
-        ? (match.jerseys?.[player.id] || "")
-        : "";
-
-    return `
-
-        <div
-            onclick="assignPlayerToSlot('${pos.slot}')"
-
-            class="
-            absolute
-            border-2
-            border-dashed
-            border-white/70
-            bg-white/10
-            rounded-xl
-            px-3
-            py-2
-            text-xs
-            font-bold
-            text-white
-            cursor-pointer
-            -translate-x-1/2
-            -translate-y-1/2"
-
-            style="
-                left:${pos.x}%;
-                top:${pos.y}%;
-            ">
-
-          ${
-    player
-        ? `
-            <div class="flex flex-col items-center">
-
-                <div
-                    class="
-                    w-10 h-10
-                    rounded-full
-                    bg-white
-                    flex
-                    items-center
-                    justify-center
-                    shadow">
-
-                    <input
-                        type="number"
-                        min="1"
-                        max="99"
-                        value="${jersey || ""}"
-
-                        onchange="
-                            setMatchJersey(
-                                '${match.id}',
-                                '${player.id}',
-                                this.value
-                            )
-                        "
-
-                        class="
-                        w-8
-                        bg-transparent
-                        text-center
-                        text-green-700
-                        font-black
-                        text-sm
-                        outline-none">
-
-                </div>
-
-                <div
-                    class="
-                    text-[10px]
-                    leading-tight
-                    mt-1
-                    text-center">
-
-                    ${getFirstName(player)}
-
-                </div>
-
-            </div>
-          `
-        : pos.slot
-}
-        </div>
-
-    `;
-
-}).join('')}
-
-${terrainPlayers.map(player => {
-
-    const pos =
-        match.composition[player.id];
-
-    return `
-
-                            <div
-                                draggable="true" ondragstart="startDragPlayer(event,'${player.id}')"
-
-                                class="absolute bg-white rounded-xl shadow-lg cursor-grab px-3 py-2 text-center min-w-[110px] -translate-x-1/2 -translate-y-1/2"
-
-                                style="
-                                    left:${pos.x}%;
-                                    top:${pos.y}%;
-                                ">
-
-                                <div class="font-bold text-xs">
-                                    ${getFirstName(player)}
-                                </div>
-
-                                <div class="text-[10px] text-sky-700 font-semibold">
-                                    ${getPosteLabel(player.poste1)}
-                                </div>
-
-                                <button
-                                    onclick="removePlayerFromComposition('${player.id}')"
-                                    class="text-red-500 text-[10px] mt-1">
-
-                                    Retirer
-
-                                </button>
-
-                            </div>
-
-                        `;
-
-                    }).join('')}
-
-                </div>
-
-            </div>
-
-            <div>
-
-                <h3 class="font-bold mb-1">
-                    🔄 Banc
-                </h3>
-
-                <p class="text-[10px] mb-2 ${players.length > targetConvoked ? 'text-red-600 font-bold' : 'text-slate-500'}">
-                    ${players.length} convoqué(s) / ${targetConvoked} · ${maxSubsOnSheet} remplaçant(s) sur la feuille${players.length > targetConvoked ? ' · ⚠️ trop de convoqués' : ''}
-                </p>
-
-                <div class="space-y-2">
-
-                    ${benchPlayers.length > maxSubsOnSheet ? `<div class="flex items-center gap-2 pb-1">
-                        <span class="text-[10px] font-extrabold uppercase tracking-wide text-emerald-600">Sur la feuille (${maxSubsOnSheet})</span>
-                        <span class="flex-1 h-px bg-emerald-100"></span>
-                    </div>` : ''}
-
-                    ${benchPlayers.map((player, benchIdx) => {
-
-                        const horsFeuille = benchIdx >= maxSubsOnSheet;
-
-                        const divider = (benchIdx === maxSubsOnSheet && benchPlayers.length > maxSubsOnSheet)
-                            ? `<div class="flex items-center gap-2 pt-3 pb-1">
-                                   <span class="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Hors feuille de match</span>
-                                   <span class="flex-1 h-px bg-slate-200"></span>
-                               </div>`
-                            : '';
-
-                        return `${divider}
-
-                        <div class="flex items-center gap-1 ${horsFeuille ? 'opacity-60' : ''}">
-
-                            <span class="w-5 shrink-0 text-center text-[10px] font-extrabold ${horsFeuille ? 'text-slate-300' : 'text-slate-400'}" title="Position ${benchIdx + 1} sur le banc">${benchIdx + 1}</span>
-
-                            <button
-                                onclick="selectBenchPlayer('${player.id}')"
-
-                                class="flex-1 min-w-0 bg-white border rounded-xl p-3 text-left hover:bg-sky-50 ${horsFeuille ? 'border-dashed' : ''}">
-
-                                <span class="font-bold">${player.name}</span>
-
-                                <span class="ml-2 text-[10px] font-semibold ${horsFeuille ? 'text-slate-500 bg-slate-100' : 'text-sky-700 bg-sky-50'} px-1.5 py-0.5 rounded">
-                                    ${getPosteLabel(player.poste1)}
-                                </span>
-
-                            </button>
-
-                            <button
-                                onclick="moveCompositionBenchPlayer('${match.id}', '${player.id}', 'up')"
-                                ${benchIdx === 0 ? 'disabled' : ''}
-                                class="w-9 h-9 shrink-0 rounded-lg border border-slate-200 text-slate-600 flex items-center justify-center text-[13px] font-bold ${benchIdx === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
-                                aria-label="Monter ${player.name}" title="Monter">▲</button>
-
-                            <button
-                                onclick="moveCompositionBenchPlayer('${match.id}', '${player.id}', 'down')"
-                                ${benchIdx === benchPlayers.length - 1 ? 'disabled' : ''}
-                                class="w-9 h-9 shrink-0 rounded-lg border border-slate-200 text-slate-600 flex items-center justify-center text-[13px] font-bold ${benchIdx === benchPlayers.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
-                                aria-label="Descendre ${player.name}" title="Descendre">▼</button>
-
-                        </div>`;
-
-                    }).join('')}
-
-                </div>
-
-            </div>
-
-        </div>
-
-    `;
-}
+    function renderPlayerPicker() {
+        const match = state.matches[state.selectedMatchId];
+        if (!match || !pickingSlot) return;
+
+        const list = document.getElementById('pick-player-list');
+        const current = document.getElementById('pick-player-current');
+        const jerseys = computeMatchJerseys(match);
+        const teamHex = getTeamHex(match.team);
+
+        const assigned = match.slotAssignments || {};
+        const currentId = assigned[pickingSlot];
+        const takenIds = Object.values(assigned).filter(id => id !== currentId);
+
+        const currentPlayer = currentId ? state.players.find(p => p.id === currentId) : null;
+
+        const candidates = state.players
+            .filter(p => (match.convocations || {})[p.id] === 'convoke' && !takenIds.includes(p.id))
+            .sort((a, b) => {
+                const na = jerseys[a.id]?.number;
+                const nb = jerseys[b.id]?.number;
+                return (na == null ? 99 : na) - (nb == null ? 99 : nb);
+            });
+
+        if (current) {
+            current.innerHTML = currentPlayer ? `
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                    <div class="flex items-center gap-2">
+                        <span class="bench-num" style="background:${teamHex}">${jerseys[currentPlayer.id]?.number || '—'}</span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-bold text-[13px] text-slate-800 truncate">${formatPlayerName(currentPlayer)}</p>
+                            <p class="text-[11px] text-slate-500">${getPosteLabel(currentPlayer.poste1)}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <label class="flex-1">
+                            <span class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">Numéro de maillot</span>
+                            <input type="number" min="1" max="99" value="${jerseys[currentPlayer.id]?.number || ''}"
+                                   onchange="setSlotJersey('${currentPlayer.id}', this.value)"
+                                   class="w-full p-1.5 border border-slate-200 rounded-lg text-center font-bold text-sm bg-white">
+                        </label>
+                        <button onclick="setSlotJersey('${currentPlayer.id}', '')"
+                                class="px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-white"
+                                title="Revenir au numéro automatique">Auto</button>
+                        <button onclick="clearPlayerFromSlot()"
+                                class="px-2.5 py-2 rounded-lg border border-red-200 text-[11px] font-bold text-red-600 hover:bg-red-50">Retirer</button>
+                    </div>
+                </div>` : '';
+        }
+
+        if (list) {
+            list.innerHTML = candidates.length
+                ? candidates.map(p => {
+                    const jersey = jerseys[p.id] || {};
+                    return `
+                    <button type="button" class="pick-row" onclick="choosePlayerForSlot('${p.id}')">
+                        <span class="bench-num ${jersey.number ? '' : 'is-off'}" ${jersey.number ? 'style="background:' + teamHex + '"' : ''}>${jersey.number || '—'}</span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block font-bold text-[12.5px] text-slate-800 truncate">${formatPlayerName(p)}</span>
+                            <span class="block text-[10.5px] text-slate-500 truncate">${getPosteLabel(p.poste1)}</span>
+                        </span>
+                        ${p.id === currentId
+                            ? '<i class="fa-solid fa-check text-sky-600 text-xs" aria-hidden="true"></i>'
+                            : '<i class="fa-solid fa-plus text-slate-300 text-xs" aria-hidden="true"></i>'}
+                    </button>`;
+                }).join('')
+                : '<p class="text-xs text-slate-400 italic">Aucun joueur convoqué disponible.</p>';
+        }
+    }
+
+    function choosePlayerForSlot(playerId) {
+        const match = state.matches[state.selectedMatchId];
+        if (!match || !pickingSlot) return;
+
+        if (!match.slotAssignments) match.slotAssignments = {};
+        match.slotAssignments[pickingSlot] = playerId;
+
+        saveStateToFirebase();
+        toggleModal('modal-pick-player', false);
+        renderMatchComposition();
+    }
+
+    function clearPlayerFromSlot() {
+        const match = state.matches[state.selectedMatchId];
+        if (!match || !pickingSlot) return;
+
+        delete match.slotAssignments[pickingSlot];
+
+        saveStateToFirebase();
+        toggleModal('modal-pick-player', false);
+        renderMatchComposition();
+    }
+
+    function setSlotJersey(playerId, value) {
+        setMatchJersey(state.selectedMatchId, playerId, value);
+        renderMatchComposition();
+        renderPlayerPicker();
+    }
 
 function startDragPlayer(event, playerId) {
 
@@ -11140,42 +11378,23 @@ function applyFormation(system) {
     const match =
         state.matches[state.selectedMatchId];
 
-    if (!match.composition) {
-        match.composition = {};
+    // Une ancienne couche « composition libre » a existé : on la retire pour
+    // qu'il ne reste qu'un seul système de placement.
+    if (match.composition) {
+        delete match.composition;
     }
-
-    const playerIds =
-        Object.keys(match.composition);
-
-    const formation = getFormationSlots(system).map(pos => ({
-        x: pos.x,
-        y: pos.y
-    }));
-
-    if (!formation) {
-        return;
-    }
-
-    playerIds
-        .slice(0, 11)
-        .forEach((playerId, index) => {
-
-            match.composition[playerId] = {
-                x: formation[index].x,
-                y: formation[index].y
-            };
-
-        });
 
     match.currentFormation = system;
+
+    // Les joueurs dont la place n'existe plus dans le nouveau système
+    // repartent automatiquement sur le banc.
+    pruneSlotAssignments(match);
 
     saveStateToFirebase();
 
     renderMatchComposition();
 
-    showToast(
-        `Système ${system} appliqué`
-    );
+    showToast(`Système ${FORMATIONS.find(f => f.key === system)?.label || system} appliqué`);
 }
 
 function getFormationSlots(system = "433") {
@@ -11188,9 +11407,10 @@ function getFormationSlots(system = "433") {
             { slot:"DC2", x:62, y:72 },
             { slot:"DD", x:85, y:72 },
 
-            { slot:"MC1", x:25, y:50 },
-            { slot:"MC2", x:50, y:45 },
-            { slot:"MC3", x:75, y:50 },
+            // Milieu à 3 : 6 en sentinelle, 8 en relayeur, 10 en meneur (le plus haut)
+            { slot:"MC1", x:30, y:53 },
+            { slot:"MC3", x:70, y:47 },
+            { slot:"MC2", x:50, y:32 },
 
             { slot:"AG", x:20, y:18 },
             { slot:"BU", x:50, y:10 },

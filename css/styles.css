@@ -537,6 +537,231 @@ body {
 .a4-sheet { width:297mm; min-height:210mm; background:#fff; color:#000; box-shadow:0 12px 48px rgba(0,0,0,.4); margin:4px auto 48px; padding:7mm 8mm 9mm; border-radius:2px; }
 
 /* ============================================================
+   TERRAIN DE COMPOSITION
+   ============================================================ */
+.pitch-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 68 / 105;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #2f9e44;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 14px 34px -22px rgba(15, 23, 42, .6);
+    touch-action: manipulation;
+    isolation: isolate;
+}
+
+/* Léger vignettage : le terrain se détache du cadre */
+.pitch-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 45%, rgba(0, 0, 0, 0) 55%, rgba(5, 46, 22, .28) 100%);
+    z-index: 1;
+}
+
+@media (min-width: 768px) {
+    .pitch-wrap { aspect-ratio: 105 / 68; }
+}
+
+.pitch-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Un joueur (ou une place libre) sur le terrain */
+.pitch-slot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    left: var(--px);
+    top: var(--py);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: 76px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: #fff;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .12s ease;
+}
+
+@media (min-width: 768px) {
+    .pitch-slot {
+        left: var(--lx);
+        top: var(--ly);
+        width: 96px;
+    }
+}
+
+.pitch-slot:active {
+    transform: translate(-50%, -50%) scale(.94);
+}
+
+.jersey-box {
+    position: relative;
+    width: 40px;
+    height: 40px;
+}
+
+@media (min-width: 768px) {
+    .jersey-box { width: 52px; height: 52px; }
+}
+
+.jersey-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .35));
+}
+
+.jersey-num {
+    position: absolute;
+    left: 50%;
+    top: 58%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .55);
+}
+
+@media (min-width: 768px) {
+    .jersey-num { font-size: 17px; }
+}
+
+.jersey-dup {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: #dc2626;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #fff;
+}
+
+.pitch-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-width: 110px;
+    margin-top: 1px;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: rgba(6, 32, 17, .55);
+    backdrop-filter: blur(1px);
+    font-size: 9px;
+    line-height: 1.15;
+    font-weight: 800;
+    text-align: center;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+}
+
+@media (min-width: 768px) {
+    /* Sur PC le terrain est large : le nom peut sortir de la largeur de la zone
+       de clic pour s'afficher en entier. */
+    .pitch-name { font-size: 10px; width: max-content; max-width: 132px; -webkit-line-clamp: 2; }
+}
+
+/* Les joueurs et la couche décorative au-dessus du vignettage */
+.pitch-slot, .pitch-svg { z-index: 2; }
+
+.slot-empty {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 2px dashed rgba(255, 255, 255, .6);
+    background: rgba(255, 255, 255, .14);
+    color: rgba(255, 255, 255, .95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+}
+
+@media (min-width: 768px) {
+    .slot-empty { width: 40px; height: 40px; }
+}
+
+/* Barre des formations */
+.formation-btn {
+    padding: 6px 10px;
+    border-radius: 9px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #334155;
+    font-size: 11.5px;
+    font-weight: 800;
+    transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+
+.formation-btn:hover:not(.is-active) {
+    border-color: #7dd3fc;
+    color: #0369a1;
+}
+
+.formation-btn.is-active {
+    background: #0284c7;
+    border-color: #0284c7;
+    color: #fff;
+}
+
+/* Numéro du banc */
+.bench-num {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #fff;
+}
+
+.bench-num.is-off {
+    background: #e2e8f0;
+    color: #94a3b8;
+}
+
+/* Ligne de choix d'un joueur (modale) */
+.pick-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    text-align: left;
+    transition: border-color .15s ease, background .15s ease;
+}
+
+.pick-row:hover {
+    border-color: #7dd3fc;
+    background: #f0f9ff;
+}
+
+/* ============================================================
    SOCLE VISUEL — jetons, typographie, cartes
    ============================================================ */
 :root {
