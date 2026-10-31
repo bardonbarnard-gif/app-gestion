@@ -455,6 +455,7 @@ if (
     state.selectedMatchId = null;
 } 
 
+                applyPlayerNameDisplay();
                 renderSection(activeSection);
                 maybeAutoSyncFFF();
             } catch(err) {
@@ -467,7 +468,7 @@ function saveStateToFirebase() {
     recalculateGlobalStats();
 
  const dataToSave = {
-    players: state.players,
+    players: getPlayersForStorage(),
     matches: state.matches,
     trainings: state.trainings,
     cards: state.cards,
@@ -509,6 +510,7 @@ db.ref('rangueil_data').update(dataToSave);
         window.logoutUser = logoutUser;
 
         function renderAll() {
+            applyPlayerNameDisplay();
             renderDashboard();
             renderTeamFilters();
             renderEffectif();
@@ -736,7 +738,7 @@ return colorMap[colorName] || colorMap.slate;
         }
     }
 
-    ['dashboard', 'effectif', 'matchs', 'entrainements', 'calendrier','staff','admin'].forEach(t => {
+    ['dashboard', 'dashboard-cards', 'dashboard-bilan', 'effectif', 'matchs', 'entrainements', 'calendrier','staff','admin'].forEach(t => {
                 const sec = document.getElementById(`sec-${t}`);
                 if(sec) sec.classList.add('hidden');
                 const btn = document.getElementById(`tab-${t}`);
@@ -824,6 +826,108 @@ if (subTabId === 'composition') {
             return [p1, p2, p3].filter(x => x && x !== '-');
         }
 
+        // --- Ordre d'affichage des noms (Prénom avant Nom) ---
+        // Le nom reste stocké au format « NOM Prénom » : seul l'affichage change.
+        function splitPlayerName(rawName) {
+            const name = String(rawName || '').trim().replace(/\s+/g, ' ');
+            if (!name) return { prenom: '', nom: '' };
+
+            const words = name.split(' ');
+            let cut = 0;
+            // Le nom s'arrête au premier mot qui n'est pas entièrement en majuscules
+            while (cut < words.length && words[cut] === words[cut].toUpperCase() && /\p{Lu}/u.test(words[cut])) cut++;
+
+            if (cut === 0) {
+                if (words.length === 1) return { prenom: name, nom: '' };
+                return { prenom: words.slice(0, -1).join(' '), nom: words[words.length - 1] };
+            }
+            if (cut >= words.length) return { prenom: '', nom: name };
+            return { prenom: words.slice(cut).join(' '), nom: words.slice(0, cut).join(' ') };
+        }
+
+        function getPlayerNameParts(p) {
+            if (!p) return { prenom: '', nom: '' };
+            const prenom = String(p.prenom || '').trim();
+            const nom = String(p.nom || '').trim();
+            if (prenom || nom) return { prenom, nom };
+            return splitPlayerName(p.nameCanonical || p.name || '');
+        }
+
+        function isFirstNameFirst(teamKey) {
+            const key = String(teamKey || '').trim();
+            if (!key) return false;
+            const team = state.teams?.[key] || state.teams?.[key.toLowerCase()];
+            return !!(team && team.nameOrder === 'first');
+        }
+
+        function formatPlayerName(p) {
+            if (!p) return '';
+            const { prenom, nom } = getPlayerNameParts(p);
+            if (!prenom && !nom) return p.nameCanonical || p.name || '';
+            const firstFirst = isFirstNameFirst(p.team || p.cat);
+            return firstFirst
+                ? [prenom, nom].filter(Boolean).join(' ')
+                : [nom, prenom].filter(Boolean).join(' ');
+        }
+
+        // Nom affiché sur le terrain : prénom usuel (champ « Prénom usuel » de la fiche),
+        // sinon le prénom, sinon le nom complet
+        function getPitchDisplayName(p) {
+            if (!p) return '';
+            const nick = String(p.nickname || '').trim();
+            if (nick) return nick;
+            const { prenom } = getPlayerNameParts(p);
+            if (prenom) return prenom;
+            return formatPlayerName(p);
+        }
+
+        // Recalcule le nom affiché sans toucher au nom de stockage
+        function applyPlayerNameDisplay() {
+            (state.players || []).forEach(p => {
+                if (!p) return;
+                if (typeof p.nameCanonical !== 'string' || !p.nameCanonical) {
+                    p.nameCanonical = p.name || '';
+                }
+                p.name = formatPlayerName(p);
+            });
+        }
+
+        // À l'enregistrement, on réécrit le nom canonique « NOM Prénom »
+        function getPlayersForStorage() {
+            return (state.players || []).map(p => {
+                const copy = { ...p };
+                if (copy.nameCanonical) copy.name = copy.nameCanonical;
+                delete copy.nameCanonical;
+                return copy;
+            });
+        }
+
+        // Garde les joueurs groupés par équipe, en triant par prénom là où l'option est active
+        function sortPlayersForDisplay(players) {
+            const groups = new Map();
+            const order = [];
+
+            (players || []).forEach(p => {
+                const key = String(p.team || p.cat || '').toLowerCase();
+                if (!groups.has(key)) {
+                    groups.set(key, []);
+                    order.push(key);
+                }
+                groups.get(key).push(p);
+            });
+
+            const result = [];
+            order.forEach(key => {
+                const list = groups.get(key);
+                if (isFirstNameFirst(key)) {
+                    list.sort((a, b) => formatPlayerName(a).localeCompare(formatPlayerName(b), 'fr', { sensitivity: 'base' }));
+                }
+                result.push(...list);
+            });
+
+            return result;
+        }
+
         function getTotalTeamCards() {
             let yellows = 0, reds = 0;
             if (state.cards) {
@@ -847,6 +951,810 @@ if (subTabId === 'composition') {
             }
             return { yellows, reds };
         }
+
+        // --- Discipline : 3 cartons jaunes sur 3 mois glissants = suspension du match suivant ---
+        const CARD_SUSPENSION_THRESHOLD = 3;
+        const CARD_WINDOW_MONTHS = 3;
+
+        // Toujours à minuit local : une date de carton et une date de match doivent
+        // être comparées au jour près, sinon le match du jour du carton passe pour le suivant.
+        function parseCardMatchDate(value) {
+            if (!value) return null;
+            const parts = String(value).split('-');
+            if (parts.length < 3) return null;
+            const y = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10);
+            const d = parseInt(parts[2], 10);
+            if (!y || !m || !d) return null;
+            const date = new Date(y, m - 1, d);
+            return isNaN(date.getTime()) ? null : date;
+        }
+
+        function atStartOfDay(date) {
+            return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        }
+
+        function addDaysToDate(date, days) {
+            const d = atStartOfDay(date);
+            d.setDate(d.getDate() + days);
+            return d;
+        }
+
+        // Ajoute des mois en bloquant le jour sur la fin du mois cible (31/11 + 3 mois → 28/02)
+        function addMonthsClamped(date, months) {
+            const d = atStartOfDay(date);
+            const day = d.getDate();
+            d.setDate(1);
+            d.setMonth(d.getMonth() + months);
+            const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+            d.setDate(Math.min(day, lastDay));
+            return d;
+        }
+
+        function formatCardDate(date) {
+            return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        function shortCardDate(date) {
+            return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        // Seuls le championnat et la coupe comptent pour la suspension (pas les amicaux)
+        function isSuspensionMatch(match) {
+            const type = ((match && match.type) || '').toLowerCase();
+            return type === 'championnat' || type === 'coupe';
+        }
+
+        function getCardsByPlayerIndex() {
+            const index = new Map();
+
+            Object.entries(state.cards || {}).forEach(([matchId, matchCards]) => {
+                if (!matchCards) return;
+                const match = state.matches ? state.matches[matchId] : null;
+                const date = match ? parseCardMatchDate(match.date) : null;
+
+                Object.entries(matchCards).forEach(([playerId, cardType]) => {
+                    if (cardType !== 'yellow' && cardType !== 'red') return;
+                    if (!index.has(playerId)) index.set(playerId, []);
+                    index.get(playerId).push({
+                        type: cardType,
+                        matchId,
+                        date,
+                        team: match ? (match.team || '') : '',
+                        opponent: match ? (match.opponent || '') : '',
+                        official: isSuspensionMatch(match)
+                    });
+                });
+            });
+
+            return index;
+        }
+
+        // Prochain match officiel de l'équipe, strictement après la date du 3e jaune
+        function getNextOfficialMatchForTeam(team, afterDate) {
+            if (!team) return null;
+            const teamKey = team.toLowerCase();
+            let best = null;
+
+            Object.values(state.matches || {}).forEach(match => {
+                if (!match || !isSuspensionMatch(match)) return;
+                if ((match.team || '').toLowerCase() !== teamKey) return;
+                const date = parseCardMatchDate(match.date);
+                if (!date || date <= afterDate) return;
+                if (!best || date < best.date) {
+                    best = { date, opponent: match.opponent || '', type: match.type || '', id: match.id };
+                }
+            });
+
+            return best;
+        }
+
+        // À chaque carton, on regarde les 3 mois qui précèdent :
+        // au 3e jaune la suspension tombe sur le match officiel suivant et le compteur repart à zéro.
+        function computePlayerDiscipline(playerId, cardsIndex, referenceDate) {
+            const today = atStartOfDay(referenceDate || new Date());
+            const index = cardsIndex || getCardsByPlayerIndex();
+            const entries = (index.get(playerId) || []).filter(e => e.official && e.date);
+
+            const yellowEvents = entries
+                .filter(e => e.type === 'yellow')
+                .sort((a, b) => a.date - b.date);
+
+            const redCards = entries
+                .filter(e => e.type === 'red' && today <= addMonthsClamped(e.date, CARD_WINDOW_MONTHS))
+                .sort((a, b) => b.date - a.date);
+
+            let counted = [];
+            let lastSuspension = null;
+
+            yellowEvents.forEach(event => {
+                const windowStart = addMonthsClamped(event.date, -CARD_WINDOW_MONTHS);
+                counted = counted.filter(card => card.date >= windowStart);
+                counted.push(event);
+
+                if (counted.length >= CARD_SUSPENSION_THRESHOLD) {
+                    lastSuspension = {
+                        trigger: event,
+                        target: getNextOfficialMatchForTeam(event.team, event.date)
+                    };
+                    // Les 3 cartons sont consommés par la suspension
+                    counted = [];
+                }
+            });
+
+            // Cartons encore actifs aujourd'hui (le carton sort le lendemain de son anniversaire 3 mois)
+            const activeCards = counted
+                .filter(card => today <= addMonthsClamped(card.date, CARD_WINDOW_MONTHS))
+                .sort((a, b) => a.date - b.date);
+
+            let suspension = null;
+            if (lastSuspension) {
+                const target = lastSuspension.target;
+                if (!target) {
+                    suspension = { pendingCalendar: true, trigger: lastSuspension.trigger, target: null };
+                } else if (target.date >= today) {
+                    suspension = { pendingCalendar: false, trigger: lastSuspension.trigger, target };
+                }
+            }
+
+            const oldestActive = activeCards[0] || null;
+
+            return {
+                activeCards,
+                count: activeCards.length,
+                suspension,
+                redCards,
+                atRisk: !suspension && activeCards.length >= CARD_SUSPENSION_THRESHOLD - 1,
+                expiresOn: oldestActive ? addMonthsClamped(oldestActive.date, CARD_WINDOW_MONTHS) : null
+            };
+        }
+
+        function disciplineGaugeHTML(count, tone) {
+            const capped = Math.min(count, CARD_SUSPENSION_THRESHOLD);
+            const onClass = tone === 'danger' ? 'bg-red-600' : tone === 'warning' ? 'bg-orange-500' : 'bg-slate-400';
+            return [0, 1, 2].map(i =>
+                `<span class="inline-block w-2 h-2 rounded-full ${i < capped ? onClass : 'bg-slate-200'}"></span>`
+            ).join('');
+        }
+
+        // Repère compact affiché dans les listes (convocations, banc)
+        function renderDisciplineChip(disc, short) {
+            if (!disc) return '';
+
+            if (disc.suspension) {
+                const target = disc.suspension.target;
+                const title = disc.suspension.pendingCalendar || !target
+                    ? 'Suspendu : aucun match à venir programmé'
+                    : `Suspendu pour le match du ${formatCardDate(target.date)}${target.opponent ? ' vs ' + target.opponent : ''}`;
+                return short
+                    ? `<span class="ml-1 align-middle text-[10px]" title="${title}">🚫</span>`
+                    : `<span class="ml-1 inline-flex items-center align-middle px-1.5 py-0.5 rounded border border-red-200 bg-red-100 text-red-800 text-[9px] font-extrabold uppercase" title="${title}">🚫 Suspendu</span>`;
+            }
+
+            if (disc.redCards.length > 0) {
+                const last = disc.redCards[0];
+                const title = `Carton rouge le ${formatCardDate(last.date)}${last.opponent ? ' (' + last.opponent + ')' : ''} — durée de suspension fixée par la commission`;
+                return short
+                    ? `<span class="ml-1 align-middle text-[10px]" title="${title}">🟥</span>`
+                    : `<span class="ml-1 inline-flex items-center align-middle px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-700 text-[9px] font-extrabold uppercase" title="${title}">🟥 À vérifier</span>`;
+            }
+
+            if (disc.atRisk) {
+                const dates = disc.activeCards.map(c => `${shortCardDate(c.date)} ${c.opponent}`).join(', ');
+                const title = `${disc.count} jaune(s) sur 3 mois${dates ? ' — ' + dates : ''} — un 3e jaune = suspension du match suivant`;
+                return short
+                    ? `<span class="ml-1 align-middle text-[10px]" title="${title}">⚠️ ${disc.count}/3</span>`
+                    : `<span class="ml-1 inline-flex items-center align-middle px-1.5 py-0.5 rounded border border-orange-200 bg-orange-100 text-orange-800 text-[9px] font-extrabold uppercase" title="${title}">⚠️ ${disc.count}/3</span>`;
+            }
+
+            return '';
+        }
+
+        // --- Vue détaillée des cartons (depuis la carte du tableau de bord) ---
+        // Périmètre identique au compteur du tableau de bord :
+        //  - coach : uniquement les cartons de ses matchs
+        //  - autres rôles : tous les matchs (comme getTotalTeamCards)
+        function getDashboardCardsLeaderboard() {
+            const role = window.currentUserRole || 'public';
+            const userTeam = (window.currentUserTeam || 'all').toLowerCase();
+            const coachMode = role === 'coach';
+
+            const playersById = new Map(state.players.map(p => [p.id, p]));
+            const totals = new Map();
+
+            Object.entries(state.cards || {}).forEach(([matchId, matchCards]) => {
+                if (!matchCards) return;
+
+                if (coachMode) {
+                    const match = state.matches[matchId];
+                    if (!match) return;
+                    if ((match.team || '').toLowerCase() !== userTeam) return;
+                }
+
+                Object.entries(matchCards).forEach(([playerId, cardType]) => {
+                    if (cardType !== 'yellow' && cardType !== 'red') return;
+
+                    if (!totals.has(playerId)) {
+                        totals.set(playerId, { yellows: 0, reds: 0 });
+                    }
+
+                    const counts = totals.get(playerId);
+                    if (cardType === 'yellow') counts.yellows++;
+                    else counts.reds++;
+                });
+            });
+
+            const rows = [...totals.entries()].map(([playerId, counts]) => {
+                const player = playersById.get(playerId);
+                return {
+                    id: playerId,
+                    name: player ? player.name : 'Joueur supprimé',
+                    deleted: !player,
+                    team: player ? (player.team || player.cat || '') : '',
+                    yellows: counts.yellows,
+                    reds: counts.reds,
+                    total: counts.yellows + counts.reds
+                };
+            });
+
+            // Du plus sanctionné au moins sanctionné, puis les rouges d'abord à égalité
+            rows.sort((a, b) => {
+                if (b.total !== a.total) return b.total - a.total;
+                if (b.reds !== a.reds) return b.reds - a.reds;
+                return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+            });
+
+            // Les totaux sont la somme exacte de la liste : cohérence garantie avec la carte
+            const yellows = rows.reduce((sum, r) => sum + r.yellows, 0);
+            const reds = rows.reduce((sum, r) => sum + r.reds, 0);
+
+            return { rows, yellows, reds };
+        }
+
+        function renderDisciplineAlertHTML(row, kind) {
+            const d = row.discipline;
+            const today = atStartOfDay(new Date());
+            const gauge = kind === 'suspended'
+                ? disciplineGaugeHTML(CARD_SUSPENSION_THRESHOLD, 'danger')
+                : kind === 'risk'
+                    ? disciplineGaugeHTML(d.count, 'warning')
+                    : disciplineGaugeHTML(CARD_SUSPENSION_THRESHOLD, 'danger');
+
+            const countLabel = kind === 'suspended'
+                ? '<span class="text-[10px] font-extrabold text-red-700">3/3</span>'
+                : kind === 'risk'
+                    ? `<span class="text-[10px] font-extrabold text-orange-700">${d.count}/3</span>`
+                    : '<span class="text-[10px] font-extrabold text-red-700">🟥</span>';
+
+            let body = '';
+
+            if (kind === 'suspended') {
+                const target = d.suspension.target;
+                const when = d.suspension.pendingCalendar || !target
+                    ? 'Aucun match à venir programmé : suspension en attente de calendrier'
+                    : `Absent du match du ${formatCardDate(target.date)}${target.opponent ? ' vs ' + target.opponent : ''}`;
+                body = `<p class="text-[11px] font-bold text-red-700">${when}</p>
+                        <p class="text-[10px] text-slate-500">3e jaune le ${formatCardDate(d.suspension.trigger.date)} · compteur remis à zéro après ce match</p>`;
+            } else if (kind === 'risk') {
+                // Un 3e jaune tomberait sur le prochain match : la suspension viserait celui d'après
+                const team = row.team || '';
+                const upcoming = getNextOfficialMatchForTeam(team, addDaysToDate(today, -1));
+                const afterNext = upcoming ? getNextOfficialMatchForTeam(team, upcoming.date) : null;
+
+                let consequence;
+                if (upcoming && afterNext) {
+                    consequence = `Un 3e jaune le ${formatCardDate(upcoming.date)} (${upcoming.opponent}) = absent le ${formatCardDate(afterNext.date)} (${afterNext.opponent})`;
+                } else if (upcoming) {
+                    consequence = `Un 3e jaune le ${formatCardDate(upcoming.date)} = absent du match suivant`;
+                } else {
+                    consequence = 'Un 3e jaune = absent du match suivant (aucun match programmé)';
+                }
+
+                body = `<p class="text-[11px] text-slate-600">${d.activeCards.map(c => `${shortCardDate(c.date)} ${c.opponent}`).join(' · ')}</p>
+                        <p class="text-[11px] font-bold text-orange-700">${consequence}</p>
+                        ${d.expiresOn ? `<p class="text-[10px] text-slate-500">Le 1er carton sort des comptes le ${formatCardDate(addDaysToDate(d.expiresOn, 1))}</p>` : ''}`;
+            } else {
+                const last = d.redCards[0];
+                body = `<p class="text-[11px] text-slate-600">Rouge le ${formatCardDate(last.date)}${last.opponent ? ' (' + last.opponent + ')' : ''}</p>
+                        <p class="text-[11px] font-bold text-red-700">Durée de suspension fixée par la commission</p>`;
+            }
+
+            const borderClass = kind === 'suspended' ? 'border-red-200' : kind === 'risk' ? 'border-orange-200' : 'border-slate-200';
+
+            return `<div class="bg-white rounded-lg border ${borderClass} p-2.5 space-y-1">
+                <div class="flex items-center justify-between gap-2">
+                    <p class="font-bold text-xs text-slate-800 truncate">${row.name}</p>
+                    <span class="shrink-0 inline-flex items-center gap-1">${gauge}${countLabel}</span>
+                </div>
+                ${body}
+            </div>`;
+        }
+
+        function renderDashboardCards() {
+            const listEl = document.getElementById('dashboard-cards-list');
+            if (!listEl) return;
+
+            const { rows, yellows, reds } = getDashboardCardsLeaderboard();
+            const total = yellows + reds;
+
+            const cardsIndex = getCardsByPlayerIndex();
+            rows.forEach(row => {
+                row.discipline = computePlayerDiscipline(row.id, cardsIndex);
+            });
+
+            const suspendedRows = rows.filter(r => r.discipline.suspension);
+            const atRiskRows = rows.filter(r => r.discipline.atRisk && !r.discipline.suspension);
+            const redRows = rows.filter(r => r.discipline.redCards.length > 0 && !r.discipline.suspension);
+
+            const totalEl = document.getElementById('dashboard-cards-total');
+            if (totalEl) totalEl.innerText = total;
+
+            const detailEl = document.getElementById('dashboard-cards-detail');
+            if (detailEl) detailEl.innerHTML = `${yellows} 🟨 · ${reds} 🟥`;
+
+            const subtitleEl = document.getElementById('dashboard-cards-subtitle');
+            if (subtitleEl) {
+                if (rows.length === 0) {
+                    subtitleEl.innerText = 'Aucun joueur sanctionné';
+                } else {
+                    const parts = [`${rows.length} joueur${rows.length > 1 ? 's' : ''} sanctionné${rows.length > 1 ? 's' : ''}`];
+                    if (suspendedRows.length) parts.push(`${suspendedRows.length} suspendu${suspendedRows.length > 1 ? 's' : ''}`);
+                    if (atRiskRows.length) parts.push(`${atRiskRows.length} sous la menace`);
+                    subtitleEl.innerText = parts.join(' · ');
+                }
+            }
+
+            // Bandeau d'alerte : suspendus, joueurs à 2/3, rouges à vérifier
+            const alertsEl = document.getElementById('dashboard-cards-alerts');
+            if (alertsEl) {
+                const blocks = [];
+
+                if (suspendedRows.length) {
+                    blocks.push(`
+                        <div class="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2">
+                            <p class="text-[10px] font-extrabold uppercase tracking-wider text-red-700"><i class="fa-solid fa-ban mr-1" aria-hidden="true"></i>Suspendu${suspendedRows.length > 1 ? 's' : ''} pour le prochain match</p>
+                            ${suspendedRows.map(r => renderDisciplineAlertHTML(r, 'suspended')).join('')}
+                        </div>`);
+                }
+
+                if (atRiskRows.length) {
+                    blocks.push(`
+                        <div class="rounded-xl border border-orange-200 bg-orange-50 p-3 space-y-2">
+                            <p class="text-[10px] font-extrabold uppercase tracking-wider text-orange-700"><i class="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true"></i>Sous la menace · 2 jaunes sur 3</p>
+                            ${atRiskRows.map(r => renderDisciplineAlertHTML(r, 'risk')).join('')}
+                        </div>`);
+                }
+
+                if (redRows.length) {
+                    blocks.push(`
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                            <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-600"><i class="fa-solid fa-square text-red-600 mr-1" aria-hidden="true"></i>Cartons rouges à vérifier</p>
+                            ${redRows.map(r => renderDisciplineAlertHTML(r, 'red')).join('')}
+                        </div>`);
+                }
+
+                alertsEl.innerHTML = blocks.join('');
+            }
+
+            if (rows.length === 0) {
+                listEl.innerHTML = `
+                    <div class="p-6 text-center">
+                        <i class="fa-solid fa-square-check text-emerald-500 text-2xl" aria-hidden="true"></i>
+                        <p class="mt-2 text-xs font-bold text-slate-700">Aucun carton enregistré</p>
+                        <p class="mt-1 text-[11px] text-slate-500">Les cartons saisis dans le bilan d'un match apparaîtront ici.</p>
+                    </div>`;
+                return;
+            }
+
+            listEl.innerHTML = rows.map((r, i) => {
+                const d = r.discipline;
+                const distinctCards = [
+                    r.yellows > 0 ? `<span class="text-amber-600">${r.yellows}🟨</span>` : '',
+                    r.reds > 0 ? `<span class="text-red-600">${r.reds}🟥</span>` : ''
+                ].filter(Boolean).join(' ');
+
+                const tone = d.suspension ? 'danger' : d.atRisk ? 'warning' : 'neutral';
+                const rankClass = d.suspension ? 'bg-red-600' : d.atRisk ? 'bg-orange-500' : 'bg-slate-700';
+                const countClass = d.suspension ? 'text-red-700' : d.atRisk ? 'text-orange-700' : 'text-slate-500';
+                const gaugeCount = d.suspension ? CARD_SUSPENSION_THRESHOLD : d.count;
+                const teamLabel = r.team ? `<span class="uppercase">${r.team}</span>` : '';
+                const datesLine = d.activeCards.length
+                    ? d.activeCards.map(c => `${shortCardDate(c.date)} ${c.opponent}`).join(' · ')
+                    : '';
+
+                return `
+                    <div class="flex items-center justify-between gap-2 px-3 py-2.5 ${d.suspension ? 'bg-red-50' : ''}">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="w-6 h-6 shrink-0 rounded-full ${rankClass} text-white text-[11px] font-extrabold flex items-center justify-center" title="Rang ${i + 1}">${i + 1}</span>
+                            <div class="min-w-0">
+                                <p class="font-bold text-xs truncate ${r.deleted ? 'text-slate-400 italic' : 'text-slate-800'}">${r.name}</p>
+                                <p class="text-[10px] text-slate-400">${distinctCards}${teamLabel ? ' · ' + teamLabel : ''}</p>
+                                ${datesLine ? `<p class="text-[10px] text-slate-500">${datesLine}</p>` : ''}
+                            </div>
+                        </div>
+                        <div class="shrink-0 text-right space-y-0.5">
+                            <div class="flex items-center justify-end gap-1">
+                                ${disciplineGaugeHTML(gaugeCount, tone)}
+                                <span class="text-[10px] font-extrabold ${countClass}">${gaugeCount}/3</span>
+                            </div>
+                            <p class="text-[10px] font-bold text-slate-400">${r.total} au total</p>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function openDashboardCards() {
+            renderDashboardCards();
+
+            const dashboardSec = document.getElementById('sec-dashboard');
+            const cardsSec = document.getElementById('sec-dashboard-cards');
+
+            if (dashboardSec) dashboardSec.classList.add('hidden');
+            if (!cardsSec) return;
+
+            cardsSec.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function closeDashboardCards() {
+            const dashboardSec = document.getElementById('sec-dashboard');
+            const cardsSec = document.getElementById('sec-dashboard-cards');
+
+            if (cardsSec) cardsSec.classList.add('hidden');
+            if (dashboardSec) dashboardSec.classList.remove('hidden');
+
+            renderDashboard();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.openDashboardCards = openDashboardCards;
+        window.closeDashboardCards = closeDashboardCards;
+
+        // --- Écran Bilan (depuis la tuile V-N-D du tableau de bord) ---
+        const BILAN_COMPETITIONS = ['Championnat', 'Coupe', 'Amical'];
+        // null = pas encore choisi : l'écran s'ouvrira sur l'équipe par défaut
+        let bilanTeamFilter = null;
+        let bilanFilterOwner = null;
+
+        const BILAN_RESULT_STYLE = {
+            V: { soft: 'bg-emerald-100 text-emerald-700', text: 'text-emerald-600', bar: 'bg-emerald-500' },
+            N: { soft: 'bg-slate-200 text-slate-700', text: 'text-slate-600', bar: 'bg-slate-400' },
+            D: { soft: 'bg-red-100 text-red-700', text: 'text-red-600', bar: 'bg-red-500' }
+        };
+
+        function normalizeBilanType(type) {
+            const t = (type || '').toLowerCase();
+            if (t === 'championnat') return 'Championnat';
+            if (t === 'coupe') return 'Coupe';
+            if (t === 'amical') return 'Amical';
+            return 'Autre';
+        }
+
+        function isMatchPlayed(match) {
+            if (!match) return false;
+            const h = match.scoreHome;
+            const a = match.scoreAway;
+            if (h === undefined || h === null || h === '' || a === undefined || a === null || a === '') return false;
+            return !isNaN(parseInt(h)) && !isNaN(parseInt(a));
+        }
+
+        // scoreHome = buts de notre équipe, scoreAway = buts de l'adversaire
+        function computeBilanStats(matches) {
+            const played = (matches || [])
+                .filter(isMatchPlayed)
+                .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+
+            let wins = 0, draws = 0, losses = 0, goalsFor = 0, goalsAgainst = 0;
+
+            const results = played.map(match => {
+                const scored = parseInt(match.scoreHome);
+                const conceded = parseInt(match.scoreAway);
+                goalsFor += scored;
+                goalsAgainst += conceded;
+
+                const result = scored > conceded ? 'V' : scored === conceded ? 'N' : 'D';
+                if (result === 'V') wins++;
+                else if (result === 'N') draws++;
+                else losses++;
+
+                return { match, result, scored, conceded };
+            });
+
+            const count = played.length;
+
+            return {
+                played: count,
+                results,
+                wins, draws, losses,
+                goalsFor, goalsAgainst,
+                diff: goalsFor - goalsAgainst,
+                winPct: count ? Math.round((wins / count) * 100) : null,
+                avgFor: count ? goalsFor / count : null,
+                avgAgainst: count ? goalsAgainst / count : null,
+                streak: results.slice(-5).map(r => r.result)
+            };
+        }
+
+        function formatOneDecimal(value) {
+            if (value === null || value === undefined) return '—';
+            return value.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        }
+
+        function formatDiff(value) {
+            return value > 0 ? '+' + value : String(value);
+        }
+
+        // Uniquement les équipes qui ont réellement des matchs en base
+        function getBilanTeamOptions() {
+            const keys = new Set();
+            Object.values(state.matches || {}).forEach(m => { if (m && m.team) keys.add(m.team); });
+            return [...keys].sort((a, b) => getBilanTeamLabel(a).localeCompare(getBilanTeamLabel(b), 'fr'));
+        }
+
+        function getBilanTeamLabel(teamKey) {
+            return state.teams?.[teamKey]?.name || String(teamKey || '').toUpperCase();
+        }
+
+        // Équipe affichée à l'ouverture : celle du compte, sinon la plus active
+        function getDefaultBilanTeam() {
+            const options = getBilanTeamOptions();
+            const userTeam = window.currentUserTeam;
+
+            if (userTeam && userTeam !== 'all' && options.includes(userTeam)) return userTeam;
+
+            let best = 'all';
+            let bestPlayed = 0;
+            options.forEach(team => {
+                const played = Object.values(state.matches || {})
+                    .filter(m => (m.team || '') === team && isMatchPlayed(m)).length;
+                if (played > bestPlayed) {
+                    bestPlayed = played;
+                    best = team;
+                }
+            });
+
+            return best;
+        }
+
+        function bilanBarHTML(stats) {
+            if (!stats.played) return '<div class="h-2 rounded-full bg-slate-100"></div>';
+            const width = (n) => Math.round((n / stats.played) * 100);
+            return `<div class="h-2 rounded-full overflow-hidden flex bg-slate-100">
+                ${stats.wins ? `<span class="${BILAN_RESULT_STYLE.V.bar}" style="width:${width(stats.wins)}%"></span>` : ''}
+                ${stats.draws ? `<span class="${BILAN_RESULT_STYLE.N.bar}" style="width:${width(stats.draws)}%"></span>` : ''}
+                ${stats.losses ? `<span class="${BILAN_RESULT_STYLE.D.bar}" style="width:${width(stats.losses)}%"></span>` : ''}
+            </div>`;
+        }
+
+        function bilanStreakHTML(stats, dark) {
+            if (!stats.streak.length) return '';
+            const pills = stats.streak.map(r =>
+                `<span class="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-extrabold ${dark ? 'bg-white/25 text-white' : BILAN_RESULT_STYLE[r].soft}">${r}</span>`
+            ).join('');
+            const label = stats.streak.length > 1 ? `${stats.streak.length} derniers` : 'dernier';
+            return `<div class="flex items-center gap-1">
+                <span class="text-[9px] font-extrabold uppercase mr-1 ${dark ? 'opacity-90' : 'text-slate-400'}">${label}</span>
+                ${pills}
+            </div>`;
+        }
+
+        function renderBilanGlobal(stats, title) {
+            const cell = (value, label) => `<div class="bg-white/20 rounded-lg py-1.5 text-center">
+                <p class="text-base font-extrabold drop-shadow-sm">${value}</p>
+                <p class="text-[9px] font-bold uppercase opacity-90">${label}</p>
+            </div>`;
+
+            return `
+            <div class="grad-card grad-card-emerald">
+                <div class="grad-card-content space-y-2.5">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-[10px] font-extrabold uppercase tracking-wider opacity-90">${title || 'Global'}</p>
+                            <p class="text-2xl font-extrabold drop-shadow-sm">${stats.played} <span class="text-xs font-bold opacity-90">match${stats.played > 1 ? 's' : ''} joué${stats.played > 1 ? 's' : ''}</span></p>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <p class="text-xl font-extrabold drop-shadow-sm">${stats.winPct === null ? '—' : stats.winPct + '%'}</p>
+                            <p class="text-[9px] font-bold uppercase opacity-90">victoires</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-1.5">
+                        ${cell(stats.wins, 'Victoires')}
+                        ${cell(stats.draws, 'Nuls')}
+                        ${cell(stats.losses, 'Défaites')}
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-1.5">
+                        ${cell(stats.goalsFor + ' ⚽', 'Marqués')}
+                        ${cell(stats.goalsAgainst + ' 🥅', 'Encaissés')}
+                        ${cell(formatDiff(stats.diff), 'Différence')}
+                    </div>
+
+                    <p class="text-[10px] font-bold opacity-90">Moyenne : ${formatOneDecimal(stats.avgFor)} marqués · ${formatOneDecimal(stats.avgAgainst)} encaissés par match</p>
+                    ${bilanStreakHTML(stats, true)}
+                </div>
+            </div>`;
+        }
+
+        function renderBilanCompetitionCard(type, stats, totalMatches) {
+            const tile = (value, label, classes) => `<div class="${classes} rounded-lg py-1 text-center">
+                <p class="text-sm font-extrabold">${value}</p>
+                <p class="text-[9px] font-bold uppercase opacity-80">${label}</p>
+            </div>`;
+
+            const diffClass = stats.diff > 0 ? 'text-emerald-600' : stats.diff < 0 ? 'text-red-600' : 'text-slate-600';
+            const remaining = totalMatches - stats.played;
+
+            return `
+            <div class="bg-white rounded-xl card-shadow border border-slate-100 p-3 space-y-2">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold text-slate-800 truncate">${type}</p>
+                        <p class="text-[10px] text-slate-400">${stats.played} joué${stats.played > 1 ? 's' : ''}${remaining > 0 ? ` sur ${totalMatches} programmé${totalMatches > 1 ? 's' : ''}` : ''}</p>
+                    </div>
+                    <span class="shrink-0 text-[10px] font-extrabold px-2 py-0.5 rounded-full ${stats.winPct === null ? 'bg-slate-100 text-slate-400' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}">${stats.winPct === null ? '—' : stats.winPct + '% V'}</span>
+                </div>
+
+                ${stats.played ? `
+                <div class="grid grid-cols-3 gap-1.5">
+                    ${tile(stats.wins, 'V', 'bg-emerald-50 border border-emerald-100 text-emerald-700')}
+                    ${tile(stats.draws, 'N', 'bg-slate-50 border border-slate-200 text-slate-700')}
+                    ${tile(stats.losses, 'D', 'bg-red-50 border border-red-100 text-red-700')}
+                </div>
+                ${bilanBarHTML(stats)}
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-slate-600">
+                    <span>${stats.goalsFor} ⚽</span>
+                    <span>${stats.goalsAgainst} 🥅</span>
+                    <span class="${diffClass}">${formatDiff(stats.diff)}</span>
+                    <span class="text-slate-400 font-semibold">moy. ${formatOneDecimal(stats.avgFor)} / ${formatOneDecimal(stats.avgAgainst)}</span>
+                </div>
+                ${bilanStreakHTML(stats, false)}
+                ` : `<p class="text-[11px] text-slate-400 italic py-1">Aucun match joué dans cette compétition.</p>`}
+            </div>`;
+        }
+
+        function renderBilanMatches(matches, showTeam) {
+            const container = document.getElementById('bilan-matches');
+            if (!container) return;
+
+            const played = (matches || [])
+                .filter(isMatchPlayed)
+                .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+
+            if (!played.length) {
+                container.innerHTML = `<p class="p-6 text-center text-xs text-slate-400 italic">Aucun match joué pour ce filtre.</p>`;
+                return;
+            }
+
+            const groups = {};
+            played.forEach(match => {
+                const key = normalizeBilanType(match.type);
+                (groups[key] = groups[key] || []).push(match);
+            });
+
+            const order = BILAN_COMPETITIONS.concat('Autre').filter(t => groups[t] && groups[t].length);
+
+            container.innerHTML = order.map(type => {
+                const rows = groups[type].map(match => {
+                    const scored = parseInt(match.scoreHome);
+                    const conceded = parseInt(match.scoreAway);
+                    const result = scored > conceded ? 'V' : scored === conceded ? 'N' : 'D';
+                    const style = BILAN_RESULT_STYLE[result];
+                    const dateValue = parseCardMatchDate(match.date);
+                    const dateLabel = dateValue ? formatCardDate(dateValue) : '--/--/----';
+                    const where = (match.location || '').toLowerCase().startsWith('ext') ? 'extérieur' : 'domicile';
+
+                    return `<div class="flex items-center justify-between gap-2 px-3 py-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="w-6 h-6 shrink-0 rounded-lg ${style.soft} text-[10px] font-extrabold flex items-center justify-center">${result}</span>
+                            <div class="min-w-0">
+                                <p class="font-bold text-xs text-slate-800 truncate">${match.opponent || 'Adversaire'}</p>
+                                <p class="text-[10px] text-slate-400">${dateLabel} · ${where}${showTeam ? ' · ' + getBilanTeamLabel(match.team) : ''}</p>
+                            </div>
+                        </div>
+                        <p class="shrink-0 text-xs font-extrabold ${style.text}">${scored} - ${conceded}</p>
+                    </div>`;
+                }).join('');
+
+                return `<div class="flex items-center gap-2 px-3 pt-3 pb-1">
+                    <span class="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">${type} (${groups[type].length})</span>
+                    <span class="flex-1 h-px bg-slate-200"></span>
+                </div>${rows}`;
+            }).join('');
+        }
+
+        function renderDashboardBilan() {
+            const role = window.currentUserRole || 'public';
+
+            // Changement de compte (rôle ou équipe) : on repart de l'équipe du compte
+            const owner = `${role}|${window.currentUserTeam || 'all'}`;
+            if (bilanFilterOwner !== owner) {
+                bilanFilterOwner = owner;
+                bilanTeamFilter = null;
+            }
+
+            // Premier affichage : on part sur l'équipe du compte plutôt que sur un total club
+            if (bilanTeamFilter === null) bilanTeamFilter = getDefaultBilanTeam();
+
+            // Un coach ne voit que son équipe : filtre forcé sans écraser le choix des autres rôles
+            const activeFilter = role === 'coach' ? (window.currentUserTeam || 'all') : bilanTeamFilter;
+
+            const allMatches = Object.values(state.matches || {});
+
+            // Filtre par équipe (masqué pour un coach, qui ne voit que la sienne)
+            const filterEl = document.getElementById('bilan-team-filter');
+            if (filterEl) {
+                if (role === 'coach') {
+                    filterEl.innerHTML = '';
+                } else {
+                    const options = [{ key: 'all', label: 'Toutes' }]
+                        .concat(getBilanTeamOptions().map(t => ({ key: t, label: getBilanTeamLabel(t) })));
+                    filterEl.innerHTML = options.map(option => {
+                        const active = activeFilter === option.key;
+                        return `<button onclick="setBilanTeamFilter('${option.key}')" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 active:bg-slate-100'}">${option.label}</button>`;
+                    }).join('');
+                }
+            }
+
+            const scoped = activeFilter === 'all'
+                ? allMatches
+                : allMatches.filter(m => (m.team || '') === activeFilter);
+
+            const globalEl = document.getElementById('bilan-global');
+            if (globalEl) {
+                const title = activeFilter === 'all' ? 'Global' : getBilanTeamLabel(activeFilter);
+                globalEl.innerHTML = renderBilanGlobal(computeBilanStats(scoped), title);
+            }
+
+            const competitionsEl = document.getElementById('bilan-competitions');
+            if (competitionsEl) {
+                const byType = {};
+                scoped.forEach(match => {
+                    const key = normalizeBilanType(match.type);
+                    (byType[key] = byType[key] || []).push(match);
+                });
+
+                const types = BILAN_COMPETITIONS.concat('Autre').filter(t => byType[t] && byType[t].length);
+                competitionsEl.innerHTML = types.length
+                    ? types.map(t => renderBilanCompetitionCard(t, computeBilanStats(byType[t]), byType[t].length)).join('')
+                    : `<div class="bg-white rounded-xl card-shadow border border-slate-100 p-4 text-center text-xs text-slate-400 italic">Aucun match pour cette équipe.</div>`;
+            }
+
+            renderBilanMatches(scoped, activeFilter === 'all');
+        }
+
+        function setBilanTeamFilter(teamKey) {
+            bilanTeamFilter = teamKey;
+            renderDashboardBilan();
+        }
+
+        function openDashboardBilan() {
+            renderDashboardBilan();
+
+            const dashboardSec = document.getElementById('sec-dashboard');
+            const bilanSec = document.getElementById('sec-dashboard-bilan');
+
+            if (dashboardSec) dashboardSec.classList.add('hidden');
+            if (!bilanSec) return;
+
+            bilanSec.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function closeDashboardBilan() {
+            const dashboardSec = document.getElementById('sec-dashboard');
+            const bilanSec = document.getElementById('sec-dashboard-bilan');
+
+            if (bilanSec) bilanSec.classList.add('hidden');
+            if (dashboardSec) dashboardSec.classList.remove('hidden');
+
+            renderDashboard();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.openDashboardBilan = openDashboardBilan;
+        window.closeDashboardBilan = closeDashboardBilan;
+        window.setBilanTeamFilter = setBilanTeamFilter;
 
        function getMatchTypeBadge(type) {
 
@@ -930,16 +1838,14 @@ dashboardMatches.forEach(m => {
     }
 });
             document.getElementById('stat-bilan-vdn').innerHTML =
-    `<span class="text-emerald-600">${wins}V</span> -
-     <span class="text-slate-700">${draws}N</span> -
-     <span class="text-red-600">${losses}D</span>`;
+    `<span class="text-emerald-100">${wins}V</span><span class="opacity-50 px-1">·</span><span class="text-white">${draws}N</span><span class="opacity-50 px-1">·</span><span class="text-rose-100">${losses}D</span>`;
 
             
             const teamCards =
     role === 'coach'
         ? getTeamCards(dashboardMatches)
         : getTotalTeamCards();
-document.getElementById('stat-total-cards').innerHTML = `<span class="text-amber-500">${teamCards.yellows}🟨</span> <span class="text-red-600">${teamCards.reds}🟥</span>`;
+document.getElementById('stat-total-cards').innerHTML = `<span>${teamCards.yellows}🟨</span> <span>${teamCards.reds}🟥</span>`;
 
             // Alerte Licences
             const missingLicences = dashboardPlayers.filter(
@@ -1085,6 +1991,18 @@ else {
             } else {
                 nextBadge.innerHTML = ""; nextCont.innerHTML = `<p class="text-slate-400 italic py-2">Aucun match programmé.</p>`;
             }
+
+            // Si la vue détaillée des cartons est ouverte, la garder à jour
+            const cardsView = document.getElementById('sec-dashboard-cards');
+            if (cardsView && !cardsView.classList.contains('hidden')) {
+                renderDashboardCards();
+            }
+
+            // Idem pour la vue Bilan
+            const bilanView = document.getElementById('sec-dashboard-bilan');
+            if (bilanView && !bilanView.classList.contains('hidden')) {
+                renderDashboardBilan();
+            }
         }
 
         function getTeamCards(matches) {
@@ -1184,6 +2102,9 @@ if (role === 'responsable') {
 }
     
 
+            // Tri par prénom pour les équipes en affichage « Prénom Nom »
+            playersToDisplay = sortPlayersForDisplay(playersToDisplay);
+
             // Bilan de convocations par équipe (calculé une seule fois par équipe)
             const convocHistoryCache = {};
             const getConvocationHistoryForTeam = (teamKey) => {
@@ -1272,58 +2193,87 @@ Object.values(state.trainings).forEach(session => {
                 const matchPct = matchStats.total > 0 ? Math.round((matchStats.played / matchStats.total) * 100) : null;
                 const matchColor = matchPct === null ? 'text-slate-400' : matchPct >= 75 ? 'text-emerald-600' : matchPct >= 50 ? 'text-amber-600' : 'text-red-600';
 
-                                return `
-                <div class="p-3 ${teamColors.bg} border ${teamColors.border} rounded-xl flex flex-col justify-between space-y-3">
-                    <div class="flex justify-between items-start">
-                        <div>
-    <h3 class="font-bold text-xs ${teamColors.textBold}">${p.name}</h3>
-    ${attendanceBadge}
-    <p class="text-[11px] ${hasLicence ? teamColors.textLight : 'text-amber-700 font-bold'}">
-        Licence: ${hasLicence ? p.licence : '⚠️ Manquante'}
-        ${blessureBadge}
-    </p>
-</div>
-                        <div class="flex items-center space-x-1.5">${catBadge}<button onclick="openModalPlayer('${p.id}')" class="p-1 ${teamColors.textLight} hover:${teamColors.textBold}" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs"></i></button><button onclick="deletePlayer('${p.id}')" class="p-1 text-slate-400 hover:text-red-600" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs"></i></button></div>
-                    </div>
-                    <div class="text-xs space-y-2 pt-2 border-t ${teamColors.border}">
-                        <div class="grid grid-cols-2 gap-2">
-                            <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between"><span class="text-slate-500">Stats:</span><span class="font-bold text-slate-700">${pStats.goals}⚽ ${pStats.assists}🎯</span></div>
-                            <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between"><span class="text-slate-500">Cartons:</span><span class="font-bold"><span class="text-amber-600">${cards.yellows}🟨</span> <span class="text-red-600">${cards.reds}🟥</span></span></div>
-                        </div>
-                        <div class="bg-white px-2.5 py-1.5 rounded border flex justify-between items-center">
-                            <span class="text-slate-500">Entraînements :</span>
-                            <span class="font-bold ${presenceColor}">
-                                ${presencePct !== null ? `${presencePct}% 📅 (${presences}/${totalSessions})` : '<span class="text-slate-400 font-normal italic">Aucune séance passée</span>'}
-                            </span>
-                        </div>
-                        <div class="bg-white px-2.5 py-1.5 rounded border space-y-1">
-                            <div class="flex justify-between items-center">
-                                <span class="text-slate-500">Matchs :</span>
-                                <span class="font-bold ${matchColor}">
-                                    ${matchPct !== null ? `${matchPct}% ⚽ (${matchStats.played}/${matchStats.total})` : `<span class="text-slate-400 font-normal italic">${convocHistory.matches.length ? 'Aucun statut enregistré' : 'Aucun match passé'}</span>`}
-                                </span>
+                                const initials = (p.name || '?')
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map(w => w.charAt(0).toUpperCase())
+                    .join('');
+
+                const matchHint = matchPct !== null
+                    ? `${matchStats.played} convoqué(s) sur ${matchStats.total} match(s)`
+                    : (convocHistory.matches.length ? 'Aucun statut enregistré' : 'Aucun match passé');
+
+                return `
+                <article class="player-row border-slate-200">
+                    <div class="player-avatar ${teamColors.badge}" aria-hidden="true">${initials}</div>
+
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <h3 class="player-name truncate">${p.name}</h3>
+                                <p class="player-meta truncate">
+                                    ${p1 !== '-' ? p1 : 'Poste non défini'}
+                                    <span class="text-slate-300 px-1">·</span>
+                                    <span class="${hasLicence ? '' : 'text-amber-700 font-bold'}">${hasLicence ? 'Lic. ' + p.licence : '⚠️ Licence manquante'}</span>
+                                </p>
                             </div>
-                            ${matchStats.total > 0 ? `<div class="flex flex-wrap items-center gap-1 text-[10px]">
-                                <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold" title="Disponible mais non retenu (choix du coach)">⚪ ${matchStats.choix} choix</span>
-                                <span class="px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 font-bold" title="S'était signalé indisponible">🟠 ${matchStats.indispo} indispo</span>
-                            </div>` : ''}
-                        </div>
-                        <div class="bg-white p-2 rounded border">
-    <p class="text-[10px] text-slate-500 uppercase font-extrabold mb-1">
-        Niveau :
-    </p>
-    ${niveauBadge}
-</div>
-                        <div class="bg-white p-2 rounded border space-y-1">
-                            <p class="text-[10px] text-slate-500 uppercase font-extrabold">Postes :</p>
-                            <div class="flex items-center space-x-1.5 text-[11px]">
-                                <span class="font-bold px-2 py-0.5 rounded bg-sky-100 text-sky-900">1. ${p1}</span>
-                                ${p2 !== '-' ? `<span class="font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800">2. ${p2}</span>` : ''}
-                                ${p3 !== '-' ? `<span class="font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800">3. ${p3}</span>` : ''}
+
+                            <div class="flex items-center gap-1 shrink-0">
+                                <span class="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-extrabold ${teamColors.badge}">${teamName}</span>
+                                <button onclick="openModalPlayer('${p.id}')" class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs" aria-hidden="true"></i></button>
+                                <button onclick="deletePlayer('${p.id}')" class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs" aria-hidden="true"></i></button>
                             </div>
                         </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2.5">
+                            <div class="metric" title="${matchHint}">
+                                <span class="metric-label">Matchs</span>
+                                <span class="metric-value ${matchColor}">${matchPct !== null ? matchPct + '%' : '—'}</span>
+                            </div>
+                            <div class="metric" title="${presencePct !== null ? presences + ' présence(s) sur ' + totalSessions + ' séance(s)' : 'Aucune séance passée'}">
+                                <span class="metric-label">Séances</span>
+                                <span class="metric-value ${presenceColor}">${presencePct !== null ? presencePct + '%' : '—'}</span>
+                            </div>
+                            <div class="metric" title="${pStats.goals} but(s), ${pStats.assists} passe(s) décisive(s)">
+                                <span class="metric-label">Buts</span>
+                                <span class="metric-value">${pStats.goals}⚽ ${pStats.assists}🎯</span>
+                            </div>
+                            <div class="metric" title="${cards.yellows} jaune(s), ${cards.reds} rouge(s)">
+                                <span class="metric-label">Cartons</span>
+                                <span class="metric-value"><span class="text-amber-600">${cards.yellows}🟨</span> <span class="text-red-600">${cards.reds}🟥</span></span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-1 mt-2">
+                            ${niveauBadge}
+                            ${blessureBadge}
+                            ${attendanceBadge}
+                        </div>
+
+                        <details class="player-details mt-2">
+                            <summary><i class="fa-solid fa-chevron-right" aria-hidden="true"></i>Détails et postes</summary>
+                            <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
+                                    <span class="text-slate-500">Postes :</span>
+                                    <span class="font-bold text-slate-800">${p1}${p2 !== '-' ? ' · ' + p2 : ''}${p3 !== '-' ? ' · ' + p3 : ''}</span>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
+                                    <span class="text-slate-500">Convocations :</span>
+                                    <span class="font-bold text-slate-800">${matchStats.total > 0 ? `${matchStats.played} retenu(s) · ${matchStats.choix} choix · ${matchStats.indispo} indispo` : '—'}</span>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
+                                    <span class="text-slate-500">Entraînements :</span>
+                                    <span class="font-bold text-slate-800">${presencePct !== null ? `${presences}/${totalSessions} séances` : '—'}</span>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
+                                    <span class="text-slate-500">Équipe :</span>
+                                    <span class="font-bold text-slate-800">${teamName}</span>
+                                </div>
+                            </div>
+                        </details>
                     </div>
-                </div>`;
+                </article>`;
             }).join('');
 
             renderStaffEffectif();
@@ -1406,6 +2356,23 @@ Object.values(state.trainings).forEach(session => {
             renderMatchDetail();
         }
 
+        function setConvocViews(hasMatch) {
+            const rows = document.getElementById('convoc-rows');
+            const empty = document.getElementById('convoc-empty-state');
+
+            if (rows) rows.classList.toggle('hidden', !hasMatch);
+            if (empty) empty.classList.toggle('hidden', hasMatch);
+
+            if (!hasMatch) {
+                const tbody = document.getElementById('match-convocation-tbody');
+                if (tbody) tbody.innerHTML = '';
+                ['convoc-history-panel', 'bench-order-panel'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = '';
+                });
+            }
+        }
+
         function renderMatchDetail() {
             const role = window.currentUserRole || 'public';
 const userTeam = window.currentUserTeam || 'all';
@@ -1419,21 +2386,7 @@ const userTeam = window.currentUserTeam || 'all';
 
            if (!state.selectedMatchId) {
 
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="6" class="p-8 text-center text-slate-400">
-                <div class="flex flex-col items-center space-y-2">
-                    <i class="fa-solid fa-calendar-days text-3xl"></i>
-                    <p class="font-bold">
-                        Aucun match sélectionné
-                    </p>
-                    <p>
-                        Sélectionnez ou créez un match pour gérer les convocations.
-                    </p>
-                </div>
-            </td>
-        </tr>
-    `;
+    setConvocViews(false);
 
     infoCard.style.display = 'none';
     counterBanner.style.display = 'none';
@@ -1451,7 +2404,7 @@ const userTeam = window.currentUserTeam || 'all';
                     const el = document.getElementById(id);
                     if (el) el.innerHTML = '';
                 });
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Aucun match disponible.</td></tr>`;
+                setConvocViews(false);
               if (infoCard) infoCard.style.display = 'none';
 if (counterBanner) counterBanner.style.display = 'none';
 if (carpoolBanner) carpoolBanner.style.display = 'none';  
@@ -1504,6 +2457,8 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
 
             // Bilan des convocations sur les matchs passés de cette équipe
             const convocHistory = buildConvocationHistory(m.team);
+            const cardsIndex = getCardsByPlayerIndex();
+            const jerseysForMatch = computeMatchJerseys(m);
 
             if (inviteSearchBlock) {
                 inviteSearchBlock.classList.toggle('hidden', role !== 'coach' && role !== 'responsable');
@@ -1735,59 +2690,60 @@ renderMatchSummary(m);
             playerItems.forEach(({ p, invite }) => {
                 const currentStatus = m.convocations[p.id] || 'none';
                 const selectedPosition = m.positions[p.id] || p.poste1 || '-';
-                const jerseyNumber = m.jerseys[p.id] || '';
+                const jerseyNumber = jerseysForMatch[p.id]?.number ?? '';
                 const carpoolSeats = m.carpool[p.id] || 0;
+                const disciplineChip = renderDisciplineChip(computePlayerDiscipline(p.id, cardsIndex));
                 const postes = getPlayerPostesList(p);
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
 
                 // --- HTML POUR MOBILE (Cartes) ---
                 htmlMobileCards += `
-                    <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 shadow-sm space-y-3 mb-2.5">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2.5">
-                                <div class="inline-flex rounded-lg border p-0.5 bg-slate-100 shrink-0">
-                                    <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
-                                    <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
-                                    <button onclick="setMatchStatus('${m.id}', '${p.id}', 'indisponible')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'indisponible' ? 'active-indisponible bg-orange-600 text-white' : 'text-slate-600'}">Indispo</button>
-                                </div>
-                                ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
-                                <div>
-                                    <div class="font-bold text-slate-800 text-xs">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}</div>
-                                    <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
-                                    ${convocationBadgeHtml(convocHistory.history[p.id])}
-                                </div>
+                    <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 shadow-sm space-y-2.5 mb-2.5">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="font-bold text-slate-800 text-[13px]">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}</div>
+                                <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
+                                ${convocationBadgeHtml(convocHistory.history[p.id])}
                             </div>
+                            ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg shrink-0" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                         </div>
-                        <div class="grid grid-cols-1 gap-2 pt-2 border-t border-slate-100 text-xs">
-                            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
-                                <span class="text-[10px] text-slate-500 uppercase font-bold">Licence :</span>
+
+                        <div class="grid grid-cols-3 gap-1 bg-slate-100 rounded-lg p-0.5">
+                            <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn status-convoke text-center ${currentStatus === 'convoke' ? 'active-convoke' : ''}">Conv.</button>
+                            <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn status-nonconvoke text-center ${currentStatus === 'nonconvoke' ? 'active-nonconvoke' : ''}">Non</button>
+                            <button onclick="setMatchStatus('${m.id}', '${p.id}', 'indisponible')" class="status-btn status-indisponible text-center ${currentStatus === 'indisponible' ? 'active-indisponible' : ''}">Indispo</button>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-1.5 text-xs pt-2 border-t border-slate-100">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Licence</span>
                                 <div class="flex items-center space-x-1.5">
-                                    <span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border text-xs">${hasLicence ? p.licence : '⚠️ Manquante'}</span>
-                                    ${hasLicence ? `<button onclick="copyLicence('${p.licence}')" class="p-1 bg-white hover:bg-sky-100 text-slate-500 rounded border"><i class="fa-solid fa-copy text-xs"></i></button>` : ''}
+                                    <span class="font-mono font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border text-xs">${hasLicence ? p.licence : '⚠️ Manquante'}</span>
+                                    ${hasLicence ? `<button onclick="copyLicence('${p.licence}')" class="p-1.5 bg-white hover:bg-sky-50 text-slate-500 rounded border" aria-label="Copier la licence"><i class="fa-solid fa-copy text-xs"></i></button>` : ''}
                                 </div>
                             </div>
-                            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
-                                <span class="text-[10px] text-slate-500 uppercase font-bold">Poste :</span>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Poste</span>
                                 <select onchange="setMatchPosition('${m.id}', '${p.id}', this.value)" class="bg-white border border-sky-300 font-bold text-xs text-sky-900 py-1 px-2 rounded-lg">
                                     ${postes.map(pos => `<option value="${pos}" ${pos === selectedPosition ? 'selected' : ''}>${pos}</option>`).join('')}
                                     <option value="Gardien" ${selectedPosition === 'Gardien' ? 'selected' : ''}>Gardien</option>
                                     <option value="Remplaçant" ${selectedPosition === 'Remplaçant' ? 'selected' : ''}>Remplaçant</option>
                                 </select>
                             </div>
-                            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
-                                <span class="text-[10px] text-slate-500 uppercase font-bold">Maillot N° :</span>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Maillot</span>
                                 <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-16 p-1 border rounded text-center font-bold text-xs bg-white">
                             </div>
-                        </div>
-                        <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-xs bg-slate-50/50 p-2 rounded-lg">
-                            <span class="text-[10px] text-slate-500 uppercase font-bold">Covoiturage :</span>
-                            <select onchange="setMatchCarpool('${m.id}', '${p.id}', this.value)" class="bg-white border font-bold text-xs py-1 px-2 rounded-lg">
-                                <option value="0" ${carpoolSeats == 0 ? 'selected' : ''}>0 place</option>
-                                <option value="2" ${carpoolSeats == 2 ? 'selected' : ''}>🚗 2 places</option>
-                                <option value="3" ${carpoolSeats == 3 ? 'selected' : ''}>🚗 3 places</option>
-                                <option value="4" ${carpoolSeats == 4 ? 'selected' : ''}>🚗 4 places</option>
-                                <option value="5" ${carpoolSeats == 5 ? 'selected' : ''}>🚗 5 places</option>
-                            </select>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[10px] text-slate-500 uppercase font-bold">Covoiturage</span>
+                                <select onchange="setMatchCarpool('${m.id}', '${p.id}', this.value)" class="bg-white border font-bold text-xs py-1 px-2 rounded-lg">
+                                    <option value="0" ${carpoolSeats == 0 ? 'selected' : ''}>0 place</option>
+                                    <option value="2" ${carpoolSeats == 2 ? 'selected' : ''}>🚗 2 places</option>
+                                    <option value="3" ${carpoolSeats == 3 ? 'selected' : ''}>🚗 3 places</option>
+                                    <option value="4" ${carpoolSeats == 4 ? 'selected' : ''}>🚗 4 places</option>
+                                    <option value="5" ${carpoolSeats == 5 ? 'selected' : ''}>🚗 5 places</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1796,7 +2752,7 @@ renderMatchSummary(m);
                 htmlTableRows += `
                     <tr class="${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
                         <td class="p-3 pl-4">
-                            <div class="font-bold text-slate-800">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}</div>
+                            <div class="font-bold text-slate-800">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}</div>
                             <div class="text-[10px] text-slate-400">Poste favori : ${p.poste1 || '-'}</div>
                             ${convocationBadgeHtml(convocHistory.history[p.id])}
                         </td>
@@ -1819,9 +2775,9 @@ renderMatchSummary(m);
                         
 <td class="p-3 text-center">
                              <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
-                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'convoke' ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Conv.</button>
-                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'nonconvoke' ? 'active-nonconvoke bg-slate-600 text-white' : 'text-slate-600'}">Non</button>
-                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'indisponible')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${currentStatus === 'indisponible' ? 'active-indisponible bg-orange-600 text-white' : 'text-slate-600'}">Indispo</button>
+                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn status-convoke ${currentStatus === 'convoke' ? 'active-convoke' : ''}">Conv.</button>
+                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn status-nonconvoke ${currentStatus === 'nonconvoke' ? 'active-nonconvoke' : ''}">Non</button>
+                                 <button onclick="setMatchStatus('${m.id}', '${p.id}', 'indisponible')" class="status-btn status-indisponible ${currentStatus === 'indisponible' ? 'active-indisponible' : ''}">Indispo</button>
                              </div>
                             ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="ml-1 text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                         </td>
@@ -1843,6 +2799,8 @@ renderMatchSummary(m);
             if (tbody) {
                 tbody.innerHTML = htmlTableRows + staffTableRows;
             }
+
+            setConvocViews(true);
 
             // Panneau récapitulatif des convocations (matchs passés)
             renderConvocationHistory(m, playerItems, convocHistory);
@@ -1884,7 +2842,7 @@ if (role === 'coach') {
 
             if (sessions.length === 0) {
                 container.innerHTML = `<div class="flex flex-col items-center justify-center py-12 text-slate-400">
-                    <i class="fa-solid fa-whistle text-4xl mb-3 opacity-30"></i>
+                    <i class="fa-solid fa-person-running text-4xl mb-3 opacity-30"></i>
                     <p class="text-sm font-semibold">Aucune séance enregistrée</p>
                     <p class="text-xs mt-1">Créez votre première séance avec le bouton ci-dessus</p>
                 </div>`;
@@ -1939,14 +2897,14 @@ const nbTotal = playersForTraining.length;
      class="p-3.5 ${cardBg} border ${teamColors.border} border-l-4 rounded-xl cursor-pointer transition-all group">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-xl ${isPast ? 'bg-slate-400' : 'bg-gradient-to-br from-sky-500 to-blue-600'} text-white flex items-center justify-center shadow-sm">
-                                <i class="fa-solid fa-whistle text-sm"></i>
+                            <div class="w-9 h-9 shrink-0 rounded-xl ${isPast ? 'bg-slate-100 text-slate-500' : 'bg-gradient-to-br from-sky-500 to-sky-700 text-white'} flex items-center justify-center">
+                                <i class="fa-solid fa-person-running text-sm" aria-hidden="true"></i>
                             </div>
                             <div>
                                 <div class="flex items-center space-x-2">
                                     ${statusDot}
                                     <div>
-    <p class="font-bold text-slate-800 text-xs">
+    <p class="font-bold text-slate-800 text-xs capitalize">
         ${s.title || 'Séance sans titre'}
     </p>
 
@@ -1960,7 +2918,12 @@ const nbTotal = playersForTraining.length;
                                 <p class="text-[11px] text-sky-600 font-semibold">${s.theme || 'Thème non défini'}</p>
                             </div>
                         </div>
-                        <div class="flex items-center space-x-3">
+                        <div class="flex items-center space-x-3 shrink-0">
+                            ${isPast
+                                ? (isComplete
+                                    ? '<span class="hidden sm:inline px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-extrabold whitespace-nowrap">Saisie complète</span>'
+                                    : '<span class="hidden sm:inline px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-extrabold whitespace-nowrap">À compléter</span>')
+                                : '<span class="hidden sm:inline px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-100 text-[10px] font-extrabold whitespace-nowrap">À venir</span>'}
                             <div class="text-right">
                                 <p class="font-extrabold text-sm ${pctColor}">${nbPresent}/${nbTotal}</p>
                                 <p class="text-[10px] text-slate-400">présents</p>
@@ -2016,15 +2979,15 @@ const nbTotal = playersForTraining.length;
             const bar = document.getElementById('training-stats-bar');
             if (!bar) return;
             bar.innerHTML = `
-                <div class="bg-white p-3 rounded-xl border border-slate-100 card-shadow text-center">
+                <div class="card p-3 text-center">
                     <p class="text-2xl font-extrabold text-sky-600">${nbSessions}</p>
                     <p class="text-[11px] text-slate-500 mt-0.5">Séances</p>
                 </div>
-                <div class="bg-white p-3 rounded-xl border border-slate-100 card-shadow text-center">
+                <div class="card p-3 text-center">
                     <p class="text-2xl font-extrabold ${avgColor}">${avgPct === null ? '—' : avgPct + '%'}</p>
                     <p class="text-[11px] text-slate-500 mt-0.5">Présence moy.</p>
                 </div>
-                <div class="bg-white p-3 rounded-xl border border-slate-100 card-shadow text-center">
+                <div class="card p-3 text-center">
                     <p class="text-2xl font-extrabold text-slate-700">${totalPresences}</p>
                     <p class="text-[11px] text-slate-500 mt-0.5">Présences tot.</p>
                 </div>`;
@@ -3882,9 +4845,9 @@ Un passager non déclaré = un enfant sans siège prévu.
 
             if (!data.matches.length) {
                 container.innerHTML = `
-                <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
-                    <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-simple mr-1 text-sky-600"></i>Bilan des convocations</h3>
-                    <p class="text-xs text-slate-500 mt-1">Aucun match passé pour ${teamName} : le bilan apparaîtra dès le premier match joué.</p>
+                <div class="card card-pad">
+                    <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations</h3>
+                    <p class="card-sub">Aucun match passé pour ${teamName} : le bilan apparaîtra dès le premier match joué.</p>
                 </div>`;
                 return;
             }
@@ -3909,15 +4872,20 @@ Un passager non déclaré = un enfant sans siège prévu.
             }).join('');
 
             container.innerHTML = `
-            <div class="bg-white rounded-xl card-shadow border border-slate-100">
-                <div class="flex items-start justify-between gap-2 p-4 pb-2">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-simple mr-1 text-sky-600"></i>Bilan des convocations</h3>
-                        <p class="text-[11px] text-slate-500">${teamName} · ${data.matches.length} match(s) passé(s) · ✅ convoqué · 🟠 indispo · ⚪ choix</p>
-                    </div>
-                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">${rows.length} joueurs</span>
-                </div>
-                <div class="divide-y divide-slate-100 max-h-80 overflow-y-auto">${rowsHtml}</div>
+            <div class="card overflow-hidden">
+                <details class="group">
+                    <summary class="list-none cursor-pointer p-4 flex items-start justify-between gap-2 hover:bg-slate-50 transition-colors">
+                        <div>
+                            <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations</h3>
+                            <p class="card-sub">${teamName} · ${data.matches.length} match(s) passé(s) · ✅ convoqué · 🟠 indispo · ⚪ choix</p>
+                        </div>
+                        <span class="flex items-center gap-2 shrink-0">
+                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">${rows.length} joueurs</span>
+                            <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true"></i>
+                        </span>
+                    </summary>
+                    <div class="divide-y divide-slate-100 border-t border-slate-100 max-h-[60vh] overflow-y-auto">${rowsHtml}</div>
+                </details>
             </div>`;
         }
 
@@ -4004,6 +4972,7 @@ Un passager non déclaré = un enfant sans siège prévu.
             if (!container || !m) return;
 
             const subs = getMatchSubstitutePlayers(m);
+            const benchCardsIndex = getCardsByPlayerIndex();
 
             if (!subs.length) {
                 container.innerHTML = `
@@ -4042,7 +5011,7 @@ Un passager non déclaré = un enfant sans siège prévu.
                         <div class="flex items-center gap-2 min-w-0">
                             <span class="w-6 h-6 shrink-0 rounded-full bg-sky-600 text-white text-[11px] font-extrabold flex items-center justify-center" title="Position ${i + 1} sur le banc">${i + 1}</span>
                             <div class="min-w-0">
-                                <p class="font-bold text-xs text-slate-800 truncate">${p.name}</p>
+                                <p class="font-bold text-xs text-slate-800 truncate">${p.name}${renderDisciplineChip(computePlayerDiscipline(p.id, benchCardsIndex), true)}</p>
                                 <p class="text-[10px] text-slate-400">${p.poste1 || '-'}</p>
                             </div>
                         </div>
@@ -4093,8 +5062,45 @@ Un passager non déclaré = un enfant sans siège prévu.
         }
 
         function setMatchJersey(mId, pId, jersey) {
-            if (!state.matches[mId].jerseys) state.matches[mId].jerseys = {};
-            state.matches[mId].jerseys[pId] = jersey;
+            const match = state.matches[mId];
+            if (!match) return;
+
+            if (!match.jerseys) match.jerseys = {};
+
+            const value = String(jersey == null ? '' : jersey).trim();
+            const auto = computeAutoJerseyMap(match)[pId];
+
+            // Vide ou identique au numéro automatique : aucune surcharge stockée
+            if (!value || (auto != null && parseInt(value, 10) === auto)) {
+                delete match.jerseys[pId];
+                saveStateToFirebase();
+                return;
+            }
+
+            const number = parseInt(value, 10);
+            const isStarter = Object.values(match.slotAssignments || {}).includes(pId);
+            const min = isStarter ? 1 : 12;
+            const max = isStarter ? 11 : 14;
+
+            if (!number || number < min || number > max) {
+                showToast(
+                    isStarter
+                        ? 'Un titulaire prend un numéro de 1 à 11'
+                        : 'Un remplaçant prend un numéro de 12 à 14',
+                    'error'
+                );
+                return;
+            }
+
+            const clash = Object.entries(computeMatchJerseys(match))
+                .find(([id, j]) => id !== pId && j.number === number);
+
+            if (clash) {
+                showToast('Le numéro ' + number + ' est déjà pris', 'error');
+                return;
+            }
+
+            match.jerseys[pId] = String(number);
             saveStateToFirebase();
         }
 
@@ -4348,7 +5354,10 @@ function updateMatchLocationUI() {
     const saveTravel = parseInt(document.getElementById('m-travel-time').value) || 25;
     const saveArrival = parseInt(document.getElementById('m-arrival-margin').value) || 60;
     const saveSecurity = parseInt(document.getElementById('m-security-margin').value) || 10;
-    const matchData = {
+    // On repart de l'objet existant et on écrase seulement les champs du formulaire.
+    // Sinon tout champ non listé est perdu : extraPlayers (invités/surclassés),
+    // entourage, benchOrder, carpoolClosed, fff, currentFormation…
+    const matchData = Object.assign({}, existingMatch, {
         id: matchId,
         opponent: document.getElementById('m-opponent').value,
         adresse: document.getElementById('m-adresse').value,
@@ -4389,7 +5398,7 @@ slotAssignments:
     existingMatch.slotAssignments || {},
 isValidated: existingMatch.isValidated || false
 
-    };
+    });
 
     // Mise à jour de l'état local
     state.matches[matchId] = matchData;
@@ -4417,7 +5426,9 @@ state.selectedMatchId = matchId;
                 if (player) {
                     document.getElementById('modal-player-title').innerText = "Modifier le Joueur";
                     document.getElementById('p-id').value = player.id;
-                    document.getElementById('p-name').value = player.name || '';
+                    const nameParts = getPlayerNameParts(player);
+                    document.getElementById('p-prenom').value = nameParts.prenom || '';
+                    document.getElementById('p-nom').value = nameParts.nom || '';
                     document.getElementById('p-nickname').value = player.nickname || '';
                     document.getElementById('p-licence').value = player.licence !== '-' ? player.licence : '';
                     document.getElementById('p-team').value = player.team || 'U14';
@@ -4460,10 +5471,24 @@ if (role === 'responsable') {
             e.preventDefault();
             const pId = document.getElementById('p-id').value;
             const existingPlayer = pId ? state.players.find(p => p.id === pId) : null;
+
+            const prenom = document.getElementById('p-prenom').value.trim().replace(/\s+/g, ' ');
+            const nom = document.getElementById('p-nom').value.trim().replace(/\s+/g, ' ').toUpperCase();
+
+            if (!prenom && !nom) {
+                alert("Renseignez au moins le prénom ou le nom du joueur.");
+                return;
+            }
+
+            // Stockage toujours au format « NOM Prénom »
+            const canonicalName = [nom, prenom].filter(Boolean).join(' ');
+
             const playerData = {
     ...(existingPlayer || {}),
     id: pId || 'J_' + Date.now(),
-    name: document.getElementById('p-name').value,
+    name: canonicalName,
+    prenom: prenom,
+    nom: nom,
     nickname: document.getElementById('p-nickname').value.trim(),
     licence: document.getElementById('p-licence').value.trim() || '-',
     team: document.getElementById('p-team').value,
@@ -4477,6 +5502,9 @@ if (role === 'responsable') {
     phoneMere: document.getElementById('p-phone-mere').value || '-',
     phoneJoueur: document.getElementById('p-phone-joueur').value || '-'
 };
+            // Le nom canonique vient d'être recalculé : on écarte l'ancien cache d'affichage
+            delete playerData.nameCanonical;
+
             if (pId) {
                 const idx = state.players.findIndex(p => p.id === pId);
                 if (idx !== -1) state.players[idx] = playerData;
@@ -4773,7 +5801,7 @@ if (role === 'responsable') {
                     <div class="bg-white border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
                         <div class="font-bold text-slate-700 text-xs">${label}</div>
                         <div class="flex items-center space-x-2">
-                            <select id="entourage-coach-select-${m.id}-${field}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1">
+                            <select id="entourage-coach-select-${m.id}-${field}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1 min-w-0">
                                 ${staffSelectOptions(sortedStaff, current ? staffId(current) : '', true)}
                             </select>
                             <button onclick="ajouterCoach('${m.id}','${field}','mobile')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold shrink-0">OK</button>
@@ -4810,7 +5838,7 @@ if (role === 'responsable') {
                 <div class="bg-white border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
                     <div class="font-bold text-slate-700 text-xs">Ajouter un dirigeant</div>
                     <div class="flex items-center space-x-2">
-                        <select id="entourage-dirigeant-select-${m.id}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1">
+                        <select id="entourage-dirigeant-select-${m.id}-mobile" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg flex-1 min-w-0">
                             ${staffSelectOptions(sortedStaff, '', false)}
                         </select>
                         <button onclick="addMatchDirigeant('${m.id}','mobile')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold shrink-0">Ajouter</button>
@@ -4988,22 +6016,35 @@ if (role === 'responsable') {
 
         function setFilterCat(cat) {
             currentCatFilter = cat;
-            document.querySelectorAll('.cat-filter-btn').forEach(btn => {
-                btn.classList.remove('bg-sky-600', 'text-white', 'bg-blue-600', 'bg-purple-600');
-                btn.classList.add('bg-slate-100', 'text-slate-600');
-            });
+
             document
-    .querySelectorAll('.team-chip')
-    .forEach(btn => btn.classList.remove('active'));
+                .querySelectorAll('.team-chip')
+                .forEach(btn => btn.classList.remove('active'));
 
-const active =
-    document.getElementById(
-        'filter-' + cat
-    );
+            const active =
+                document.getElementById(
+                    'filter-' + cat
+                );
 
-if (active) {
-    active.classList.add('active');
-}
+            if (active) {
+                active.classList.add('active');
+
+                const row = active.parentElement;
+
+                if (row && row.scrollWidth > row.clientWidth) {
+                    const offset =
+                        active.getBoundingClientRect().left -
+                        row.getBoundingClientRect().left +
+                        row.scrollLeft -
+                        12;
+
+                    row.scrollLeft = Math.max(0, offset);
+                }
+            }
+
+            const select = document.getElementById('effectif-team-select');
+            if (select) select.value = cat;
+
             filterPlayers();
         }
 
@@ -5132,6 +6173,8 @@ if (role === 'responsable') {
     const container = document.getElementById('effectif-full-container');
     const cards = Array.from(container.children);
 
+    let visibleCount = 0;
+
     cards.forEach((card, i) => {
 
         const player = playersSource[i];
@@ -5146,11 +6189,18 @@ if (role === 'responsable') {
             currentCatFilter === 'all' ||
             player.team === currentCatFilter;
 
-        card.style.display =
-            (matchText && matchCat)
-                ? 'block'
-                : 'none';
+        const visible = matchText && matchCat;
+
+        if (visible) visibleCount++;
+
+        // Une chaîne vide restaure le display défini par la feuille de styles
+        card.style.display = visible ? '' : 'none';
     });
+
+    const countEl = document.getElementById('effectif-total-count');
+    if (countEl) {
+        countEl.textContent = `${visibleCount} joueur${visibleCount > 1 ? 's' : ''}`;
+    }
 }
 
 function renderTeamFilters() {
@@ -5180,7 +6230,18 @@ function renderTeamFilters() {
         );
     }
 
-    const totalPlayers = state.players.length;
+    const visibleTeamKeys = new Set(
+        teamsToDisplay.map(([key]) => String(key).toLowerCase())
+    );
+
+    const totalPlayers = state.players.filter(p =>
+        visibleTeamKeys.has(String(p.team || p.cat || '').toLowerCase())
+    ).length;
+
+    const countEl = document.getElementById('effectif-total-count');
+    if (countEl) {
+        countEl.textContent = `${totalPlayers} joueur${totalPlayers > 1 ? 's' : ''}`;
+    }
 
     function getGroup(teamName) {
 
@@ -5253,49 +6314,20 @@ function renderTeamFilters() {
     });
 
     let html = `
-    <div class="bg-white rounded-xl border p-4 mb-4 card-shadow">
-        ...
-    </div>
-`;
-
-if (role === 'admin') {
-    html += `
-        ${role === 'admin' ? `
-<div class="team-group">
-    <button
-        onclick="setFilterCat('all')"
-        id="filter-all"
-        class="team-chip active">
-
-        Toutes
-
-        <span class="count">
-            ${totalPlayers}
-        </span>
-    </button>
-</div>
-` : ''}
-
-
-                <span class="count">
-                    ${totalPlayers}
-                </span>
+        <div class="flex flex-nowrap sm:flex-wrap items-center gap-1.5 overflow-x-auto sm:overflow-visible no-scrollbar pb-1 -mb-1">
+            <button
+                onclick="setFilterCat('all')"
+                id="filter-all"
+                class="team-chip${currentCatFilter === 'all' ? ' active' : ''}">
+                <i class="fa-solid fa-users" aria-hidden="true"></i>
+                Toutes
+                <span class="count">${totalPlayers}</span>
             </button>
-        </div>
     `;
-}
 
     Object.entries(groups).forEach(([groupName, teams]) => {
 
         if (!teams.length) return;
-
-        html += `
-            <div class="team-group">
-
-                <div class="team-group-title">
-                    ${groupName}
-                </div>
-        `;
 
         teams
             .sort((a, b) => {
@@ -5307,11 +6339,16 @@ if (role === 'admin') {
 })
             .forEach(team => {
 
+                const isActive =
+                    String(currentCatFilter).toLowerCase() ===
+                    String(team.key).toLowerCase();
+
                 html += `
                     <button
                         onclick="setFilterCat('${team.key}')"
                         id="filter-${team.key}"
-                        class="team-chip cat-filter-btn">
+                        title="${groupName}"
+                        class="team-chip cat-filter-btn${isActive ? ' active' : ''}">
 
                         ${team.name}
 
@@ -5322,11 +6359,25 @@ if (role === 'admin') {
                     </button>
                 `;
             });
-
-        html += `</div>`;
     });
 
+    html += `</div>`;
+
     container.innerHTML = html;
+
+    // Garde le filtre actif visible dans la rangée horizontale du mobile
+    const row = container.firstElementChild;
+    const activeChip = container.querySelector('.team-chip.active');
+
+    if (row && activeChip && row.scrollWidth > row.clientWidth) {
+        const offset =
+            activeChip.getBoundingClientRect().left -
+            row.getBoundingClientRect().left +
+            row.scrollLeft -
+            12;
+
+        row.scrollLeft = Math.max(0, offset);
+    }
 }
 // --- 4. GESTION DES RÔLES ET PERMISSIONS MISE À JOUR ---
 function applyPermissions() {
@@ -8895,6 +9946,8 @@ function openModalTeam(teamId = null) {
         }
         if (nameInput) nameInput.value = team.name || '';
         if (targetInput) targetInput.value = team.targetConvocations || 14;
+        const orderInputTeam = document.getElementById('team-name-order');
+        if (orderInputTeam) orderInputTeam.checked = team.nameOrder === 'first';
 
     } else {
 
@@ -8905,6 +9958,8 @@ function openModalTeam(teamId = null) {
             keyInput.disabled = false;
         }
         if (targetInput) targetInput.value = 14;
+        const orderInputNew = document.getElementById('team-name-order');
+        if (orderInputNew) orderInputNew.checked = false;
 
     }
 
@@ -8928,9 +9983,14 @@ function handleSaveTeamModal(event) {
 
     if (!key || !name) return;
 
+    const orderInputSave = document.getElementById('team-name-order');
+    const nameOrder = orderInputSave && orderInputSave.checked ? 'first' : 'last';
+
     firebase.database().ref('teams/' + key).set({
+        ...(state.teams?.[key] || {}),
         name: name,
-        targetConvocations: target
+        targetConvocations: target,
+        nameOrder: nameOrder
     }, (error) => {
         if (error) {
             showToast("Erreur lors de l'enregistrement de l'équipe.", "error");
@@ -9668,392 +10728,581 @@ function getFirstName(player) {
     return (player.name || '').split(' ').pop();
 }
 
-function renderMatchComposition() {
+    /* ============================================================
+       TERRAIN DE COMPOSITION — tracé, joueurs, numérotation
+       ============================================================ */
 
-    const container =
-        document.getElementById(
-            'match-composition-container'
+    const PITCH_W = 68;   // largeur, touche à touche (m)
+    const PITCH_L = 105;  // longueur, but à but (m)
+
+    const SLOT_LABELS = {
+        GB: 'Gardien',
+        DG: 'Latéral gauche',
+        DD: 'Latéral droit',
+        DC1: 'Défenseur central gauche',
+        DC2: 'Défenseur central',
+        DC3: 'Défenseur central droit',
+        MG: 'Milieu gauche',
+        MD: 'Milieu droit',
+        MC1: 'Milieu central',
+        MC2: 'Milieu central',
+        MC3: 'Milieu central',
+        MDF: 'Milieu défensif',
+        MDF1: 'Milieu défensif gauche',
+        MDF2: 'Milieu défensif droit',
+        MOG: 'Ailier gauche',
+        MOD: 'Ailier droit',
+        MOC: 'Meneur offensif',
+        AT1: 'Attaquant gauche',
+        AT2: 'Attaquant droit',
+        BU: 'Buteur',
+        AG: 'Ailier gauche',
+        AD: 'Ailier droit'
+    };
+
+    function getSlotLabel(slot) {
+        return SLOT_LABELS[slot] || slot;
+    }
+
+    const TEAM_HEX = {
+        sky: '#0ea5e9', blue: '#3b82f6', indigo: '#6366f1', violet: '#8b5cf6',
+        purple: '#a855f7', fuchsia: '#d946ef', pink: '#ec4899', rose: '#f43f5e',
+        red: '#ef4444', orange: '#f97316', amber: '#f59e0b', yellow: '#eab308',
+        lime: '#84cc16', green: '#22c55e', emerald: '#10b981', teal: '#14b8a6',
+        cyan: '#06b6d4', slate: '#64748b', gray: '#6b7280', zinc: '#71717a',
+        neutral: '#737373', stone: '#78716c',
+        skyDark: '#0369a1', blueDark: '#1d4ed8'
+    };
+
+    function getTeamHex(teamKey) {
+        const color = state.teams?.[teamKey]?.color || 'slate';
+        return TEAM_HEX[color] || TEAM_HEX[String(color).replace(/Dark$/, '')] || '#475569';
+    }
+
+    // Tracé du terrain : dessiné dans un repère « longueur verticale »
+    // (x = largeur 68 m, y = longueur 105 m), puis pivoté pour l'affichage PC.
+    function buildPitchSVG(orientation) {
+        const W = PITCH_W;
+        const L = PITCH_L;
+        const isPortrait = orientation === 'portrait';
+        const uid = isPortrait ? 'p' : 'l';
+        const line = 'rgba(255,255,255,.82)';
+        const sw = 0.3;
+
+        let stripes = '';
+        const bands = 12;
+        for (let i = 0; i < bands; i++) {
+            const h = L / bands;
+            stripes += '<rect x="0" y="' + (i * h).toFixed(2) + '" width="' + W + '" height="' + (h + 0.06).toFixed(2) + '" fill="' + (i % 2 ? '#37b24d' : '#2f9e44') + '"/>';
+        }
+
+        const boxW = 40.32;
+        const boxD = 16.5;
+        const goalW = 18.32;
+        const goalD = 5.5;
+        const spot = 11;
+        const bx = (W - boxW) / 2;
+        const gx = (W - goalW) / 2;
+        const mouth = (W - 7.32) / 2;
+
+        const body =
+            stripes +
+            '<g fill="none" stroke="' + line + '" stroke-width="' + sw + '">' +
+                '<rect x="' + (sw / 2) + '" y="' + (sw / 2) + '" width="' + (W - sw) + '" height="' + (L - sw) + '"/>' +
+                '<line x1="0" y1="' + (L / 2) + '" x2="' + W + '" y2="' + (L / 2) + '"/>' +
+                '<circle cx="' + (W / 2) + '" cy="' + (L / 2) + '" r="9.15"/>' +
+                '<rect x="' + bx + '" y="0" width="' + boxW + '" height="' + boxD + '"/>' +
+                '<rect x="' + bx + '" y="' + (L - boxD) + '" width="' + boxW + '" height="' + boxD + '"/>' +
+                '<rect x="' + gx + '" y="0" width="' + goalW + '" height="' + goalD + '"/>' +
+                '<rect x="' + gx + '" y="' + (L - goalD) + '" width="' + goalW + '" height="' + goalD + '"/>' +
+                '<path d="M0 1 A1 1 0 0 1 1 0"/>' +
+                '<path d="M' + (W - 1) + ' 0 A1 1 0 0 1 ' + W + ' 1"/>' +
+                '<path d="M' + W + ' ' + (L - 1) + ' A1 1 0 0 1 ' + (W - 1) + ' ' + L + '"/>' +
+                '<path d="M1 ' + L + ' A1 1 0 0 1 0 ' + (L - 1) + '"/>' +
+            '</g>' +
+            '<circle cx="' + (W / 2) + '" cy="' + (L / 2) + '" r="0.42" fill="' + line + '"/>' +
+            '<circle cx="' + (W / 2) + '" cy="' + spot + '" r="0.42" fill="' + line + '"/>' +
+            '<circle cx="' + (W / 2) + '" cy="' + (L - spot) + '" r="0.42" fill="' + line + '"/>' +
+            '<defs>' +
+                '<clipPath id="pc-' + uid + '-a"><rect x="0" y="' + boxD + '" width="' + W + '" height="' + (L - boxD) + '"/></clipPath>' +
+                '<clipPath id="pc-' + uid + '-b"><rect x="0" y="0" width="' + W + '" height="' + (L - boxD) + '"/></clipPath>' +
+            '</defs>' +
+            '<g fill="none" stroke="' + line + '" stroke-width="' + sw + '">' +
+                '<circle cx="' + (W / 2) + '" cy="' + spot + '" r="9.15" clip-path="url(#pc-' + uid + '-a)"/>' +
+                '<circle cx="' + (W / 2) + '" cy="' + (L - spot) + '" r="9.15" clip-path="url(#pc-' + uid + '-b)"/>' +
+            '</g>' +
+            '<g fill="rgba(255,255,255,.12)" stroke="' + line + '" stroke-width="' + sw + '">' +
+                '<rect x="' + mouth + '" y="0" width="7.32" height="1.7"/>' +
+                '<rect x="' + mouth + '" y="' + (L - 1.7) + '" width="7.32" height="1.7"/>' +
+            '</g>' +
+            // Filets des buts
+            '<g stroke="rgba(255,255,255,.45)" stroke-width="0.16">' +
+            Array.from({ length: 7 }, (_, i) => {
+                const x = mouth + (i * 7.32) / 6;
+                return '<line x1="' + x + '" y1="0" x2="' + x + '" y2="1.7"/>' +
+                       '<line x1="' + x + '" y1="' + (L - 1.7) + '" x2="' + x + '" y2="' + L + '"/>';
+            }).join('') +
+            Array.from({ length: 2 }, (_, i) => {
+                const y = (i + 1) * 0.56;
+                return '<line x1="' + mouth + '" y1="' + y + '" x2="' + (mouth + 7.32) + '" y2="' + y + '"/>' +
+                       '<line x1="' + mouth + '" y1="' + (L - y) + '" x2="' + (mouth + 7.32) + '" y2="' + (L - y) + '"/>';
+            }).join('') +
+            '</g>';
+
+        if (isPortrait) {
+            return '<svg class="pitch-svg md:hidden" viewBox="0 0 ' + W + ' ' + L + '" preserveAspectRatio="none" aria-hidden="true">' + body + '</svg>';
+        }
+
+        return '<svg class="pitch-svg hidden md:block" viewBox="0 0 ' + L + ' ' + W + '" preserveAspectRatio="none" aria-hidden="true">' +
+            '<g transform="translate(' + L + ',0) rotate(90)">' + body + '</g>' +
+            '</svg>';
+    }
+
+    // Numérotation classique : un numéro par poste, selon le système de jeu.
+    const FORMATION_JERSEYS = {
+        // 4-3-3 : meneur offensif (le plus haut) 10, relayeur 8, milieu défensif 6
+        '433':  { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MC1: 6, MC2: 10, MC3: 8, AG: 11, BU: 9, AD: 7 },
+        '442':  { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MG: 11, MC1: 6, MC2: 8, MD: 7, AT1: 9, AT2: 10 },
+        '352':  { GB: 1, DC1: 4, DC2: 5, DC3: 6, MG: 2, MC1: 8, MC2: 10, MC3: 11, MD: 3, AT1: 9, AT2: 7 },
+        '4231': { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MDF1: 6, MDF2: 8, MOG: 11, MOC: 10, MOD: 7, BU: 9 },
+        '4141': { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MDF: 6, MG: 11, MC1: 8, MC2: 10, MD: 7, BU: 9 },
+        '451':  { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MG: 11, MC1: 6, MC2: 10, MC3: 8, MD: 7, BU: 9 },
+        '343':  { GB: 1, DC1: 4, DC2: 5, DC3: 6, MG: 2, MC1: 8, MC2: 10, MD: 3, AG: 11, BU: 9, AD: 7 },
+        '532':  { GB: 1, DG: 3, DC1: 4, DC2: 5, DC3: 6, DD: 2, MC1: 8, MC2: 10, MC3: 7, AT1: 9, AT2: 11 },
+        '541':  { GB: 1, DG: 3, DC1: 4, DC2: 5, DC3: 6, DD: 2, MG: 11, MC1: 8, MC2: 10, MD: 7, BU: 9 },
+        '4312': { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MC1: 6, MC2: 8, MC3: 11, MOC: 10, AT1: 9, AT2: 7 },
+        '4222': { GB: 1, DG: 3, DC1: 4, DC2: 5, DD: 2, MDF1: 6, MDF2: 8, MOG: 11, MOD: 7, AT1: 9, AT2: 10 }
+    };
+
+    // Utilisé seulement si un poste inconnu apparaît dans une formation
+    const SLOT_JERSEY = {
+        GB: 1, DD: 2, DG: 3, DC1: 4, DC2: 5, DC3: 6,
+        MDF: 6, MDF1: 6, MDF2: 8, MC1: 6, MC2: 10, MC3: 8,
+        MOC: 10, MD: 7, MG: 11, MOD: 7, MOG: 11, AD: 7, AG: 11,
+        BU: 9, AT1: 9, AT2: 10
+    };
+
+    // Numéros automatiques : titulaires selon leur poste, banc 12-14
+    function computeAutoJerseyMap(match) {
+        const map = {};
+        if (!match) return map;
+
+        const formationKey = match.currentFormation || '433';
+        const slots = getFormationSlots(formationKey);
+        const table = FORMATION_JERSEYS[formationKey] || FORMATION_JERSEYS['433'];
+        const assigned = match.slotAssignments || {};
+        const used = new Set();
+
+        const firstFree = () => {
+            for (let n = 1; n <= 11; n++) if (!used.has(n)) return n;
+            return null;
+        };
+
+        slots.forEach(s => {
+            const pid = assigned[s.slot];
+            if (!pid || map[pid] != null) return;
+
+            let number = table[s.slot];
+            if (!number || used.has(number)) number = SLOT_JERSEY[s.slot];
+            if (!number || used.has(number)) number = firstFree();
+            if (number == null) return;
+
+            used.add(number);
+            map[pid] = number;
+        });
+
+        // Trois remplaçants au maximum sur la feuille : 12, 13 puis 14,
+        // dans l'ordre du banc. Au-delà, pas de numéro.
+        const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
+        const maxSubs = Math.min(3, Math.max(0, targetConvoked - 11));
+
+        getCompositionBenchPlayers(match).forEach((p, i) => {
+            map[p.id] = i < maxSubs ? 12 + i : null;
+        });
+
+        return map;
+    }
+
+    // Numéros affichés : titulaires 1-11, remplaçants 12-14, surcharge manuelle encadrée
+    function computeMatchJerseys(match) {
+        const autoMap = computeAutoJerseyMap(match);
+        const out = {};
+
+        Object.entries(autoMap).forEach(([pid, number]) => {
+            out[pid] = { number: number, auto: true, duplicate: false, ignored: false };
+        });
+
+        const assigned = Object.values(match?.slotAssignments || {});
+        const used = new Set(
+            Object.values(out).map(j => j.number).filter(n => n != null)
         );
 
-    if (!container) return;
+        Object.entries(match?.jerseys || {}).forEach(([pid, value]) => {
+            const n = parseInt(value, 10);
+            if (!n) return;
 
-    if (
-        !state.selectedMatchId ||
-        !state.matches[state.selectedMatchId]
-    ) {
+            const starter = assigned.includes(pid);
+            const min = starter ? 1 : 12;
+            const max = starter ? 11 : 14;
+
+            if (!out[pid]) out[pid] = { number: null, auto: false, duplicate: false, ignored: false };
+
+            // Le numéro déjà attribué automatiquement : on garde l'automatique
+            if (out[pid].number === n) return;
+
+            // Hors de la plage du rôle, ou déjà pris ailleurs : on ignore la surcharge
+            if (n < min || n > max || used.has(n)) {
+                out[pid].ignored = true;
+                return;
+            }
+
+            if (out[pid].number != null) used.delete(out[pid].number);
+
+            out[pid].number = n;
+            out[pid].auto = false;
+            used.add(n);
+        });
+
+        const counts = {};
+        Object.values(out).forEach(j => {
+            if (j.number != null) counts[j.number] = (counts[j.number] || 0) + 1;
+        });
+        Object.values(out).forEach(j => {
+            j.duplicate = j.number != null && counts[j.number] > 1;
+        });
+
+        return out;
+    }
+
+    function getJerseyNumber(match, playerId) {
+        const jersey = computeMatchJerseys(match)[playerId];
+        return jersey && jersey.number != null ? jersey.number : '';
+    }
+
+    const FORMATIONS = [
+        { key: '433', label: '4-3-3' },
+        { key: '442', label: '4-4-2' },
+        { key: '352', label: '3-5-2' },
+        { key: '4231', label: '4-2-3-1' },
+        { key: '4141', label: '4-1-4-1' },
+        { key: '451', label: '4-5-1' },
+        { key: '343', label: '3-4-3' },
+        { key: '532', label: '5-3-2' },
+        { key: '541', label: '5-4-1' },
+        { key: '4312', label: '4-3-1-2' },
+        { key: '4222', label: '4-2-2-2' }
+    ];
+
+    const JERSEY_PATH = 'M25 6 Q32 12 39 6 L52 13 L58 29 L46 35 L46 58 Q46 62 42 62 L22 62 Q18 62 18 58 L18 35 L6 29 L12 13 Z';
+
+    // Un numéro doit rester lisible : on choisit blanc ou encre selon la clarté du maillot
+    function isLightColor(hex) {
+        const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+        if (!m) return false;
+        const n = parseInt(m[1], 16);
+        const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62;
+    }
+
+    function jerseyMarkup(teamHex, number, duplicate) {
+        const ink = isLightColor(teamHex) ? '#0f172a' : '#ffffff';
+        return `
+            <span class="jersey-box" style="color:${teamHex}" data-ink="${ink}">
+                <svg viewBox="0 0 64 64" class="jersey-svg" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="jersey-light" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0" stop-color="#ffffff" stop-opacity=".32"/>
+                            <stop offset=".55" stop-color="#ffffff" stop-opacity="0"/>
+                            <stop offset="1" stop-color="#000000" stop-opacity=".22"/>
+                        </linearGradient>
+                        <clipPath id="jersey-clip"><path d="${JERSEY_PATH}"/></clipPath>
+                    </defs>
+                    <path d="${JERSEY_PATH}" fill="currentColor" stroke="rgba(15,23,42,.35)" stroke-width="2"/>
+                    <path d="${JERSEY_PATH}" fill="url(#jersey-light)"/>
+                    <g clip-path="url(#jersey-clip)" fill="none" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.6">
+                        <path d="M25 7 Q32 14 39 7"/>
+                        <path d="M18 34 L18 60"/>
+                        <path d="M46 34 L46 60"/>
+                    </g>
+                    <path d="${JERSEY_PATH}" fill="none" stroke="rgba(255,255,255,.28)" stroke-width=".8"/>
+                </svg>
+                <span class="jersey-num" style="color:${ink};text-shadow:0 1px 2px ${ink === '#ffffff' ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.45)'}">${number != null && number !== '' ? number : ''}</span>
+                ${duplicate ? '<span class="jersey-dup" title="Numéro en double">!</span>' : ''}
+            </span>`;
+    }
+
+    // Une place qui n'existe plus dans la formation courante doit renvoyer le joueur au banc
+    function pruneSlotAssignments(match) {
+        if (!match) return;
+
+        const valid = new Set(
+            getFormationSlots(match.currentFormation || '433').map(s => s.slot)
+        );
+
+        Object.keys(match.slotAssignments || {}).forEach(slot => {
+            if (!valid.has(slot)) delete match.slotAssignments[slot];
+        });
+    }
+
+    function renderMatchComposition() {
+
+        const container = document.getElementById('match-composition-container');
+        if (!container) return;
+
+        if (!state.selectedMatchId || !state.matches[state.selectedMatchId]) {
+            container.innerHTML = `
+                <div class="card card-pad text-center py-10">
+                    <div class="w-12 h-12 mx-auto rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mb-3">
+                        <i class="fa-solid fa-chess-board text-lg" aria-hidden="true"></i>
+                    </div>
+                    <p class="font-bold text-slate-800 text-sm">Aucun match sélectionné</p>
+                    <p class="screen-sub max-w-sm mx-auto">Choisis un match pour composer l'équipe.</p>
+                </div>`;
+            return;
+        }
+
+        const match = state.matches[state.selectedMatchId];
+        if (!match.slotAssignments) match.slotAssignments = {};
+        pruneSlotAssignments(match);
+
+        const formation = match.currentFormation || '433';
+        const slots = getFormationSlots(formation);
+        const jerseys = computeMatchJerseys(match);
+        const teamHex = getTeamHex(match.team);
+
+        const convoked = state.players.filter(p => (match.convocations || {})[p.id] === 'convoke');
+        const bench = getCompositionBenchPlayers(match);
+        const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
+        const maxSubs = Math.min(3, Math.max(0, targetConvoked - 11));
+        const placedCount = slots.filter(s => match.slotAssignments[s.slot]).length;
+
+        const duplicates = Object.entries(jerseys)
+            .filter(([, j]) => j.duplicate)
+            .map(([id]) => state.players.find(p => p.id === id))
+            .filter(Boolean)
+            .map(p => formatPlayerName(p));
+
+        const slotHTML = (pos) => {
+            const playerId = match.slotAssignments[pos.slot];
+            const player = playerId ? state.players.find(p => p.id === playerId) : null;
+            const jersey = player ? jerseys[player.id] : null;
+            const label = getSlotLabel(pos.slot);
+            const style = `--px:${pos.x}%;--py:${pos.y}%;--lx:${(100 - pos.y).toFixed(2)}%;--ly:${pos.x}%;`;
+
+            if (!player) {
+                return `
+                <button type="button" class="pitch-slot" style="${style}"
+                        onclick="openPlayerPicker('${pos.slot}')"
+                        aria-label="Placer un joueur : ${label}">
+                    <span class="slot-empty"><i class="fa-solid fa-plus" aria-hidden="true"></i></span>
+                    <span class="pitch-name">${label}</span>
+                </button>`;
+            }
+
+            return `
+                <button type="button" class="pitch-slot" style="${style}"
+                        onclick="openPlayerPicker('${pos.slot}')"
+                        title="${formatPlayerName(player)}"
+                        aria-label="Changer ${formatPlayerName(player)} : ${label}">
+                    ${jerseyMarkup(teamHex, jersey ? jersey.number : null, jersey && jersey.duplicate)}
+                    <span class="pitch-name">${getPitchDisplayName(player)}</span>
+                </button>`;
+        };
+
+        const benchHTML = bench.length
+            ? bench.map((p, i) => {
+                const off = i >= maxSubs;
+                const jersey = jerseys[p.id] || {};
+                const number = jersey.number;
+                const divider = (i === maxSubs && bench.length > maxSubs)
+                    ? `<div class="flex items-center gap-2 pt-2">
+                           <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Hors feuille</span>
+                           <span class="flex-1 h-px bg-slate-200"></span>
+                       </div>`
+                    : '';
+
+                return `${divider}
+                <div class="flex items-center gap-2 ${off ? 'opacity-60' : ''}">
+                    <span class="bench-num ${number ? '' : 'is-off'}" ${number ? 'style="background:' + teamHex + '"' : ''}>${number || '—'}</span>
+                    <div class="min-w-0 flex-1">
+                        <p class="font-bold text-[12.5px] text-slate-800 truncate">${formatPlayerName(p)}${jersey.duplicate ? ' <span class="text-red-600">!</span>' : ''}</p>
+                        <p class="text-[10.5px] text-slate-500 truncate">${getPosteLabel(p.poste1)}</p>
+                    </div>
+                    <div class="flex flex-col gap-0.5">
+                        <button onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'up')" ${i === 0 ? 'disabled' : ''}
+                                class="w-7 h-7 rounded-md border border-slate-200 text-slate-600 flex items-center justify-center text-[10px] ${i === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                aria-label="Monter ${formatPlayerName(p)}">▲</button>
+                        <button onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'down')" ${i === bench.length - 1 ? 'disabled' : ''}
+                                class="w-7 h-7 rounded-md border border-slate-200 text-slate-600 flex items-center justify-center text-[10px] ${i === bench.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                aria-label="Descendre ${formatPlayerName(p)}">▼</button>
+                    </div>
+                </div>`;
+            }).join('')
+            : '<p class="text-xs text-slate-400 italic">Aucun remplaçant : tous les convoqués sont sur le terrain.</p>';
 
         container.innerHTML = `
-            <div class="text-center py-8 text-slate-400">
+        <div class="space-y-3">
 
-                ⚽
+            <div class="flex flex-wrap items-center gap-1.5">
+                ${FORMATIONS.map(f => `
+                    <button onclick="applyFormation('${f.key}')"
+                            class="formation-btn ${formation === f.key ? 'is-active' : ''}">${f.label}</button>
+                `).join('')}
+                <button onclick="resetComposition()"
+                        class="formation-btn ml-auto"
+                        style="border-color:#fecaca;color:#b91c1c">
+                    <i class="fa-solid fa-rotate-left mr-1" aria-hidden="true"></i>Tout au banc
+                </button>
+            </div>
 
-                <div>
-                    Sélectionnez un match
+            ${duplicates.length ? `
+                <div class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11.5px] text-red-800 flex items-start gap-2">
+                    <i class="fa-solid fa-triangle-exclamation mt-0.5" aria-hidden="true"></i>
+                    <span>Numéro en double : <strong>${duplicates.join(', ')}</strong>. Ouvre le joueur pour changer son numéro.</span>
+                </div>` : ''}
+
+            <div class="grid lg:grid-cols-4 gap-3">
+
+                <div class="lg:col-span-3">
+                    <div class="pitch-wrap" id="composition-terrain">
+                        ${buildPitchSVG('portrait')}
+                        ${buildPitchSVG('landscape')}
+                        ${slots.map(slotHTML).join('')}
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-slate-500">
+                        <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>
+                        <span>Touche une position pour y placer un joueur.</span>
+                        <span class="ml-auto font-bold text-slate-600">${placedCount}/11 titulaires</span>
+                    </div>
                 </div>
 
-            </div>
-        `;
+                <aside class="card card-pad space-y-3">
+                    <div>
+                        <h3 class="card-title"><i class="fa-solid fa-arrows-up-down"></i>Banc</h3>
+                        <p class="card-sub" ${convoked.length > targetConvoked ? 'style="color:#dc2626;font-weight:700"' : ''}>
+                            ${convoked.length} convoqué(s) / ${targetConvoked} · ${maxSubs} remplaçant(s)
+                        </p>
+                    </div>
+                    <div class="space-y-1.5">${benchHTML}</div>
+                </aside>
 
-        return;
+            </div>
+        </div>`;
     }
 
-    const match =
-        state.matches[state.selectedMatchId];
+    /* ---- Choix du joueur pour une position ---- */
 
-    if (!match.composition) {
-        match.composition = {};
+    let pickingSlot = null;
+
+    function openPlayerPicker(slot) {
+        const match = state.matches[state.selectedMatchId];
+        if (!match) return;
+        pickingSlot = slot;
+
+        const sub = document.getElementById('pick-player-slot');
+        if (sub) sub.textContent = getSlotLabel(slot);
+
+        renderPlayerPicker();
+        toggleModal('modal-pick-player', true);
     }
 
-    const players =
-        state.players.filter(
-            p =>
-                match.convocations?.[p.id] ===
-                'convoke'
-        );
-
-    const terrainPlayers =
-        players.filter(
-            p =>
-                match.composition[p.id]
-        );
-
-    const assignedPlayers =
-    Object.values(
-        match.slotAssignments || {}
-    );
-
-const benchPlayers =
-    sortByBenchOrder(
-        match,
-        players.filter(
-            p =>
-                !assignedPlayers.includes(
-                    p.id
-                )
-        )
-    );
-
-// Nombre de remplaçants autorisés sur la feuille (14 convoqués par défaut = 11 + 3)
-const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
-const maxSubsOnSheet = Math.max(0, targetConvoked - 11);
-
-    container.innerHTML = `
-
-        <div class="flex flex-wrap gap-2 mb-4">
-
-            <button
-                onclick="applyFormation('433')"
-                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-
-                4-3-3
-
-            </button>
-
-            <button
-                onclick="applyFormation('442')"
-                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-
-                4-4-2
-
-            </button>
-
-            <button
-                onclick="applyFormation('352')"
-                class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-
-                3-5-2
-
-            </button>
-
-            <button onclick="applyFormation('4231')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    4-2-3-1
-</button>
-
-<button onclick="applyFormation('4141')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    4-1-4-1
-</button>
-
-<button onclick="applyFormation('451')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    4-5-1
-</button>
-
-<button onclick="applyFormation('343')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    3-4-3
-</button>
-
-<button onclick="applyFormation('532')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    5-3-2
-</button>
-
-<button onclick="applyFormation('541')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    5-4-1
-</button>
-
-<button onclick="applyFormation('4312')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    4-3-1-2
-</button>
-
-<button onclick="applyFormation('4222')"
-    class="px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-bold">
-    4-2-2-2
-</button>
-
-            <button
-    onclick="resetComposition()"
-    class="px-3 py-2 bg-red-600 text-white rounded-lg text-xs font-bold">
-
-    🔄 Tout au banc
-
-</button>
-
-        </div>
-
-        <div class="grid lg:grid-cols-4 gap-4">
-
-            <div class="lg:col-span-3">
-
-                <div
-                    id="composition-terrain"
-                    ondragover="allowDrop(event)"
-                    ondrop="dropPlayer(event)"
-                    class="
-                    relative
-                    bg-green-600
-                    rounded-2xl
-                    min-h-[700px]
-                    overflow-hidden">
-
-                    <div class="absolute inset-4 border-2 border-white/60 rounded-xl"></div>
-
-                    <div class="absolute left-0 right-0 top-1/2 border-t border-white/40"></div>
-
-                   <div class="absolute left-1/2 top-1/2 w-24 h-24 border-2 border-white/40 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-
-${getFormationSlots(
-    match.currentFormation || "433"
-).map(pos => {
-
-    const playerId =
-        match.slotAssignments?.[pos.slot];
-
-    const player =
-        state.players.find(
-            p => p.id === playerId
-        );
-
-        const jersey =
-    player
-        ? (match.jerseys?.[player.id] || "")
-        : "";
-
-    return `
-
-        <div
-            onclick="assignPlayerToSlot('${pos.slot}')"
-
-            class="
-            absolute
-            border-2
-            border-dashed
-            border-white/70
-            bg-white/10
-            rounded-xl
-            px-3
-            py-2
-            text-xs
-            font-bold
-            text-white
-            cursor-pointer
-            -translate-x-1/2
-            -translate-y-1/2"
-
-            style="
-                left:${pos.x}%;
-                top:${pos.y}%;
-            ">
-
-          ${
-    player
-        ? `
-            <div class="flex flex-col items-center">
-
-                <div
-                    class="
-                    w-10 h-10
-                    rounded-full
-                    bg-white
-                    flex
-                    items-center
-                    justify-center
-                    shadow">
-
-                    <input
-                        type="number"
-                        min="1"
-                        max="99"
-                        value="${jersey || ""}"
-
-                        onchange="
-                            setMatchJersey(
-                                '${match.id}',
-                                '${player.id}',
-                                this.value
-                            )
-                        "
-
-                        class="
-                        w-8
-                        bg-transparent
-                        text-center
-                        text-green-700
-                        font-black
-                        text-sm
-                        outline-none">
-
-                </div>
-
-                <div
-                    class="
-                    text-[10px]
-                    leading-tight
-                    mt-1
-                    text-center">
-
-                    ${getFirstName(player)}
-
-                </div>
-
-            </div>
-          `
-        : pos.slot
-}
-        </div>
-
-    `;
-
-}).join('')}
-
-${terrainPlayers.map(player => {
-
-    const pos =
-        match.composition[player.id];
-
-    return `
-
-                            <div
-                                draggable="true" ondragstart="startDragPlayer(event,'${player.id}')"
-
-                                class="absolute bg-white rounded-xl shadow-lg cursor-grab px-3 py-2 text-center min-w-[110px] -translate-x-1/2 -translate-y-1/2"
-
-                                style="
-                                    left:${pos.x}%;
-                                    top:${pos.y}%;
-                                ">
-
-                                <div class="font-bold text-xs">
-                                    ${getFirstName(player)}
-                                </div>
-
-                                <div class="text-[10px] text-sky-700 font-semibold">
-                                    ${getPosteLabel(player.poste1)}
-                                </div>
-
-                                <button
-                                    onclick="removePlayerFromComposition('${player.id}')"
-                                    class="text-red-500 text-[10px] mt-1">
-
-                                    Retirer
-
-                                </button>
-
-                            </div>
-
-                        `;
-
-                    }).join('')}
-
-                </div>
-
-            </div>
-
-            <div>
-
-                <h3 class="font-bold mb-1">
-                    🔄 Banc
-                </h3>
-
-                <p class="text-[10px] mb-2 ${players.length > targetConvoked ? 'text-red-600 font-bold' : 'text-slate-500'}">
-                    ${players.length} convoqué(s) / ${targetConvoked} · ${maxSubsOnSheet} remplaçant(s) sur la feuille${players.length > targetConvoked ? ' · ⚠️ trop de convoqués' : ''}
-                </p>
-
-                <div class="space-y-2">
-
-                    ${benchPlayers.length > maxSubsOnSheet ? `<div class="flex items-center gap-2 pb-1">
-                        <span class="text-[10px] font-extrabold uppercase tracking-wide text-emerald-600">Sur la feuille (${maxSubsOnSheet})</span>
-                        <span class="flex-1 h-px bg-emerald-100"></span>
-                    </div>` : ''}
-
-                    ${benchPlayers.map((player, benchIdx) => {
-
-                        const horsFeuille = benchIdx >= maxSubsOnSheet;
-
-                        const divider = (benchIdx === maxSubsOnSheet && benchPlayers.length > maxSubsOnSheet)
-                            ? `<div class="flex items-center gap-2 pt-3 pb-1">
-                                   <span class="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Hors feuille de match</span>
-                                   <span class="flex-1 h-px bg-slate-200"></span>
-                               </div>`
-                            : '';
-
-                        return `${divider}
-
-                        <div class="flex items-center gap-1 ${horsFeuille ? 'opacity-60' : ''}">
-
-                            <span class="w-5 shrink-0 text-center text-[10px] font-extrabold ${horsFeuille ? 'text-slate-300' : 'text-slate-400'}" title="Position ${benchIdx + 1} sur le banc">${benchIdx + 1}</span>
-
-                            <button
-                                onclick="selectBenchPlayer('${player.id}')"
-
-                                class="flex-1 min-w-0 bg-white border rounded-xl p-3 text-left hover:bg-sky-50 ${horsFeuille ? 'border-dashed' : ''}">
-
-                                <span class="font-bold">${player.name}</span>
-
-                                <span class="ml-2 text-[10px] font-semibold ${horsFeuille ? 'text-slate-500 bg-slate-100' : 'text-sky-700 bg-sky-50'} px-1.5 py-0.5 rounded">
-                                    ${getPosteLabel(player.poste1)}
-                                </span>
-
-                            </button>
-
-                            <button
-                                onclick="moveCompositionBenchPlayer('${match.id}', '${player.id}', 'up')"
-                                ${benchIdx === 0 ? 'disabled' : ''}
-                                class="w-9 h-9 shrink-0 rounded-lg border border-slate-200 text-slate-600 flex items-center justify-center text-[13px] font-bold ${benchIdx === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
-                                aria-label="Monter ${player.name}" title="Monter">▲</button>
-
-                            <button
-                                onclick="moveCompositionBenchPlayer('${match.id}', '${player.id}', 'down')"
-                                ${benchIdx === benchPlayers.length - 1 ? 'disabled' : ''}
-                                class="w-9 h-9 shrink-0 rounded-lg border border-slate-200 text-slate-600 flex items-center justify-center text-[13px] font-bold ${benchIdx === benchPlayers.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
-                                aria-label="Descendre ${player.name}" title="Descendre">▼</button>
-
-                        </div>`;
-
-                    }).join('')}
-
-                </div>
-
-            </div>
-
-        </div>
-
-    `;
-}
+    function renderPlayerPicker() {
+        const match = state.matches[state.selectedMatchId];
+        if (!match || !pickingSlot) return;
+
+        const list = document.getElementById('pick-player-list');
+        const current = document.getElementById('pick-player-current');
+        const jerseys = computeMatchJerseys(match);
+        const teamHex = getTeamHex(match.team);
+
+        const assigned = match.slotAssignments || {};
+        const currentId = assigned[pickingSlot];
+        const takenIds = Object.values(assigned).filter(id => id !== currentId);
+
+        const currentPlayer = currentId ? state.players.find(p => p.id === currentId) : null;
+
+        const candidates = state.players
+            .filter(p => (match.convocations || {})[p.id] === 'convoke' && !takenIds.includes(p.id))
+            .sort((a, b) => {
+                const na = jerseys[a.id]?.number;
+                const nb = jerseys[b.id]?.number;
+                return (na == null ? 99 : na) - (nb == null ? 99 : nb);
+            });
+
+        if (current) {
+            current.innerHTML = currentPlayer ? `
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                    <div class="flex items-center gap-2">
+                        <span class="bench-num" style="background:${teamHex}">${jerseys[currentPlayer.id]?.number || '—'}</span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-bold text-[13px] text-slate-800 truncate">${formatPlayerName(currentPlayer)}</p>
+                            <p class="text-[11px] text-slate-500">${getPosteLabel(currentPlayer.poste1)}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <label class="flex-1">
+                            <span class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">Numéro de maillot</span>
+                            <input type="number" min="1" max="99" value="${jerseys[currentPlayer.id]?.number || ''}"
+                                   onchange="setSlotJersey('${currentPlayer.id}', this.value)"
+                                   class="w-full p-1.5 border border-slate-200 rounded-lg text-center font-bold text-sm bg-white">
+                        </label>
+                        <button onclick="setSlotJersey('${currentPlayer.id}', '')"
+                                class="px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-white"
+                                title="Revenir au numéro automatique">Auto</button>
+                        <button onclick="clearPlayerFromSlot()"
+                                class="px-2.5 py-2 rounded-lg border border-red-200 text-[11px] font-bold text-red-600 hover:bg-red-50">Retirer</button>
+                    </div>
+                </div>` : '';
+        }
+
+        if (list) {
+            list.innerHTML = candidates.length
+                ? candidates.map(p => {
+                    const jersey = jerseys[p.id] || {};
+                    return `
+                    <button type="button" class="pick-row" onclick="choosePlayerForSlot('${p.id}')">
+                        <span class="bench-num ${jersey.number ? '' : 'is-off'}" ${jersey.number ? 'style="background:' + teamHex + '"' : ''}>${jersey.number || '—'}</span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block font-bold text-[12.5px] text-slate-800 truncate">${formatPlayerName(p)}</span>
+                            <span class="block text-[10.5px] text-slate-500 truncate">${getPosteLabel(p.poste1)}</span>
+                        </span>
+                        ${p.id === currentId
+                            ? '<i class="fa-solid fa-check text-sky-600 text-xs" aria-hidden="true"></i>'
+                            : '<i class="fa-solid fa-plus text-slate-300 text-xs" aria-hidden="true"></i>'}
+                    </button>`;
+                }).join('')
+                : '<p class="text-xs text-slate-400 italic">Aucun joueur convoqué disponible.</p>';
+        }
+    }
+
+    function choosePlayerForSlot(playerId) {
+        const match = state.matches[state.selectedMatchId];
+        if (!match || !pickingSlot) return;
+
+        if (!match.slotAssignments) match.slotAssignments = {};
+        match.slotAssignments[pickingSlot] = playerId;
+
+        saveStateToFirebase();
+        toggleModal('modal-pick-player', false);
+        renderMatchComposition();
+    }
+
+    function clearPlayerFromSlot() {
+        const match = state.matches[state.selectedMatchId];
+        if (!match || !pickingSlot) return;
+
+        delete match.slotAssignments[pickingSlot];
+
+        saveStateToFirebase();
+        toggleModal('modal-pick-player', false);
+        renderMatchComposition();
+    }
+
+    function setSlotJersey(playerId, value) {
+        setMatchJersey(state.selectedMatchId, playerId, value);
+        renderMatchComposition();
+        renderPlayerPicker();
+    }
 
 function startDragPlayer(event, playerId) {
 
@@ -10132,42 +11381,23 @@ function applyFormation(system) {
     const match =
         state.matches[state.selectedMatchId];
 
-    if (!match.composition) {
-        match.composition = {};
+    // Une ancienne couche « composition libre » a existé : on la retire pour
+    // qu'il ne reste qu'un seul système de placement.
+    if (match.composition) {
+        delete match.composition;
     }
-
-    const playerIds =
-        Object.keys(match.composition);
-
-    const formation = getFormationSlots(system).map(pos => ({
-        x: pos.x,
-        y: pos.y
-    }));
-
-    if (!formation) {
-        return;
-    }
-
-    playerIds
-        .slice(0, 11)
-        .forEach((playerId, index) => {
-
-            match.composition[playerId] = {
-                x: formation[index].x,
-                y: formation[index].y
-            };
-
-        });
 
     match.currentFormation = system;
+
+    // Les joueurs dont la place n'existe plus dans le nouveau système
+    // repartent automatiquement sur le banc.
+    pruneSlotAssignments(match);
 
     saveStateToFirebase();
 
     renderMatchComposition();
 
-    showToast(
-        `Système ${system} appliqué`
-    );
+    showToast(`Système ${FORMATIONS.find(f => f.key === system)?.label || system} appliqué`);
 }
 
 function getFormationSlots(system = "433") {
@@ -10180,9 +11410,10 @@ function getFormationSlots(system = "433") {
             { slot:"DC2", x:62, y:72 },
             { slot:"DD", x:85, y:72 },
 
-            { slot:"MC1", x:25, y:50 },
-            { slot:"MC2", x:50, y:45 },
-            { slot:"MC3", x:75, y:50 },
+            // Milieu à 3 : 6 en sentinelle, 8 en relayeur, 10 en meneur (le plus haut)
+            { slot:"MC1", x:30, y:53 },
+            { slot:"MC3", x:70, y:47 },
+            { slot:"MC2", x:50, y:32 },
 
             { slot:"AG", x:20, y:18 },
             { slot:"BU", x:50, y:10 },
