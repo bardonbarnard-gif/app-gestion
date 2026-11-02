@@ -11958,15 +11958,15 @@ const joueursChamp = presents.filter(
 
     joueursChamp.forEach(player => {
 
-        const poste = (player.poste1 || '').toUpperCase();
+        const poste = posteCategory((player.poste1 || '').toUpperCase());
 
-        if (['DC', 'DG', 'DD'].includes(poste))
+        if (poste === 'DEF')
             categories.DEF.push(player);
 
-        else if (['MC', 'MOC'].includes(poste))
+        else if (poste === 'MIL')
             categories.MIL.push(player);
 
-        else if (['AD', 'AG', 'BU'].includes(poste))
+        else if (poste === 'ATT')
             categories.ATT.push(player);
 
         else
@@ -12063,6 +12063,112 @@ function movePlayerToOtherTeam(playerId) {
     renderGeneratedTeams();
 }
 
+let teamsSquadSelectMode = false;
+
+function toggleTeamsSquadMode() {
+
+    teamsSquadSelectMode = !teamsSquadSelectMode;
+
+    renderGeneratedTeams();
+}
+
+let teamDragPlayerId = null;
+
+function getTeamListKey(playerId, session) {
+
+    const gen = session && session.generatedTeams;
+
+    if (!gen || !playerId) return null;
+
+    if ((gen.gardiens || []).includes(playerId)) return 'gardiens';
+    if ((gen.teamA || []).includes(playerId)) return 'teamA';
+    if ((gen.teamB || []).includes(playerId)) return 'teamB';
+
+    return null;
+}
+
+function moveTeamPlayer(playerId, dir) {
+
+    const session = state.trainings[currentTrainingId];
+    const key = getTeamListKey(playerId, session);
+
+    if (!key) return;
+
+    const list = session.generatedTeams[key] || [];
+    const i = list.indexOf(playerId);
+    const j = i + (dir === 'up' ? -1 : 1);
+
+    if (i < 0 || j < 0 || j >= list.length) return;
+
+    list[i] = list[j];
+    list[j] = playerId;
+
+    saveStateToFirebase();
+    renderGeneratedTeams();
+}
+
+function teamRowDragStart(event, playerId) {
+
+    teamDragPlayerId = playerId;
+
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        try { event.dataTransfer.setData('text/plain', playerId); } catch (e) { }
+    }
+
+    if (event.currentTarget) event.currentTarget.style.opacity = '.45';
+}
+
+function teamRowDragOver(event) {
+
+    if (!teamDragPlayerId) return;
+
+    event.preventDefault();
+
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+}
+
+function teamRowDragEnd() {
+
+    teamDragPlayerId = null;
+
+    renderGeneratedTeams();
+}
+
+function teamRowDrop(event, targetId) {
+
+    event.preventDefault();
+
+    const sourceId = teamDragPlayerId || (event.dataTransfer && event.dataTransfer.getData('text/plain'));
+
+    teamDragPlayerId = null;
+
+    if (!sourceId || sourceId === targetId) return;
+
+    const session = state.trainings[currentTrainingId];
+    const sourceKey = getTeamListKey(sourceId, session);
+    const targetKey = getTeamListKey(targetId, session);
+
+    // Le glisser sert a ordonner a l'interieur d'une meme liste
+    if (!sourceKey || sourceKey !== targetKey) return;
+
+    const list = session.generatedTeams[sourceKey];
+    const from = list.indexOf(sourceId);
+
+    if (from < 0) return;
+
+    list.splice(from, 1);
+
+    let to = list.indexOf(targetId);
+
+    if (to < 0) to = list.length;
+
+    list.splice(to, 0, sourceId);
+
+    saveStateToFirebase();
+    renderGeneratedTeams();
+}
+
 function renderGeneratedTeams() {
 
     const session = state.trainings[currentTrainingId];
@@ -12089,6 +12195,25 @@ function renderGeneratedTeams() {
 
     const reserve = getReserveTrainingPlayers(session);
 
+    const squadSet = new Set(getSessionSquad(session));
+
+    const squadMark = (p) => {
+
+        const inSquad = squadSet.has(p.id);
+
+        // En mode selection, chaque joueur a un bouton C pour tagger / detagger
+        if (teamsSquadSelectMode) {
+            return `<button onclick="toggleSquadPlayer('${p.id}')"
+                title="${inSquad ? 'Retirer des convoqués' : 'Marquer comme convoqué'}"
+                class="inline-flex items-center justify-center w-[17px] h-[17px] rounded-full text-[10px] font-black leading-none shrink-0 border transition ${inSquad ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-emerald-300 text-emerald-500 hover:bg-emerald-50'}">C</button>`;
+        }
+
+        // Hors selection : seul un joueur convoque porte la pastille verte "C"
+        return inSquad
+            ? '<span class="inline-flex items-center justify-center w-[17px] h-[17px] rounded-full bg-emerald-500 border border-emerald-600 text-white text-[10px] font-black leading-none shrink-0" title="Convoqué">C</span>'
+            : '';
+    };
+
     let html = '';
 
     if (gardiens.length > 0) {
@@ -12100,8 +12225,12 @@ function renderGeneratedTeams() {
                 </h3>
 
                 ${gardiens.map(p => `
-                    <div class="py-1">
-                        ${getNiveauIcon(p.niveau)} ${p.name}
+                    <div class="flex items-center justify-between gap-2 py-1">
+                        <span class="flex items-center gap-1.5 min-w-0">
+                            ${squadMark(p)}
+                            <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}</span>
+                        </span>
+                        ${sessionPosteSelect(p)}
                     </div>
                 `).join('')}
             </div>
@@ -12109,6 +12238,19 @@ function renderGeneratedTeams() {
     }
 
     html += `
+        <div class="flex items-center justify-between gap-2 mb-2">
+
+            <span class="text-[11px] font-bold text-slate-500">
+                🎯 ${getSessionSquad(session).length} convoqué(s)
+            </span>
+
+            <button onclick="toggleTeamsSquadMode()"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border ${teamsSquadSelectMode ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50'}">
+                ${teamsSquadSelectMode ? '✓ Terminer' : 'C Sélectionner les convoqués'}
+            </button>
+
+        </div>
+
         <div class="grid md:grid-cols-2 gap-4">
 
             <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -12117,19 +12259,29 @@ function renderGeneratedTeams() {
                     🔵 Équipe A (${teamA.length})
                 </h3>
 
-                ${teamA.map(p => `
+                ${teamA.map((p, i) => `
 
-                    <div class="flex justify-between items-center py-1 border-b border-blue-100 text-sm">
+                    <div draggable="true" ondragstart="teamRowDragStart(event, '${p.id}')" ondragover="teamRowDragOver(event)" ondrop="teamRowDrop(event, '${p.id}')" ondragend="teamRowDragEnd()"
+                        title="Glisse ou utilise les flèches pour réordonner"
+                        class="flex justify-between items-center gap-2 py-1 border-b border-blue-100 text-sm cursor-grab">
 
-                        <span>
-                            ${getNiveauIcon(p.niveau)} ${p.name}
+                        <span class="flex items-center gap-1.5 min-w-0">
+                            ${squadMark(p)}
+                            <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}</span>
                         </span>
 
                         <div class="flex items-center gap-2">
 
-                            <span class="text-slate-500">
-                                ${p.poste1 || '-'}
-                            </span>
+                            <div class="flex flex-col gap-0.5">
+                                <button onclick="moveTeamPlayer('${p.id}', 'up')" ${i === 0 ? 'disabled' : ''}
+                                    class="w-6 h-5 rounded border border-slate-200 text-slate-600 flex items-center justify-center text-[8px] ${i === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                    aria-label="Monter ${p.name}">▲</button>
+                                <button onclick="moveTeamPlayer('${p.id}', 'down')" ${i === teamA.length - 1 ? 'disabled' : ''}
+                                    class="w-6 h-5 rounded border border-slate-200 text-slate-600 flex items-center justify-center text-[8px] ${i === teamA.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                    aria-label="Descendre ${p.name}">▼</button>
+                            </div>
+
+                            ${sessionPosteSelect(p)}
 
                             <button
                                 onclick="movePlayerToOtherTeam('${p.id}')"
@@ -12158,12 +12310,15 @@ function renderGeneratedTeams() {
                     🔴 Équipe B (${teamB.length})
                 </h3>
 
-                ${teamB.map(p => `
+                ${teamB.map((p, i) => `
 
-                    <div class="flex justify-between items-center py-1 border-b border-red-100 text-sm">
+                    <div draggable="true" ondragstart="teamRowDragStart(event, '${p.id}')" ondragover="teamRowDragOver(event)" ondrop="teamRowDrop(event, '${p.id}')" ondragend="teamRowDragEnd()"
+                        title="Glisse ou utilise les flèches pour réordonner"
+                        class="flex justify-between items-center gap-2 py-1 border-b border-red-100 text-sm cursor-grab">
 
-                        <span>
-                            ${getNiveauIcon(p.niveau)} ${p.name}
+                        <span class="flex items-center gap-1.5 min-w-0">
+                            ${squadMark(p)}
+                            <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}</span>
                         </span>
 
                         <div class="flex items-center gap-2">
@@ -12181,9 +12336,16 @@ function renderGeneratedTeams() {
                                 ✕
                             </button>
 
-                            <span class="text-slate-500">
-                                ${p.poste1 || '-'}
-                            </span>
+                            <div class="flex flex-col gap-0.5">
+                                <button onclick="moveTeamPlayer('${p.id}', 'up')" ${i === 0 ? 'disabled' : ''}
+                                    class="w-6 h-5 rounded border border-slate-200 text-slate-600 flex items-center justify-center text-[8px] ${i === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                    aria-label="Monter ${p.name}">▲</button>
+                                <button onclick="moveTeamPlayer('${p.id}', 'down')" ${i === teamB.length - 1 ? 'disabled' : ''}
+                                    class="w-6 h-5 rounded border border-slate-200 text-slate-600 flex items-center justify-center text-[8px] ${i === teamB.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
+                                    aria-label="Descendre ${p.name}">▼</button>
+                            </div>
+
+                            ${sessionPosteSelect(p)}
 
                         </div>
 
@@ -12207,15 +12369,16 @@ function renderGeneratedTeams() {
 
             ${reserve.length ? reserve.map(p => `
 
-                <div class="flex justify-between items-center py-1 border-b border-slate-200 text-sm">
+                <div class="flex justify-between items-center gap-2 py-1 border-b border-slate-200 text-sm">
 
-                    <span>
-                        ${getNiveauIcon(p.niveau)} ${p.name}
+                    <span class="flex items-center gap-1.5 min-w-0">
+                        ${squadMark(p)}
+                        <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}</span>
                     </span>
 
                     <div class="flex items-center gap-2">
 
-                        <span class="text-slate-500">${p.poste1 || '-'}</span>
+                        ${sessionPosteSelect(p)}
 
                         <button
                             onclick="addPlayerToGeneratedTeam('${p.id}', 'A')"
@@ -12327,6 +12490,12 @@ function addPlayerToGeneratedTeam(playerId, teamKey) {
 }
 
 window.removePlayerFromGeneratedTeam = removePlayerFromGeneratedTeam;
+window.toggleTeamsSquadMode = toggleTeamsSquadMode;
+window.moveTeamPlayer = moveTeamPlayer;
+window.teamRowDragStart = teamRowDragStart;
+window.teamRowDragOver = teamRowDragOver;
+window.teamRowDragEnd = teamRowDragEnd;
+window.teamRowDrop = teamRowDrop;
 window.addPlayerToGeneratedTeam = addPlayerToGeneratedTeam;
 
 var exerciseUI = {
@@ -12509,6 +12678,14 @@ const EXERCISE_FORMATS = {
     }
 };
 
+// Postes simplifies : tous les postes de champ sont ramenes a DEF / MIL / ATT
+Object.keys(EXERCISE_FORMATS).forEach(k => {
+    (EXERCISE_FORMATS[k].positions || []).forEach(p => {
+        const cat = posteCategory(p.name);
+        if (cat !== 'AUTRE') p.name = cat;
+    });
+});
+
 function exerciseIsLandscape() {
     return window.matchMedia('(min-width: 768px)').matches;
 }
@@ -12592,6 +12769,60 @@ function getSessionSquad(session) {
     return ids.filter(id => state.players.some(p => p.id === id));
 }
 
+const SESSION_POSTES = ['GB', 'DEF', 'MIL', 'ATT'];
+
+function getSessionPoste(player, sessionArg) {
+
+    if (!player) return '-';
+
+    const session = sessionArg || state.trainings[currentTrainingId];
+    const override = session && session.roles ? session.roles[player.id] : null;
+
+    if (override && SESSION_POSTES.includes(override)) return override;
+
+    const cat = posteCategory(player.poste1);
+
+    return SESSION_POSTES.includes(cat) ? cat : '-';
+}
+
+function setSessionPoste(playerId, value) {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session || !playerId) return;
+
+    if (!session.roles) session.roles = {};
+
+    const v = String(value || '').toUpperCase();
+
+    if (SESSION_POSTES.includes(v)) session.roles[playerId] = v;
+    else delete session.roles[playerId];
+
+    saveStateToFirebase();
+
+    renderGeneratedTeams();
+
+    const board = document.getElementById('training-exercise-board');
+
+    if (board && !board.classList.contains('hidden')) renderExercise();
+}
+
+function sessionPosteSelect(player) {
+
+    const session = state.trainings[currentTrainingId];
+    const current = getSessionPoste(player);
+    const overridden = !!(session && session.roles && session.roles[player.id]);
+    const known = SESSION_POSTES.includes(current);
+    const options = known ? SESSION_POSTES : [''].concat(SESSION_POSTES);
+    const selectedValue = known ? current : '';
+
+    return `<select onchange="setSessionPoste('${player.id}', this.value)"
+        title="Poste pour cette seance uniquement - la fiche du joueur n'est pas modifiee"
+        class="px-1 py-0.5 text-[11px] font-bold rounded border ${overridden ? 'border-slate-400 bg-white text-slate-800' : 'border-slate-200 bg-transparent text-slate-500'}">
+        ${options.map(v => `<option value="${v}" ${v === selectedValue ? 'selected' : ''}>${v || '—'}</option>`).join('')}
+    </select>`;
+}
+
 function getSquadTarget(session) {
 
     const fallback = parseInt(state.teams?.[(session && session.team) || '']?.targetConvocations) || 14;
@@ -12623,7 +12854,12 @@ function toggleSquadPlayer(playerId) {
     else session.squad.push(playerId);
 
     saveStateToFirebase();
-    renderExercise();
+
+    renderGeneratedTeams();
+
+    const board = document.getElementById('training-exercise-board');
+
+    if (board && !board.classList.contains('hidden')) renderExercise();
 }
 
 function addPlayerToSquad(playerId) {
@@ -12637,6 +12873,7 @@ function addPlayerToSquad(playerId) {
     if (!session.squad.includes(playerId)) session.squad.push(playerId);
 
     saveStateToFirebase();
+    renderGeneratedTeams();
     renderExercise();
     focusSquadSearch();
 }
@@ -12650,6 +12887,7 @@ function removePlayerFromSquad(playerId) {
     removePlayerFromSquadSilently(playerId);
 
     saveStateToFirebase();
+    renderGeneratedTeams();
     renderExercise();
     focusSquadSearch();
 }
@@ -12763,7 +13001,7 @@ function renderExerciseSquad() {
 
         return `<button onclick="toggleSquadPlayer('${p.id}')" title="${inSquad ? 'Retirer du groupe' : 'Ajouter au groupe'}"
             class="px-2 py-1 rounded-lg border text-[11px] font-bold transition ${inSquad ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-white border-slate-200 text-slate-600 hover:bg-amber-50 hover:border-amber-200'}">
-            ${inSquad ? '✓ ' : ''}${getNiveauIcon(p.niveau)} ${formatFirstName(playerFirstName(p))}
+            ${inSquad ? '<span style="color:#047857;font-weight:900;">C</span> ' : ''}${getNiveauIcon(p.niveau)} ${formatFirstName(playerFirstName(p))}
         </button>`;
     };
 
@@ -12801,7 +13039,7 @@ function renderExerciseSquad() {
                 ${outside.map(p => `
                     <button onclick="removePlayerFromSquad('${p.id}')" title="Retirer du groupe"
                         class="px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-200 text-[11px] font-bold">
-                        ✓ ${getNiveauIcon(p.niveau)} ${formatFirstName(playerFirstName(p))} ✕
+                        C ${getNiveauIcon(p.niveau)} ${formatFirstName(playerFirstName(p))} ✕
                     </button>`).join('')}
             </div>` : ''}
             ${!players.length ? '<p class="text-[11px] text-slate-400 italic mt-2">Aucun joueur dans le groupe.</p>' : ''}
@@ -12866,6 +13104,7 @@ window.toggleSquadPlayer = toggleSquadPlayer;
 window.addPlayerToSquad = addPlayerToSquad;
 window.removePlayerFromSquad = removePlayerFromSquad;
 window.setSquadTarget = setSquadTarget;
+window.setSessionPoste = setSessionPoste;
 window.onSquadSearchInput = onSquadSearchInput;
 window.pushSquadToNextMatch = pushSquadToNextMatch;
 
@@ -13216,7 +13455,7 @@ function renderExerciseSlot(teamKey, key, playerId, point, editable, isSquad) {
 
     const held = exerciseUI.holdSlot === key;
 
-    const isGK = !!(player && (player.poste1 || '').toUpperCase() === 'GB');
+    const isGK = !!(player && getSessionPoste(player) === 'GB');
 
     const color = isGK ? '#059669' : (teamKey === 'A' ? '#2563eb' : '#dc2626');
 
@@ -13260,7 +13499,7 @@ function renderExerciseSlot(teamKey, key, playerId, point, editable, isSquad) {
                 ${filled
                     ? `<span style="position:absolute;top:-3px;right:-6px;font-size:9px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));">${getNiveauIcon(player.niveau)}</span>`
                     : `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:rgba(255,255,255,.85);">${point.name}</span>`}
-                ${isSquad ? `<span style="position:absolute;top:-5px;left:-6px;width:12px;height:12px;border-radius:9999px;background:rgba(15,23,42,.82);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;line-height:1;color:#fff;">✓</span>` : ''}
+                ${isSquad ? `<span style="position:absolute;top:14px;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:9999px;background:${isGK ? '#ecfdf5' : '#10b981'};border:1px solid #047857;display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:900;line-height:1;color:${isGK ? '#047857' : '#fff'};box-shadow:0 1px 2px rgba(0,0,0,.3);">C</span>` : ''}
             </div>
             ${filled ? `<span style="display:block;max-width:58px;background:rgba(255,255,255,.94);color:#0f172a;font-size:9px;font-weight:800;line-height:13px;border-radius:6px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(0,0,0,.25);">${formatFirstName(playerFirstName(player))}</span>` : ''}
         </div>
@@ -13283,13 +13522,15 @@ function exerciseTeamSize(teamKey) {
 
 function posteCategory(name) {
 
-    if (name === 'GB') return 'GB';
+    const n = String(name || '').toUpperCase().trim();
 
-    if (['DC', 'DG', 'DD'].includes(name)) return 'DEF';
+    if (n === 'GB' || n === 'G') return 'GB';
 
-    if (['MC', 'MOC'].includes(name)) return 'MIL';
+    if (n === 'DEF' || ['DC', 'DG', 'DD', 'LAT'].includes(n)) return 'DEF';
 
-    if (['AD', 'AG', 'BU'].includes(name)) return 'ATT';
+    if (n === 'MIL' || ['MC', 'MOC', 'MDC', 'MO'].includes(n)) return 'MIL';
+
+    if (n === 'ATT' || ['AD', 'AG', 'BU', 'AT'].includes(n)) return 'ATT';
 
     return 'AUTRE';
 }
@@ -13485,7 +13726,7 @@ function renderExerciseBench(setup) {
             ${onBench.map(p => `
                 <button onclick="assignExercisePlayer('${p.id}')"
                     class="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold ${team === 'A' ? 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100' : 'bg-red-50 text-red-800 border border-red-200 hover:bg-red-100'}">
-                    ${squadSet.has(p.id) ? '✓ ' : ''}${getNiveauIcon(p.niveau)} ${playerShortName(p)}
+                    ${squadSet.has(p.id) ? '<span style="color:#059669;font-weight:900;">C</span> ' : ''}${getNiveauIcon(p.niveau)} ${playerShortName(p)}
                 </button>`).join('')}
         </div>`;
 }
@@ -13855,7 +14096,7 @@ function autoAssignExerciseTeam(teamArg) {
     const buckets = { GB: [], DEF: [], MIL: [], ATT: [], AUTRE: [] };
 
     players.forEach(p => {
-        const cat = posteCategory((p.poste1 || '').toUpperCase());
+        const cat = posteCategory(getSessionPoste(p));
         buckets[cat].push(p);
     });
 
