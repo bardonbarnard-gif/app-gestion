@@ -382,6 +382,9 @@ function renderLive() {
 
     if (bannerEl) {
 
+        const dd = data_();
+        const respondedCount = dd.total ? dd.total - dd.pending : 0;
+
         let status, cls;
 
         if (closed) {
@@ -389,24 +392,24 @@ function renderLive() {
             status = '🔒 Covoiturage confirmé par le coach';
             cls = 'bg-sky-100 text-sky-800 border-sky-200';
 
-        } else if (data_().toPlace.length > 0) {
-
-            status = '🔴 Passagers à placer';
-            cls = 'bg-red-100 text-red-700 border-red-200';
-
-        } else if (data_().missing > 0) {
-
-            status = `🔴 Il manque ${data_().missing} place(s)`;
-            cls = 'bg-red-100 text-red-700 border-red-200';
-
-        } else if (data_().total === 0) {
+        } else if (dd.total === 0) {
 
             status = '⏳ Aucune réponse pour l\u2019instant';
             cls = 'bg-amber-100 text-amber-700 border-amber-200';
 
+        } else if (dd.toPlace.length > 0) {
+
+            status = `🔴 ${dd.toPlace.length} passager(s) sans voiture`;
+            cls = 'bg-red-100 text-red-700 border-red-200';
+
+        } else if (dd.missing > 0) {
+
+            status = `🟠 Il manque ${dd.missing} place(s)`;
+            cls = 'bg-amber-100 text-amber-800 border-amber-200';
+
         } else {
 
-            status = '🟢 Transport assuré';
+            status = `🟢 Transport assuré — ${respondedCount}/${dd.total} réponses`;
             cls = 'bg-emerald-100 text-emerald-800 border-emerald-200';
 
         }
@@ -423,53 +426,125 @@ function renderLive() {
 
     const d = data_();
 
-    const missing = (d.passengers - d.seats) > 0
-        ? d.passengers - d.seats
-        : 0;
+    const responded = d.total ? d.total - d.pending : 0;
+    const pct = d.total ? Math.round((responded / d.total) * 100) : 0;
+
+    const rdvTime = matchMeetingTime(match) || '--';
+    const directTime = matchDirectTime(match) || '--';
+    const meetingPlace = match.meetingPlace || 'point de rendez-vous';
+    const isAway = !!(match.location && match.location !== 'Domicile');
+
+    const myR = myResponse();
+
+    const myDriverId = me
+        ? Object.keys(responses).find(id => responses[id] && responses[id].status === 'driver' && Array.isArray(responses[id].passengers) && responses[id].passengers.includes(me))
+        : null;
+
+    const directNames = convokedPlayers()
+        .filter(p => responses[p.id] && responses[p.id].status === 'direct')
+        .map(p => shortName(p.name));
+
+    const pendingNames = convokedPlayers()
+        .filter(p => !responses[p.id])
+        .map(p => shortName(p.name));
+
+    let myCard = '';
+
+    if (me && myR) {
+
+        let title = '';
+        let detail = '';
+        let cls = '';
+
+        if (myR.status === 'driver') {
+
+            const seats = myR.seats || 0;
+            const filled = Array.isArray(myR.passengers) ? myR.passengers.length : 0;
+
+            title = '🚗 Tu conduis';
+            detail = `${filled}/${seats} place(s) occupée(s) · Départ ${rdvTime} — ${meetingPlace}`;
+            cls = 'bg-sky-50 border-sky-300 text-sky-900';
+
+        } else if (myR.status === 'passenger') {
+
+            title = '👤 Tu es passager' + (myDriverId ? ' de ' + playerShort(myDriverId) : '');
+            detail = `Rendez-vous ${rdvTime} — ${meetingPlace}`;
+            cls = 'bg-emerald-50 border-emerald-300 text-emerald-900';
+
+        } else if (myR.status === 'direct') {
+
+            title = '📍 Tu y vas directement';
+            detail = isAway ? `Sois au stade à ${directTime}` : `Rendez-vous ${rdvTime} — ${meetingPlace}`;
+            cls = 'bg-amber-50 border-amber-300 text-amber-900';
+
+        } else if (myR.status === 'absent') {
+
+            title = '❌ Tu as indiqué être absent';
+            detail = 'Aucun transport nécessaire';
+            cls = 'bg-red-50 border-red-200 text-red-800';
+
+        }
+
+        if (title) {
+            myCard = `
+            <div class="${cls} border rounded-xl p-3">
+                <p class="font-extrabold text-sm">${title}</p>
+                <p class="text-[11px] font-semibold mt-0.5">${detail}</p>
+            </div>`;
+        }
+    }
 
     liveEl.innerHTML = `
-        <div class="text-xs bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+        <div class="space-y-3">
 
-            <div class="flex flex-wrap gap-2 font-bold text-slate-700">
-                <span>✅ ${d.total ? d.total - d.pending + '/' + d.total : '0/0'}</span>
-                <span>🚗 ${d.drivers}</span>
-                <span>🚘 ${d.seats} pl.</span>
-                <span>👤 ${d.passengers}</span>
-                <span>📍 ${d.directs}</span>
-                <span>❌ ${d.absents}</span>
-                <span>⏳ ${d.pending}</span>
+            <div class="bg-white border border-slate-200 rounded-xl p-3">
+                <div class="flex items-center justify-between text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                    <span>Réponses</span>
+                    <span>${responded} / ${d.total}</span>
+                </div>
+                <div class="mt-1.5 h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div class="h-full bg-sky-500" style="width:${pct}%"></div>
+                </div>
             </div>
 
-            ${d.attr.length ? `
-                <div>
-                    <strong class="text-[11px] text-slate-500 uppercase">Qui conduit qui</strong>
-                    <div class="mt-1 space-y-0.5">
-                        ${d.attr.map(a => `
-                            <div class="text-sm">
-                                🚗 <strong>${a.name}</strong> → ${a.passengers.length ? a.passengers.join(', ') : '<span class="text-slate-400">—</span>'}
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            ` : ''}
+            ${myCard}
+
+            <div>
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-sky-700 mb-1.5">🚗 Les voitures</p>
+                ${d.attr.length ? d.attr.map(a => {
+                    const filled = a.passengers.length;
+                    const dots = Array.from({ length: a.seats }).map((_, i) =>
+                        `<span class="inline-block w-3.5 h-3.5 rounded-full ${i < filled ? 'bg-sky-500' : 'bg-slate-200'}"></span>`
+                    ).join('');
+                    return `
+                    <div class="bg-white border border-sky-200 rounded-xl p-3 mb-1.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <p class="font-extrabold text-slate-800 text-sm">${a.name}</p>
+                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${filled < a.seats ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${filled}/${a.seats}</span>
+                        </div>
+                        <div class="mt-1.5 flex items-center gap-1">${dots}</div>
+                        <p class="mt-1 text-[11px] text-slate-600">${filled ? a.passengers.join(', ') : '<span class="text-slate-400">Personne pour le moment</span>'}</p>
+                    </div>`;
+                }).join('') : '<p class="text-xs text-slate-400 italic">Aucune voiture proposée pour le moment.</p>'}
+            </div>
 
             ${d.toPlace.length ? `
-                <div>
-                    <strong class="text-[11px] text-slate-500 uppercase">Passagers à placer</strong>
-                    <div class="mt-1 text-sm">
-                        ${d.toPlace.join(', ')}
-                    </div>
-                </div>
-            ` : ''}
+            <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-red-700 mb-1">Sans voiture (${d.toPlace.length})</p>
+                <p class="text-sm font-semibold text-red-900">${d.toPlace.join(', ')}</p>
+            </div>` : ''}
 
-            ${d.pending > 0 ? `
-                <div>
-                    <strong class="text-[11px] text-slate-500 uppercase">En attente</strong>
-                    <div class="mt-1 text-sm text-slate-500">
-                        ${convokedPlayers().filter(p => !responses[p.id]).map(p => shortName(p.name)).join(', ')}
-                    </div>
-                </div>
-            ` : ''}
+            ${directNames.length ? `
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 mb-1">📍 En direct (${directNames.length})</p>
+                <p class="text-sm font-semibold text-amber-900">${directNames.join(', ')}</p>
+            </div>` : ''}
+
+            ${pendingNames.length ? `
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">⏳ Sans réponse (${pendingNames.length})</p>
+                <p class="text-sm font-semibold text-slate-600">${pendingNames.join(', ')}</p>
+            </div>` : ''}
 
         </div>
     `;
