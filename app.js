@@ -12169,6 +12169,119 @@ function teamRowDrop(event, targetId) {
     renderGeneratedTeams();
 }
 
+let teamsInviteOpen = false;
+let teamsInviteQuery = '';
+
+function isSessionInvite(player, sessionArg) {
+
+    if (!player) return false;
+
+    const session = sessionArg || state.trainings[currentTrainingId];
+    const playerTeam = String(player.team || '').toLowerCase();
+    const sessionTeam = String((session && session.team) || '').toLowerCase();
+
+    return !!playerTeam && !!sessionTeam && playerTeam !== sessionTeam;
+}
+
+function toggleTeamsInvitePanel() {
+
+    teamsInviteOpen = !teamsInviteOpen;
+
+    if (!teamsInviteOpen) teamsInviteQuery = '';
+
+    renderGeneratedTeams();
+
+    if (teamsInviteOpen) focusTeamsInviteInput();
+}
+
+function focusTeamsInviteInput() {
+
+    const input = document.getElementById('teams-invite-input');
+
+    if (!input) return;
+
+    input.focus();
+
+    try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) { }
+}
+
+function onTeamsInviteInput(value) {
+
+    teamsInviteQuery = value || '';
+
+    renderTeamsInviteResults();
+}
+
+function renderTeamsInviteResults() {
+
+    const el = document.getElementById('teams-invite-results');
+
+    if (!el) return;
+
+    const session = state.trainings[currentTrainingId];
+    const query = String(teamsInviteQuery || '').trim().toLowerCase();
+
+    if (!session || query.length < 2) {
+        el.innerHTML = '';
+        return;
+    }
+
+    const gen = session.generatedTeams || {};
+    const placed = new Set([...(gen.gardiens || []), ...(gen.teamA || []), ...(gen.teamB || [])]);
+
+    const results = state.players
+        .filter(p => !placed.has(p.id))
+        .filter(p => {
+            const haystack = [p.name, p.team, state.teams?.[p.team]?.name, p.poste1, p.licence]
+                .filter(Boolean).join(' ').toLowerCase();
+            return haystack.includes(query);
+        })
+        .slice(0, 8);
+
+    if (!results.length) {
+        el.innerHTML = '<p class="text-[11px] text-slate-400 italic">Aucun joueur trouve.</p>';
+        return;
+    }
+
+    el.innerHTML = results.map(p => `
+        <div class="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-white border border-slate-200">
+            <span class="min-w-0 text-[11px] font-bold text-slate-700 truncate">
+                ${getNiveauIcon(p.niveau)} ${formatFirstName(playerFirstName(p))}
+                <span class="font-normal text-slate-400">${p.name || ''}</span>
+                <span class="ml-1 text-[9px] font-extrabold text-purple-700">${state.teams?.[p.team]?.name || String(p.team || '').toUpperCase()}</span>
+            </span>
+            <span class="flex items-center gap-1 shrink-0">
+                <button onclick="addInviteToTeam('${p.id}', 'A')"
+                    class="px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 text-[10px] font-bold">+ A</button>
+                <button onclick="addInviteToTeam('${p.id}', 'B')"
+                    class="px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-bold">+ B</button>
+            </span>
+        </div>`).join('');
+}
+
+function addInviteToTeam(playerId, teamKey) {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session || !session.generatedTeams || !playerId) return;
+
+    const gen = session.generatedTeams;
+
+    gen.gardiens = (gen.gardiens || []).filter(id => id !== playerId);
+    gen.teamA = (gen.teamA || []).filter(id => id !== playerId);
+    gen.teamB = (gen.teamB || []).filter(id => id !== playerId);
+
+    const key = teamKey === 'B' ? 'teamB' : 'teamA';
+
+    gen[key] = [...(gen[key] || []), playerId];
+
+    saveStateToFirebase();
+    renderGeneratedTeams();
+    focusTeamsInviteInput();
+
+    showToast(`Invité ajouté à l'équipe ${teamKey === 'B' ? 'B' : 'A'}`);
+}
+
 function renderGeneratedTeams() {
 
     const session = state.trainings[currentTrainingId];
@@ -12196,6 +12309,10 @@ function renderGeneratedTeams() {
     const reserve = getReserveTrainingPlayers(session);
 
     const squadSet = new Set(getSessionSquad(session));
+
+    const inviteTag = (p) => isSessionInvite(p, session)
+        ? '<span class="ml-1 px-1 py-0.5 rounded bg-purple-100 border border-purple-200 text-purple-700 text-[9px] font-extrabold">invité</span>'
+        : '';
 
     const squadMark = (p) => {
 
@@ -12228,7 +12345,7 @@ function renderGeneratedTeams() {
                     <div class="flex items-center justify-between gap-2 py-1">
                         <span class="flex items-center gap-1.5 min-w-0">
                             ${squadMark(p)}
-                            <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}</span>
+                            <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}${inviteTag(p)}</span>
                         </span>
                         ${sessionPosteSelect(p)}
                     </div>
@@ -12238,18 +12355,35 @@ function renderGeneratedTeams() {
     }
 
     html += `
-        <div class="flex items-center justify-between gap-2 mb-2">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
 
             <span class="text-[11px] font-bold text-slate-500">
                 🎯 ${getSessionSquad(session).length} convoqué(s)
             </span>
 
-            <button onclick="toggleTeamsSquadMode()"
-                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border ${teamsSquadSelectMode ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50'}">
-                ${teamsSquadSelectMode ? '✓ Terminer' : 'C Sélectionner les convoqués'}
-            </button>
+            <div class="flex items-center gap-2">
+
+                <button onclick="toggleTeamsInvitePanel()"
+                    class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border ${teamsInviteOpen ? 'bg-sky-600 border-sky-700 text-white' : 'bg-white border-sky-300 text-sky-700 hover:bg-sky-50'}">
+                    ➕ Invité
+                </button>
+
+                <button onclick="toggleTeamsSquadMode()"
+                    class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border ${teamsSquadSelectMode ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50'}">
+                    ${teamsSquadSelectMode ? '✓ Terminer' : 'C Sélectionner les convoqués'}
+                </button>
+
+            </div>
 
         </div>
+
+        ${teamsInviteOpen ? `
+        <div class="mb-2 bg-sky-50 border border-sky-200 rounded-xl p-2">
+            <input id="teams-invite-input" type="text" oninput="onTeamsInviteInput(this.value)" value="${escapeExerciseValue(teamsInviteQuery || '')}"
+                placeholder="Ajouter un joueur extérieur (U13, autre équipe…)"
+                class="w-full bg-white border border-slate-300 rounded-lg py-2 px-3 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <div id="teams-invite-results" class="mt-1.5 space-y-1"></div>
+        </div>` : ''}
 
         <div class="grid md:grid-cols-2 gap-4">
 
@@ -12267,7 +12401,7 @@ function renderGeneratedTeams() {
 
                         <span class="flex items-center gap-1.5 min-w-0">
                             ${squadMark(p)}
-                            <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}</span>
+                            <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}${inviteTag(p)}</span>
                         </span>
 
                         <div class="flex items-center gap-2">
@@ -12318,7 +12452,7 @@ function renderGeneratedTeams() {
 
                         <span class="flex items-center gap-1.5 min-w-0">
                             ${squadMark(p)}
-                            <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}</span>
+                            <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}${inviteTag(p)}</span>
                         </span>
 
                         <div class="flex items-center gap-2">
@@ -12373,7 +12507,7 @@ function renderGeneratedTeams() {
 
                     <span class="flex items-center gap-1.5 min-w-0">
                         ${squadMark(p)}
-                        <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}</span>
+                        <span class="truncate">${getNiveauIcon(p.niveau)} ${p.name}${inviteTag(p)}</span>
                     </span>
 
                     <div class="flex items-center gap-2">
@@ -12412,6 +12546,8 @@ function renderGeneratedTeams() {
     `;
 
     container.innerHTML = html;
+
+    if (teamsInviteOpen) renderTeamsInviteResults();
 }
 
 function getGeneratedTeamIds(session) {
@@ -12492,6 +12628,9 @@ function addPlayerToGeneratedTeam(playerId, teamKey) {
 window.removePlayerFromGeneratedTeam = removePlayerFromGeneratedTeam;
 window.toggleTeamsSquadMode = toggleTeamsSquadMode;
 window.moveTeamPlayer = moveTeamPlayer;
+window.toggleTeamsInvitePanel = toggleTeamsInvitePanel;
+window.onTeamsInviteInput = onTeamsInviteInput;
+window.addInviteToTeam = addInviteToTeam;
 window.teamRowDragStart = teamRowDragStart;
 window.teamRowDragOver = teamRowDragOver;
 window.teamRowDragEnd = teamRowDragEnd;
