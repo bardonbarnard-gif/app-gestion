@@ -2187,6 +2187,16 @@ Object.values(state.trainings).forEach(session => {
                 const attendanceBadge = presencePct !== null && presencePct < 50 ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-700">⚠️ Assiduité faible</span>' : '';
                 const presenceColor = presencePct === null ? 'text-slate-400' : presencePct >= 75 ? 'text-emerald-600' : presencePct >= 50 ? 'text-amber-600' : 'text-red-600';
 
+                // Covoiturage : trajets conduits et autonomie
+                const carpoolStats = getPlayerCarpoolStats(p.id);
+                const carpoolAnswers = carpoolStats.answered - carpoolStats.absents;
+                const autoBadge = (carpoolAnswers >= 2 && carpoolStats.rides === 0)
+                    ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-700" title="Jamais passager sur les matchs renseignés">🔑 Autonome</span>'
+                    : '';
+                const carpoolHint = carpoolStats.answered
+                    ? `${carpoolStats.withPassengers} conduite(s) avec passagers, ${carpoolStats.withoutSeats} sans place, ${carpoolStats.seatsOffered} place(s) offerte(s)`
+                    : 'Aucune réponse covoiturage enregistrée';
+
                 // Bilan convocations sur les matchs passés de son équipe
                 const convocHistory = getConvocationHistoryForTeam(p.team || p.cat);
                 const matchStats = convocHistory.history[p.id] || emptyConvocationStats();
@@ -2226,7 +2236,7 @@ Object.values(state.trainings).forEach(session => {
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2.5">
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5 mt-2.5">
                             <div class="metric" title="${matchHint}">
                                 <span class="metric-label">Matchs</span>
                                 <span class="metric-value ${matchColor}">${matchPct !== null ? matchPct + '%' : '—'}</span>
@@ -2243,12 +2253,17 @@ Object.values(state.trainings).forEach(session => {
                                 <span class="metric-label">Cartons</span>
                                 <span class="metric-value"><span class="text-amber-600">${cards.yellows}🟨</span> <span class="text-red-600">${cards.reds}🟥</span></span>
                             </div>
+                            <div class="metric" title="${carpoolHint}">
+                                <span class="metric-label">Trajets</span>
+                                <span class="metric-value ${carpoolStats.withPassengers ? 'text-sky-700' : 'text-slate-400'}">${carpoolStats.withPassengers ? carpoolStats.withPassengers + '🚗' : '—'}</span>
+                            </div>
                         </div>
 
                         <div class="flex flex-wrap items-center gap-1 mt-2">
                             ${niveauBadge}
                             ${blessureBadge}
                             ${attendanceBadge}
+                            ${autoBadge}
                         </div>
 
                         <details class="player-details mt-2">
@@ -2267,6 +2282,10 @@ Object.values(state.trainings).forEach(session => {
                                     <span class="font-bold text-slate-800">${presencePct !== null ? `${presences}/${totalSessions} séances` : '—'}</span>
                                 </div>
                                 <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
+                                    <span class="text-slate-500">Covoiturage :</span>
+                                    <span class="font-bold text-slate-800">${carpoolStats.answered ? `${carpoolStats.withPassengers} avec passagers${carpoolStats.withoutSeats ? ` (dont ${carpoolStats.withoutSeats} sans place)` : ''} · ${carpoolStats.rides} passager · ${carpoolStats.directs} direct` : '—'}</span>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
                                     <span class="text-slate-500">Équipe :</span>
                                     <span class="font-bold text-slate-800">${teamName}</span>
                                 </div>
@@ -2277,9 +2296,63 @@ Object.values(state.trainings).forEach(session => {
             }).join('');
 
             renderStaffEffectif();
+            renderCarpoolRanking();
         }
 
         window.renderEffectif = renderEffectif;
+
+        // Statistiques covoiturage d'un joueur, calculees sur les matchs existants
+        // (une reponse orpheline, sans match, n'est pas comptee)
+        function getPlayerCarpoolStats(playerId) {
+
+            const stats = {
+                answered: 0,
+                withPassengers: 0,
+                withoutSeats: 0,
+                seatsOffered: 0,
+                rides: 0,
+                directs: 0,
+                absents: 0
+            };
+
+            if (!playerId) return stats;
+
+            const responses = state.carpoolResponses || {};
+
+            Object.values(state.matches || {}).forEach(m => {
+
+                if (!m || !m.carpoolId) return;
+
+                const r = (responses[m.carpoolId] || {})[playerId];
+
+                if (!r || !r.status) return;
+
+                stats.answered++;
+
+                if (r.status === 'driver') {
+
+                    const seats = parseInt(r.seats) || 0;
+
+                    if (seats > 0) {
+                        stats.withPassengers++;
+                        stats.seatsOffered += seats;
+                    } else {
+                        stats.withoutSeats++;
+                    }
+
+                } else if (r.status === 'passenger') {
+                    stats.rides++;
+                } else if (r.status === 'direct') {
+                    stats.directs++;
+                } else if (r.status === 'absent') {
+                    stats.absents++;
+                }
+            });
+
+            return stats;
+        }
+
+        window.getPlayerCarpoolStats = getPlayerCarpoolStats;
 
         // Rendu Matchs & Convocations
         function populateMatchSelector() {
@@ -3307,6 +3380,83 @@ const nbTotal = playersForTraining.length;
         }
 
         window.renderAttendanceBars = renderAttendanceBars;
+
+        // Classement des familles qui conduisent (saison), dans l'onglet Effectif
+        function renderCarpoolRanking() {
+
+            const container = document.getElementById('carpool-ranking-bars');
+            if (!container) return;
+
+            const role = window.currentUserRole || 'public';
+            const userTeam = window.currentUserTeam || 'all';
+
+            const scopes = String(userTeam || '')
+                .split(',')
+                .map(t => t.trim().toLowerCase())
+                .filter(Boolean);
+
+            let playersToShow = state.players || [];
+
+            if (role === 'coach' || role === 'responsable') {
+                playersToShow = playersToShow.filter(p =>
+                    scopes.includes((p.team || p.cat || '').toLowerCase())
+                );
+            }
+
+            const rows = playersToShow.map(p => {
+
+                const stats = getPlayerCarpoolStats(p.id);
+                const autonomous = (stats.answered - stats.absents) >= 2 && stats.rides === 0;
+
+                return { p, stats, autonomous };
+
+            }).sort((a, b) => {
+
+                if (b.stats.withPassengers !== a.stats.withPassengers) {
+                    return b.stats.withPassengers - a.stats.withPassengers;
+                }
+
+                if (b.stats.seatsOffered !== a.stats.seatsOffered) {
+                    return b.stats.seatsOffered - a.stats.seatsOffered;
+                }
+
+                return String(a.p.name || '').localeCompare(String(b.p.name || ''), 'fr', { sensitivity: 'base' });
+            });
+
+            if (!rows.length) {
+                container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Aucun joueur a classer.</p>';
+                return;
+            }
+
+            const max = rows.reduce((m, r) => Math.max(m, r.stats.withPassengers), 0);
+
+            container.innerHTML = rows.map(r => {
+
+                const count = r.stats.withPassengers;
+                const pct = max > 0 ? Math.round((count / max) * 100) : 0;
+                const barColor = count > 0 ? 'bg-sky-400' : 'bg-slate-200';
+                const textColor = count > 0 ? 'text-sky-700' : 'text-slate-400';
+
+                const detail = count
+                    ? `${count} trajet${count > 1 ? 's' : ''}${r.stats.seatsOffered ? ` · ${r.stats.seatsOffered} place${r.stats.seatsOffered > 1 ? 's' : ''}` : ''}`
+                    : '—';
+
+                const autonomousBadge = r.autonomous
+                    ? '<span class="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-extrabold shrink-0" title="Jamais passager sur les matchs renseignes">🔑</span>'
+                    : '';
+
+                return `<div class="flex items-center space-x-3">
+                    <p class="text-xs font-semibold text-slate-700 w-32 shrink-0 truncate">${formatPlayerName(r.p)}</p>
+                    <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div class="${barColor} h-2 rounded-full transition-all" style="width:${pct}%"></div>
+                    </div>
+                    <p class="text-xs font-bold ${textColor} w-28 text-right shrink-0">${detail}</p>
+                    ${autonomousBadge}
+                </div>`;
+            }).join('');
+        }
+
+        window.renderCarpoolRanking = renderCarpoolRanking;
 
         function setTrainingStatus(pId, status) {
             if (!currentTrainingId) return;

@@ -2187,6 +2187,16 @@ Object.values(state.trainings).forEach(session => {
                 const attendanceBadge = presencePct !== null && presencePct < 50 ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-700">⚠️ Assiduité faible</span>' : '';
                 const presenceColor = presencePct === null ? 'text-slate-400' : presencePct >= 75 ? 'text-emerald-600' : presencePct >= 50 ? 'text-amber-600' : 'text-red-600';
 
+                // Covoiturage : trajets conduits et autonomie
+                const carpoolStats = getPlayerCarpoolStats(p.id);
+                const carpoolAnswers = carpoolStats.answered - carpoolStats.absents;
+                const autoBadge = (carpoolAnswers >= 2 && carpoolStats.rides === 0)
+                    ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-700" title="Jamais passager sur les matchs renseignés">🔑 Autonome</span>'
+                    : '';
+                const carpoolHint = carpoolStats.answered
+                    ? `${carpoolStats.withPassengers} conduite(s) avec passagers, ${carpoolStats.withoutSeats} sans place, ${carpoolStats.seatsOffered} place(s) offerte(s)`
+                    : 'Aucune réponse covoiturage enregistrée';
+
                 // Bilan convocations sur les matchs passés de son équipe
                 const convocHistory = getConvocationHistoryForTeam(p.team || p.cat);
                 const matchStats = convocHistory.history[p.id] || emptyConvocationStats();
@@ -2226,7 +2236,7 @@ Object.values(state.trainings).forEach(session => {
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2.5">
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5 mt-2.5">
                             <div class="metric" title="${matchHint}">
                                 <span class="metric-label">Matchs</span>
                                 <span class="metric-value ${matchColor}">${matchPct !== null ? matchPct + '%' : '—'}</span>
@@ -2243,12 +2253,17 @@ Object.values(state.trainings).forEach(session => {
                                 <span class="metric-label">Cartons</span>
                                 <span class="metric-value"><span class="text-amber-600">${cards.yellows}🟨</span> <span class="text-red-600">${cards.reds}🟥</span></span>
                             </div>
+                            <div class="metric" title="${carpoolHint}">
+                                <span class="metric-label">Trajets</span>
+                                <span class="metric-value ${carpoolStats.withPassengers ? 'text-sky-700' : 'text-slate-400'}">${carpoolStats.withPassengers ? carpoolStats.withPassengers + '🚗' : '—'}</span>
+                            </div>
                         </div>
 
                         <div class="flex flex-wrap items-center gap-1 mt-2">
                             ${niveauBadge}
                             ${blessureBadge}
                             ${attendanceBadge}
+                            ${autoBadge}
                         </div>
 
                         <details class="player-details mt-2">
@@ -2267,6 +2282,10 @@ Object.values(state.trainings).forEach(session => {
                                     <span class="font-bold text-slate-800">${presencePct !== null ? `${presences}/${totalSessions} séances` : '—'}</span>
                                 </div>
                                 <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
+                                    <span class="text-slate-500">Covoiturage :</span>
+                                    <span class="font-bold text-slate-800">${carpoolStats.answered ? `${carpoolStats.withPassengers} avec passagers${carpoolStats.withoutSeats ? ` (dont ${carpoolStats.withoutSeats} sans place)` : ''} · ${carpoolStats.rides} passager · ${carpoolStats.directs} direct` : '—'}</span>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
                                     <span class="text-slate-500">Équipe :</span>
                                     <span class="font-bold text-slate-800">${teamName}</span>
                                 </div>
@@ -2277,9 +2296,63 @@ Object.values(state.trainings).forEach(session => {
             }).join('');
 
             renderStaffEffectif();
+            renderCarpoolRanking();
         }
 
         window.renderEffectif = renderEffectif;
+
+        // Statistiques covoiturage d'un joueur, calculees sur les matchs existants
+        // (une reponse orpheline, sans match, n'est pas comptee)
+        function getPlayerCarpoolStats(playerId) {
+
+            const stats = {
+                answered: 0,
+                withPassengers: 0,
+                withoutSeats: 0,
+                seatsOffered: 0,
+                rides: 0,
+                directs: 0,
+                absents: 0
+            };
+
+            if (!playerId) return stats;
+
+            const responses = state.carpoolResponses || {};
+
+            Object.values(state.matches || {}).forEach(m => {
+
+                if (!m || !m.carpoolId) return;
+
+                const r = (responses[m.carpoolId] || {})[playerId];
+
+                if (!r || !r.status) return;
+
+                stats.answered++;
+
+                if (r.status === 'driver') {
+
+                    const seats = parseInt(r.seats) || 0;
+
+                    if (seats > 0) {
+                        stats.withPassengers++;
+                        stats.seatsOffered += seats;
+                    } else {
+                        stats.withoutSeats++;
+                    }
+
+                } else if (r.status === 'passenger') {
+                    stats.rides++;
+                } else if (r.status === 'direct') {
+                    stats.directs++;
+                } else if (r.status === 'absent') {
+                    stats.absents++;
+                }
+            });
+
+            return stats;
+        }
+
+        window.getPlayerCarpoolStats = getPlayerCarpoolStats;
 
         // Rendu Matchs & Convocations
         function populateMatchSelector() {
@@ -2524,11 +2597,10 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
                     : `<button onclick="validateCurrentMatchSheet()" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition shadow-sm"><i class="fa-solid fa-circle-check"></i><span>Valider et verrouiller</span></button>`;
             }
 
-            let convokedCount = 0, totalSeats = 0;
+            let convokedCount = 0;
             const targetConvoked = parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
             playerItems.forEach(({ p }) => {
                 if (m.convocations[p.id] === 'convoke') convokedCount++;
-                totalSeats += parseInt(m.carpool[p.id]) || 0;
             });
 
             const isOverTarget = convokedCount > targetConvoked;
@@ -2679,11 +2751,32 @@ renderMatchSummary(m);
             let htmlMobileCards = '';
             let htmlTableRows = '';
 
+            // Pastille d'etat transport dans la liste de convocation
+            const carpoolResp = state.carpoolResponses?.[m.carpoolId] || {};
+
+            const carpoolChip = (pid) => {
+
+                if (m.convocations[pid] !== 'convoke') return '';
+
+                const r = carpoolResp[pid];
+
+                if (!r) return '<span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[9px] font-extrabold" title="Pas de reponse covoiturage">⏳</span>';
+
+                if (r.status === 'driver') return `<span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 text-[9px] font-extrabold" title="Conducteur">🚗 ${r.seats || 0}</span>`;
+
+                if (r.status === 'passenger') return '<span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-extrabold" title="Passager">👤</span>';
+
+                if (r.status === 'direct') return '<span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-extrabold" title="Va directement au stade">📍</span>';
+
+                if (r.status === 'absent') return '<span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[9px] font-extrabold" title="Absent">❌</span>';
+
+                return '';
+            };
+
             playerItems.forEach(({ p, invite }) => {
                 const currentStatus = m.convocations[p.id] || 'none';
                 const selectedPosition = m.positions[p.id] || p.poste1 || '-';
                 const jerseyNumber = jerseysForMatch[p.id]?.number ?? '';
-                const carpoolSeats = m.carpool[p.id] || 0;
                 const disciplineChip = renderDisciplineChip(computePlayerDiscipline(p.id, cardsIndex));
                 const postes = getPlayerPostesList(p);
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
@@ -2693,7 +2786,7 @@ renderMatchSummary(m);
                     <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 shadow-sm space-y-2.5 mb-2.5">
                         <div class="flex items-start justify-between gap-2">
                             <div class="min-w-0">
-                                <div class="font-bold text-slate-800 text-[13px]">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}</div>
+                                <div class="font-bold text-slate-800 text-[13px]">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}${carpoolChip(p.id)}</div>
                                 <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
                                 ${convocationBadgeHtml(convocHistory.history[p.id])}
                             </div>
@@ -2726,16 +2819,6 @@ renderMatchSummary(m);
                                 <span class="text-[10px] text-slate-500 uppercase font-bold">Maillot</span>
                                 <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-16 p-1 border rounded text-center font-bold text-xs bg-white">
                             </div>
-                            <div class="flex items-center justify-between gap-2">
-                                <span class="text-[10px] text-slate-500 uppercase font-bold">Covoiturage</span>
-                                <select onchange="setMatchCarpool('${m.id}', '${p.id}', this.value)" class="bg-white border font-bold text-xs py-1 px-2 rounded-lg">
-                                    <option value="0" ${carpoolSeats == 0 ? 'selected' : ''}>0 place</option>
-                                    <option value="2" ${carpoolSeats == 2 ? 'selected' : ''}>🚗 2 places</option>
-                                    <option value="3" ${carpoolSeats == 3 ? 'selected' : ''}>🚗 3 places</option>
-                                    <option value="4" ${carpoolSeats == 4 ? 'selected' : ''}>🚗 4 places</option>
-                                    <option value="5" ${carpoolSeats == 5 ? 'selected' : ''}>🚗 5 places</option>
-                                </select>
-                            </div>
                         </div>
                     </div>
                 `;
@@ -2744,7 +2827,7 @@ renderMatchSummary(m);
                 htmlTableRows += `
                     <tr class="${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
                         <td class="p-3 pl-4">
-                            <div class="font-bold text-slate-800">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}</div>
+                            <div class="font-bold text-slate-800">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}${carpoolChip(p.id)}</div>
                             <div class="text-[10px] text-slate-400">Poste favori : ${p.poste1 || '-'}</div>
                             ${convocationBadgeHtml(convocHistory.history[p.id])}
                         </td>
@@ -3297,6 +3380,83 @@ const nbTotal = playersForTraining.length;
         }
 
         window.renderAttendanceBars = renderAttendanceBars;
+
+        // Classement des familles qui conduisent (saison), dans l'onglet Effectif
+        function renderCarpoolRanking() {
+
+            const container = document.getElementById('carpool-ranking-bars');
+            if (!container) return;
+
+            const role = window.currentUserRole || 'public';
+            const userTeam = window.currentUserTeam || 'all';
+
+            const scopes = String(userTeam || '')
+                .split(',')
+                .map(t => t.trim().toLowerCase())
+                .filter(Boolean);
+
+            let playersToShow = state.players || [];
+
+            if (role === 'coach' || role === 'responsable') {
+                playersToShow = playersToShow.filter(p =>
+                    scopes.includes((p.team || p.cat || '').toLowerCase())
+                );
+            }
+
+            const rows = playersToShow.map(p => {
+
+                const stats = getPlayerCarpoolStats(p.id);
+                const autonomous = (stats.answered - stats.absents) >= 2 && stats.rides === 0;
+
+                return { p, stats, autonomous };
+
+            }).sort((a, b) => {
+
+                if (b.stats.withPassengers !== a.stats.withPassengers) {
+                    return b.stats.withPassengers - a.stats.withPassengers;
+                }
+
+                if (b.stats.seatsOffered !== a.stats.seatsOffered) {
+                    return b.stats.seatsOffered - a.stats.seatsOffered;
+                }
+
+                return String(a.p.name || '').localeCompare(String(b.p.name || ''), 'fr', { sensitivity: 'base' });
+            });
+
+            if (!rows.length) {
+                container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Aucun joueur a classer.</p>';
+                return;
+            }
+
+            const max = rows.reduce((m, r) => Math.max(m, r.stats.withPassengers), 0);
+
+            container.innerHTML = rows.map(r => {
+
+                const count = r.stats.withPassengers;
+                const pct = max > 0 ? Math.round((count / max) * 100) : 0;
+                const barColor = count > 0 ? 'bg-sky-400' : 'bg-slate-200';
+                const textColor = count > 0 ? 'text-sky-700' : 'text-slate-400';
+
+                const detail = count
+                    ? `${count} trajet${count > 1 ? 's' : ''}${r.stats.seatsOffered ? ` · ${r.stats.seatsOffered} place${r.stats.seatsOffered > 1 ? 's' : ''}` : ''}`
+                    : '—';
+
+                const autonomousBadge = r.autonomous
+                    ? '<span class="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-extrabold shrink-0" title="Jamais passager sur les matchs renseignes">🔑</span>'
+                    : '';
+
+                return `<div class="flex items-center space-x-3">
+                    <p class="text-xs font-semibold text-slate-700 w-32 shrink-0 truncate">${formatPlayerName(r.p)}</p>
+                    <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div class="${barColor} h-2 rounded-full transition-all" style="width:${pct}%"></div>
+                    </div>
+                    <p class="text-xs font-bold ${textColor} w-28 text-right shrink-0">${detail}</p>
+                    ${autonomousBadge}
+                </div>`;
+            }).join('');
+        }
+
+        window.renderCarpoolRanking = renderCarpoolRanking;
 
         function setTrainingStatus(pId, status) {
             if (!currentTrainingId) return;
@@ -5229,13 +5389,6 @@ Un passager non déclaré = un enfant sans siège prévu.
             saveStateToFirebase();
         }
 
-        function setMatchCarpool(mId, pId, seats) {
-            if (!state.matches[mId].carpool) state.matches[mId].carpool = {};
-            state.matches[mId].carpool[pId] = parseInt(seats) || 0;
-            saveStateToFirebase();
-            renderMatchDetail();
-        }
-
         function onInviteSearchInput(value) {
             const resultsEl = document.getElementById('invite-search-results');
             if (!resultsEl) return;
@@ -7166,7 +7319,31 @@ function renderTransportTab(data) {
 
     if (!container) return;
 
+    const respondedCount = data.totalConvoked ? data.totalConvoked - data.pending : 0;
+    const responsePct = data.totalConvoked ? Math.round((respondedCount / data.totalConvoked) * 100) : 0;
+
     container.innerHTML = `
+
+        <div class="bg-white border border-slate-200 rounded-xl p-3 mb-4">
+
+            <div class="flex items-center justify-between text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                <span>Réponses covoiturage</span>
+                <span>${respondedCount} / ${data.totalConvoked}</span>
+            </div>
+
+            <div class="mt-1.5 h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div class="h-full bg-sky-500" style="width:${responsePct}%"></div>
+            </div>
+
+            <div class="mt-1 text-[11px] font-bold text-slate-500">
+                🚘 ${data.seats} places proposées · ${data.passengers} passager(s)
+            </div>
+
+            <div class="mt-1 font-bold ${data.transportClass}">
+                ${data.transportStatus}
+            </div>
+
+        </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
 
@@ -7208,125 +7385,102 @@ function renderTransportTab(data) {
 
         </div>
 
-        <div class="bg-white border rounded-xl p-4 mb-4">
+        <div class="grid md:grid-cols-2 gap-3 mb-3">
 
-            <div class="font-bold mb-2">
-                🚘 Places disponibles
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 mb-1">
+                    📍 En direct (${data.directs})
+                </p>
+                <p class="text-sm font-semibold text-amber-900">
+                    ${data.directList.join(', ') || 'Aucun'}
+                </p>
             </div>
 
-            <div>
-                ${data.seats}
-            </div>
-
-            <div class="mt-2 font-semibold">
-                ${data.transportStatus}
-            </div>
-
-        </div>
-
-        <div class="grid md:grid-cols-2 gap-4">
-
-            <div class="border rounded-xl p-4">
-
-                <h3 class="font-bold mb-2">
-                    🚗 Conducteurs
-                </h3>
-
-                ${data.driverList.join('<br>') || 'Aucun'}
-
-            </div>
-
-            <div class="border rounded-xl p-4">
-
-                <h3 class="font-bold mb-2">
-                    👤 Passagers
-                </h3>
-
-                ${data.passengerList.join('<br>') || 'Aucun'}
-
-            </div>
-
-            <div class="border rounded-xl p-4">
-
-                <h3 class="font-bold mb-2">
-                    📍 Direct
-                </h3>
-
-                ${data.directList.join('<br>') || 'Aucun'}
-
-            </div>
-
-            <div class="border rounded-xl p-4">
-
-                <h3 class="font-bold mb-2">
-                    ❌ Absents
-                </h3>
-
-                ${data.absentList.join('<br>') || 'Aucun'}
-
+            <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-red-700 mb-1">
+                    ❌ Absents (${data.absents})
+                </p>
+                <p class="text-sm font-semibold text-red-800">
+                    ${data.absentList.join(', ') || 'Aucun'}
+                </p>
             </div>
 
         </div>
 
-        <div class="mt-4 border rounded-xl p-4">
+        ${data.driverNoSeatList.length ? `
+        <div class="mb-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
+            <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">
+                🚙 Conducteur(s) sans place (${data.driverNoSeatList.length})
+            </p>
+            <p class="text-sm font-semibold text-slate-600">${data.driverNoSeatList.join(', ')}</p>
+        </div>` : ''}
 
-            <h3 class="font-bold mb-2">
-                🚗 → 👤 Répartition des passagers
+        <div class="mt-1">
+
+            <h3 class="font-bold mb-2 text-slate-700">
+                🚗 Les voitures
             </h3>
 
-            ${data.driverAssignments.length ? data.driverAssignments.map(a => `
-                <div class="border-b border-slate-100 py-2">
+            ${data.driverAssignments.length ? data.driverAssignments.map(a => {
 
-                    <div class="flex items-center justify-between gap-2 flex-wrap">
-                        <div class="font-semibold">
-                            ${a.name}
-                            <span class="text-[10px] text-slate-400">
-                                (${a.seats} places)
+                const filled = a.passengerNames.length;
+                const dots = Array.from({ length: a.seats }).map((_, i) =>
+                    `<span class="inline-block w-3.5 h-3.5 rounded-full ${i < filled ? 'bg-sky-500' : 'bg-slate-200'}"></span>`
+                ).join('');
+
+                return `
+                <div class="bg-white border border-sky-200 rounded-xl p-3 mb-2">
+
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="font-bold text-slate-800 text-sm">${a.name}</p>
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${filled < a.seats ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                            ${filled}/${a.seats} places
+                        </span>
+                    </div>
+
+                    <div class="mt-1.5 flex items-center gap-1">${dots}</div>
+
+                    <div class="mt-1.5 flex flex-wrap gap-1">
+                        ${a.passengerNames.map((pn, i) => `
+                            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold flex items-center gap-1">
+                                ${pn}
+                                <button onclick="carpoolRemovePassenger('${data.matchId}','${a.id}','${a.passengerIds[i]}')" class="text-emerald-600 hover:text-red-600" title="Retirer">✕</button>
                             </span>
-                        </div>
-                        <div class="flex flex-wrap gap-1">
-                            ${a.passengerNames.map((pn, i) => `
-                                <span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold flex items-center gap-1">
-                                    ${pn}
-                                    <button onclick="carpoolRemovePassenger('${data.matchId}','${a.id}','${a.passengerIds[i]}')" class="text-sky-500 hover:text-red-600" title="Retirer">✕</button>
-                                </span>
-                            `).join('')}
-                        </div>
+                        `).join('')}
+                        ${filled ? '' : '<span class="text-[11px] text-slate-400">Personne pour le moment</span>'}
                     </div>
 
                     <select
                         onchange="carpoolAssignPassenger('${data.matchId}','${a.id}', this.value); this.value=''"
-                        class="mt-1 w-full p-1.5 text-xs border rounded-lg bg-white">
+                        class="mt-2 w-full p-1.5 text-xs border rounded-lg bg-white">
                         <option value="">
-                            ➕ Ajouter un passager (${a.passengerNames.length}/${a.seats})
+                            ➕ Ajouter un passager (${filled}/${a.seats})
                         </option>
                         ${data.availablePassengers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
                     </select>
 
-                </div>
-            `).join('') : '<p class="text-xs text-slate-400">Aucun conducteur avec places pour le moment.</p>'}
+                </div>`;
+            }).join('') : '<p class="text-xs text-slate-400">Aucun conducteur avec places pour le moment.</p>'}
 
             ${data.toPlaceList.length ? `
-                <div class="mt-3">
-                    <strong class="text-red-700">
-                        🚫 À placer (${data.toPlaceList.length})
-                    </strong>
-                    <br>
-                    ${data.toPlaceList.join('<br>')}
-                </div>
-            ` : '<div class="mt-3 text-xs text-slate-400">Tous les passagers sont placés ✅</div>'}
+            <div class="mt-2 bg-red-50 border border-red-200 rounded-xl p-3">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-red-700 mb-1">
+                    🚫 Sans voiture (${data.toPlaceList.length})
+                </p>
+                <p class="text-sm font-semibold text-red-900">${data.toPlaceList.join(', ')}</p>
+            </div>` : '<div class="mt-2 text-xs text-slate-400">Tous les passagers sont placés ✅</div>'}
 
         </div>
 
-        <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <div class="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
 
-            <h3 class="font-bold mb-2">
+            <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">
+                ⏳ Sans réponse (${data.pendingList.length})
+            </p>
 
-                ⏳ En attente (${data.pendingList.length})
-
-            </h3>
-
-            ${data.pendingList.join('<br>') || 'Tout le monde a répondu ✅'}
+            <p class="text-sm font-semibold text-slate-600">
+                ${data.pendingList.join(', ') || 'Tout le monde a répondu ✅'}
+            </p>
 
         </div>
 
