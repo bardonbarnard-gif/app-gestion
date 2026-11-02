@@ -2427,20 +2427,12 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
     return;
 }
 
-            // Filtrer les joueurs selon le rôle
-            const playersForMatch = role === 'coach'
-           
-            
-                ? state.players.filter(p => (p.team || p.cat || '').toLowerCase() === userTeam.toLowerCase())
-                : state.players;
-
-            const invites = Object.values(m.extraPlayers || {});
-            const existingIds = new Set(playersForMatch.map(p => p.id));
-            const playerItems = playersForMatch
-                .map(p => ({ p, invite: false }))
-                .concat(invites
-                    .filter(ep => !existingIds.has(ep.id))
-                    .map(ep => ({ p: ep, invite: true })));
+            // Liste des joueurs du match via le sélecteur unique :
+            // effectif de l'équipe + surclassés (résolus depuis l'effectif).
+            // Un coach ne voit que son équipe et ses invités ; un admin voit
+            // tout l'effectif pour pouvoir convoquer n'importe qui.
+            const playerItems = getMatchPlayers(m, { includeAll: role !== 'coach' });
+            const playersForMatch = playerItems.map(item => item.p);
 
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
             const teamColors = getTeamColorClasses(m.team);
@@ -2815,33 +2807,156 @@ renderMatchSummary(m);
 
         let currentTrainingId = null;
 
+        let trainingSearchQuery = '';
+        let trainingTeamFilter = 'all';
+        let trainingStatusFilter = 'all';
+
+        function getTrainingScopeTeams() {
+            const role = window.currentUserRole || 'public';
+            const scopes = String(window.currentUserTeam || '')
+                .split(',')
+                .map(t => t.trim().toLowerCase())
+                .filter(Boolean);
+            return role === 'coach' && scopes.length ? scopes : null;
+        }
+
+        function getTrainingSessionsForUser() {
+            let all = Object.values(state.trainings || {});
+            const scope = getTrainingScopeTeams();
+            if (scope) all = all.filter(t => scope.includes((t.team || '').toLowerCase()));
+            return all;
+        }
+
+        function getTrainingSessionStats(s) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const sDate = s.date ? new Date(s.date + 'T12:00:00') : null;
+            const isPast = !!(sDate && sDate < today);
+            const presences = Object.values(s.presence || {});
+            const nbPresent = presences.filter(v => v === 'present' || v === 'retard').length;
+            const nbTotal = state.players.filter(p =>
+                (p.team || p.cat || '').toLowerCase() === (s.team || '').toLowerCase()
+            ).length;
+            const pct = nbTotal > 0 ? Math.round((nbPresent / nbTotal) * 100) : 0;
+            const isComplete = nbTotal > 0 && presences.length >= nbTotal;
+            return { isPast, presences, nbPresent, nbTotal, pct, isComplete };
+        }
+
+        function matchTrainingStatus(s, status) {
+            if (status === 'all') return true;
+            const stats = getTrainingSessionStats(s);
+            if (status === 'upcoming') return !stats.isPast;
+            if (status === 'past') return stats.isPast;
+            if (status === 'tocomplete') return stats.isPast && !stats.isComplete;
+            return true;
+        }
+
+        function trainingSessionMatches(s) {
+            if (trainingTeamFilter !== 'all' && (s.team || '') !== trainingTeamFilter) return false;
+            if (!matchTrainingStatus(s, trainingStatusFilter)) return false;
+            const query = trainingSearchQuery.trim().toLowerCase();
+            if (!query) return true;
+            return [s.title, s.theme, s.lieu, s.team, state.teams?.[s.team]?.name]
+                .filter(Boolean).join(' ').toLowerCase().includes(query);
+        }
+
+        function setTrainingStatusFilter(status) {
+            trainingStatusFilter = status;
+            renderEntrainements();
+        }
+
+        function filterTrainingSessions(value) {
+            if (typeof value === 'string') trainingSearchQuery = value;
+            const select = document.getElementById('training-team-filter');
+            if (select) trainingTeamFilter = select.value;
+            renderEntrainements();
+        }
+
+        function resetTrainingFilters() {
+            trainingSearchQuery = '';
+            trainingTeamFilter = 'all';
+            trainingStatusFilter = 'all';
+            const input = document.getElementById('training-search');
+            if (input) input.value = '';
+            const select = document.getElementById('training-team-filter');
+            if (select) select.value = 'all';
+            renderEntrainements();
+        }
+
+        window.setTrainingStatusFilter = setTrainingStatusFilter;
+        window.filterTrainingSessions = filterTrainingSessions;
+        window.resetTrainingFilters = resetTrainingFilters;
+
+        function renderTrainingToolbar() {
+            const wrapper = document.getElementById('training-toolbar');
+            if (!wrapper) return;
+
+            const allSessions = getTrainingSessionsForUser();
+            wrapper.classList.toggle('hidden', allSessions.length === 0);
+
+            const select = document.getElementById('training-team-filter');
+            if (select) {
+                const teamKeys = [...new Set(allSessions.map(s => s.team).filter(Boolean))];
+                if (trainingTeamFilter !== 'all' && !teamKeys.includes(trainingTeamFilter)) {
+                    trainingTeamFilter = 'all';
+                }
+                select.innerHTML = '<option value="all">Toutes les équipes</option>' + teamKeys
+                    .map(key => `<option value="${key}" ${trainingTeamFilter === key ? 'selected' : ''}>${state.teams?.[key]?.name || String(key).toUpperCase()}</option>`)
+                    .join('');
+                select.classList.toggle('hidden', teamKeys.length < 2);
+            }
+
+            const statusEl = document.getElementById('training-status-filters');
+            if (!statusEl) return;
+            const counts = { all: allSessions.length, upcoming: 0, tocomplete: 0, past: 0 };
+            allSessions.forEach(s => {
+                const stats = getTrainingSessionStats(s);
+                if (stats.isPast) {
+                    counts.past++;
+                    if (!stats.isComplete) counts.tocomplete++;
+                } else {
+                    counts.upcoming++;
+                }
+            });
+            const chips = [
+                { key: 'all', label: 'Toutes', count: counts.all },
+                { key: 'upcoming', label: 'À venir', count: counts.upcoming },
+                { key: 'tocomplete', label: 'À compléter', count: counts.tocomplete },
+                { key: 'past', label: 'Passées', count: counts.past }
+            ];
+            statusEl.innerHTML = chips.map(c => {
+                const active = trainingStatusFilter === c.key;
+                return `<button type="button" onclick="setTrainingStatusFilter('${c.key}')" class="px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 active:bg-slate-100'}">${c.label}<span class="ml-1 ${active ? 'text-white/60' : 'text-slate-400'}">${c.count}</span></button>`;
+            }).join('');
+        }
+
         function renderEntrainements() {
             renderTrainingStatsBar();
+            renderTrainingToolbar();
             const daysLabelEl = document.getElementById('training-days-label');
             if (daysLabelEl) daysLabelEl.textContent = trainingDaysLabel() + ' · 18h00 – 20h00';
             const today = new Date(); today.setHours(0,0,0,0);
 
-            const role = window.currentUserRole || 'public';
-const userTeam = window.currentUserTeam || 'all';
-
-let all = Object.values(state.trainings || {});
-
-if (role === 'coach') {
-    all = all.filter(t =>
-        (t.team || '').toLowerCase() === userTeam.toLowerCase()
-    );
-}
+            const all = getTrainingSessionsForUser().filter(trainingSessionMatches);
             const future = all.filter(s => s.date && new Date(s.date + 'T12:00:00') >= today)
                               .sort((a, b) => new Date(a.date) - new Date(b.date));
             const past   = all.filter(s => !s.date || new Date(s.date + 'T12:00:00') < today)
                               .sort((a, b) => new Date(b.date) - new Date(a.date));
             const sessions = [...future, ...past];
+            const nextUpcomingId = future.length ? future[0].id : null;
 
             const container = document.getElementById('training-sessions-list');
             if (!container) return;
 
             if (sessions.length === 0) {
-                container.innerHTML = `<div class="flex flex-col items-center justify-center py-12 text-slate-400">
+                const hasAnySession = getTrainingSessionsForUser().length > 0;
+                container.innerHTML = hasAnySession
+                    ? `<div class="flex flex-col items-center justify-center py-12 text-slate-400">
+                    <i class="fa-solid fa-filter-circle-xmark text-4xl mb-3 opacity-30" aria-hidden="true"></i>
+                    <p class="text-sm font-semibold">Aucune séance ne correspond</p>
+                    <p class="text-xs mt-1">Modifiez la recherche ou les filtres</p>
+                    <button type="button" onclick="resetTrainingFilters()" class="mt-3 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold">Réinitialiser les filtres</button>
+                </div>`
+                    : `<div class="flex flex-col items-center justify-center py-12 text-slate-400">
                     <i class="fa-solid fa-person-running text-4xl mb-3 opacity-30"></i>
                     <p class="text-sm font-semibold">Aucune séance enregistrée</p>
                     <p class="text-xs mt-1">Créez votre première séance avec le bouton ci-dessus</p>
@@ -2851,19 +2966,22 @@ if (role === 'coach') {
 
             // Séparateurs
             let html = '';
-            let shownNext = false, shownPast = false;
+            let shownUpcoming = false, shownPast = false;
 
             sessions.forEach((s, i) => {
                 const sDate = s.date ? new Date(s.date + 'T12:00:00') : null;
-                const isPast = sDate && sDate < today;
+                const isPast = !!(sDate && sDate < today);
+                const isNext = s.id === nextUpcomingId;
 
-                if (!isPast && !shownNext && i === 0) {
-                    html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-sky-500 mb-1 mt-1">⚡ Prochain entraînement</p>`;
-                    shownNext = true;
-                } else if (!isPast && shownNext && i === 1) {
-                    html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1 mt-3">📅 À venir</p>`;
-                } else if (isPast && !shownPast) {
-                    html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1 mt-4">🕓 Séances passées</p>`;
+                if (!isPast) {
+                    if (isNext) {
+                        html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-sky-500 mb-1 mt-1">⚡ Prochain entraînement</p>`;
+                    } else if (!shownUpcoming) {
+                        html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1 mt-3">📅 À venir · ${future.length - 1}</p>`;
+                        shownUpcoming = true;
+                    }
+                } else if (!shownPast) {
+                    html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1 mt-4">🕓 Séances passées · ${past.length}</p>`;
                     shownPast = true;
                 }
 
@@ -2885,9 +3003,9 @@ const nbTotal = playersForTraining.length;
 
                 const statusDot = isPast
                     ? (isComplete ? '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>' : '<span class="w-2 h-2 rounded-full bg-slate-300 inline-block"></span>')
-                    : (i === 0 ? '<span class="w-2 h-2 rounded-full bg-sky-400 inline-block animate-pulse"></span>' : '<span class="w-2 h-2 rounded-full bg-slate-300 inline-block"></span>');
+                    : (isNext ? '<span class="w-2 h-2 rounded-full bg-sky-400 inline-block animate-pulse"></span>' : '<span class="w-2 h-2 rounded-full bg-slate-300 inline-block"></span>');
 
-                const cardBg = !isPast && i === 0
+                const cardBg = isNext
                     ? 'bg-sky-50 border-sky-200 hover:border-sky-400'
                     : 'bg-slate-50 hover:bg-sky-50 border-slate-200 hover:border-sky-200';
 
@@ -3184,6 +3302,11 @@ const nbTotal = playersForTraining.length;
             if (!currentTrainingId) return;
             if (!state.trainings[currentTrainingId].presence) state.trainings[currentTrainingId].presence = {};
             state.trainings[currentTrainingId].presence[pId] = status;
+
+            // Un joueur absent ou blesse sort du groupe de travail
+            if (status === 'absent' || status === 'blesse') {
+                removePlayerFromSquadSilently(pId);
+            }
             
             // Mise à jour du champ blessure sur l'objet joueur (pour l'effetif)
             const player = state.players.find(p => p.id === pId);
@@ -3255,6 +3378,9 @@ function setAllTrainingAbsent() {
     playersToMark.forEach(player => {
         state.trainings[currentTrainingId].presence[player.id] = 'absent';
     });
+
+    // Tous absents : le groupe de travail se vide aussi
+    state.trainings[currentTrainingId].squad = [];
 
     saveStateToFirebase();
 
@@ -3837,8 +3963,7 @@ function openFeuilleDeMatch() {
     const terrain = m.pelouse || '';
     const opponent = m.opponent || '';
 
-    const convoques = state.players
-        .filter(p => m.convocations && m.convocations[p.id] === 'convoke')
+    const convoques = getMatchConvoked(m)
         .slice()
         .sort((a, b) => {
             const ja = parseInt(m.jerseys?.[a.id], 10) || 0;
@@ -4315,13 +4440,15 @@ function formatDeadlineFr(deadlineText) {
     const m =
         state.matches[state.selectedMatchId];
 
+    const squad = getMatchPlayers(m).map(item => item.p);
+
     const convoked =
-        state.players.filter(
+        squad.filter(
             p => m.convocations[p.id] === 'convoke'
         );
 
     const indisponibles =
-        state.players.filter(
+        squad.filter(
             p => m.convocations[p.id] === 'indisponible'
         );
 
@@ -4451,7 +4578,7 @@ function generateCarpoolReminder() {
 
     if (!m) return;
 
-    const summary = buildCarpoolSummary(m, state.players || []);
+    const summary = buildCarpoolSummary(m, getMatchPlayers(m).map(item => item.p));
 
     const target =
         parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
@@ -4494,8 +4621,8 @@ function generateCarpoolReminder() {
     };
 
     const respMapAll = state.carpoolResponses?.[m.carpoolId] || {};
-    const pendingIdsAll = (state.players || [])
-        .filter(p => m.convocations?.[p.id] === 'convoke' && !respMapAll[p.id])
+    const pendingIdsAll = getMatchConvoked(m)
+        .filter(p => !respMapAll[p.id])
         .map(p => p.id);
     const passengerIdsAll = Object.entries(respMapAll)
         .filter(([id, r]) => r && r.status === 'passenger')
@@ -4675,7 +4802,7 @@ Un passager non déclaré = un enfant sans siège prévu.
             if (!m.convocations) m.convocations = {};
             if (!state.cards[m.id]) state.cards[m.id] = {};
             if (!m.matchStats) m.matchStats = {};
-            const convokedPlayers = state.players.filter(p => m.convocations[p.id] === 'convoke');
+            const convokedPlayers = getMatchConvoked(m);
             container.innerHTML = `
                 <div class="bg-slate-50 p-3 rounded-lg border space-y-3">
                     <p class="font-bold text-slate-700">Scores Finaux :</p>
@@ -4829,14 +4956,13 @@ Un passager non déclaré = un enfant sans siège prévu.
             const teamKey = String(m.team || '').toLowerCase();
 
             const rows = (playerItems || [])
-                .filter(item => !item.invite)
                 // On garde les joueurs de l'équipe + les surclassés déjà convoqués
                 .filter(({ p }) => {
                     const ownTeam = String(p.team || p.cat || '').toLowerCase() === teamKey;
                     const s = data.history[p.id];
                     return ownTeam || (s && s.total > 0);
                 })
-                .map(({ p }) => ({ p, s: data.history[p.id] || emptyConvocationStats() }))
+                .map(({ p, invite }) => ({ p, invite, s: data.history[p.id] || emptyConvocationStats() }))
                 .sort((a, b) =>
                     (b.s.played - a.s.played) ||
                     (a.s.choix - b.s.choix) ||
@@ -4852,12 +4978,16 @@ Un passager non déclaré = un enfant sans siège prévu.
                 return;
             }
 
-            const rowsHtml = rows.map(({ p, s }) => {
+            const rowsHtml = rows.map(({ p, invite, s }) => {
                 const pct = s.total ? Math.round((s.played / s.total) * 100) : 0;
+                const originTeam = invite
+                    ? (state.teams?.[p.team]?.name || String(p.team || p.cat || '').toUpperCase())
+                    : '';
+                const originLabel = originTeam ? ` · prêté par ${originTeam}` : '';
                 return `<div class="flex items-center justify-between gap-2 px-4 py-2">
                         <div class="min-w-0">
                             <p class="font-bold text-xs text-slate-800 truncate">${p.name}</p>
-                            <p class="text-[10px] text-slate-400">${p.poste1 || '-'}</p>
+                            <p class="text-[10px] text-slate-400">${p.poste1 || '-'}${originLabel}</p>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <span class="px-1.5 py-0.5 rounded border border-sky-100 bg-sky-50 text-sky-700 text-[10px] font-bold" title="Convoqué">✅ ${s.played}</span>
@@ -4905,17 +5035,10 @@ Un passager non déclaré = un enfant sans siège prévu.
 
         function getMatchSubstitutePlayers(m) {
             if (!m) return [];
-            const byId = new Map();
-            (state.players || []).forEach(p => byId.set(p.id, p));
-            Object.values(m.extraPlayers || {}).forEach(p => {
-                if (p && p.id) byId.set(p.id, p);
-            });
-
             const positions = m.positions || {};
-            const subs = [];
-            byId.forEach(p => {
-                if (positions[p.id] === 'Remplaçant') subs.push(p);
-            });
+            const subs = getMatchPlayers(m)
+                .map(item => item.p)
+                .filter(p => positions[p.id] === 'Remplaçant');
 
             return sortByBenchOrder(m, subs);
         }
@@ -4942,10 +5065,12 @@ Un passager non déclaré = un enfant sans siège prévu.
         function getCompositionBenchPlayers(m) {
             if (!m) return [];
             const assigned = Object.values(m.slotAssignments || {});
-            const bench = (state.players || []).filter(p =>
-                (m.convocations || {})[p.id] === 'convoke' &&
-                !assigned.includes(p.id)
-            );
+            const bench = getMatchPlayers(m)
+                .map(item => item.p)
+                .filter(p =>
+                    (m.convocations || {})[p.id] === 'convoke' &&
+                    !assigned.includes(p.id)
+                );
             return sortByBenchOrder(m, bench);
         }
 
@@ -5174,8 +5299,10 @@ Un passager non déclaré = un enfant sans siège prévu.
             const p = state.players.find(pp => pp.id === playerId);
             if (!p) return;
 
+            // Modèle canonique : on ne stocke que l'ID. Le joueur est résolu
+            // à l'affichage depuis l'effectif (nom/poste/licence à jour).
             if (!m.extraPlayers) m.extraPlayers = {};
-            m.extraPlayers[playerId] = Object.assign({}, p);
+            m.extraPlayers[playerId] = true;
             saveStateToFirebase();
             renderMatchDetail();
         }
@@ -5189,6 +5316,15 @@ Un passager non déclaré = un enfant sans siège prévu.
             if (m.positions) delete m.positions[playerId];
             if (m.jerseys) delete m.jerseys[playerId];
             if (m.carpool) delete m.carpool[playerId];
+
+            // Nettoyage des références au joueur retiré
+            Object.keys(m.slotAssignments || {}).forEach(slot => {
+                if (m.slotAssignments[slot] === playerId) delete m.slotAssignments[slot];
+            });
+            if (Array.isArray(m.benchOrder)) {
+                m.benchOrder = m.benchOrder.filter(id => id !== playerId);
+            }
+
             saveStateToFirebase();
             renderMatchDetail();
         }
@@ -6741,11 +6877,112 @@ firebase.database().ref('teams').on('value', (snapshot) => {
     renderAdminTeams(data);
 });
 
+// ============================================================
+// JOUEURS D'UN MATCH — source unique de vérité
+// ------------------------------------------------------------
+// Renvoie l'effectif concerné par un match : les joueurs de l'équipe
+// + les surclassés (joueurs d'une autre équipe convoqués/invités).
+//
+// Un invité peut être stocké sous trois formes (compatibilité ascendante) :
+//   - ID seul           : extraPlayers[id] === true        (nouveau format)
+//   - ID + copie joueur : extraPlayers[id] = { ...player } (ancien format)
+//   - aucune trace dans extraPlayers, mais présent dans convocations
+//     ou slotAssignments (données historiques / matchs réparés)
+//
+// Dans tous les cas l'ID est résolu depuis l'effectif courant, pour que
+// nom, poste et licence restent à jour. Si le joueur a été supprimé de
+// l'effectif, on retombe sur la copie enregistrée dans le match.
+//
+// options.includeAll : true pour un admin/responsable (tout l'effectif
+// est listé, afin de pouvoir convoquer n'importe quel joueur).
+function getMatchPlayers(m, options) {
+    const opts = options || {};
+    const includeAll = !!opts.includeAll;
+    const teamKey = String((m && m.team) || '').toLowerCase();
+    const all = Array.isArray(state.players) ? state.players : [];
+
+    const byId = new Map();
+    all.forEach(p => { if (p && p.id) byId.set(p.id, p); });
+
+    const result = [];
+    const seen = new Set();
+
+    const push = (p, invite) => {
+        if (!p || !p.id || seen.has(p.id)) return;
+        seen.add(p.id);
+        result.push({ p, invite: !!invite });
+    };
+
+    const belongsToTeam = p =>
+        String(p.team || p.cat || '').toLowerCase() === teamKey;
+
+    // 1) Effectif de l'équipe (ou effectif complet pour un admin/responsable)
+    all.forEach(p => {
+        if (!p || !p.id) return;
+        if (includeAll || !teamKey || belongsToTeam(p)) push(p, false);
+    });
+
+    // 2) Joueurs référencés par le match mais hors effectif de l'équipe
+    //    = les surclassés. On se base sur les champs qui font foi.
+    const referenced = new Set();
+    ['extraPlayers', 'convocations'].forEach(key => {
+        Object.keys((m && m[key]) || {}).forEach(id => referenced.add(id));
+    });
+    Object.values((m && m.slotAssignments) || {}).forEach(id => {
+        if (id) referenced.add(id);
+    });
+    (Array.isArray(m && m.benchOrder) ? m.benchOrder : []).forEach(id => {
+        if (id) referenced.add(id);
+    });
+
+    referenced.forEach(id => {
+        if (seen.has(id)) return;
+
+        const live = byId.get(id);
+        if (live) {
+            // Joueur toujours dans l'effectif : données à jour
+            push(live, true);
+            return;
+        }
+
+        // Joueur supprimé de l'effectif : on garde la copie du match
+        const snapshot = m && m.extraPlayers ? m.extraPlayers[id] : null;
+        if (snapshot && typeof snapshot === 'object') {
+            push(Object.assign({}, snapshot, { id: snapshot.id || id }), true);
+        }
+        // Sans copie, impossible de l'afficher : on l'ignore silencieusement.
+    });
+
+    return result;
+}
+
+// Joueurs convoqués d'un match (IDs résolus), pour les compteurs et les listes
+function getMatchConvoked(m) {
+    const conv = (m && m.convocations) || {};
+    return getMatchPlayers(m)
+        .filter(item => conv[item.p.id] === 'convoke')
+        .map(item => item.p);
+}
+
 function buildCarpoolSummary(m, playersForMatch) {
     const carpoolResponses = state.carpoolResponses?.[m.carpoolId] || {};
-    const responses = Object.keys(carpoolResponses).length;
 
-    const totalConvoked = playersForMatch.filter(p => m.convocations[p.id] === 'convoke').length;
+    const convokedPlayers = (playersForMatch || [])
+        .filter(p => m.convocations[p.id] === 'convoke');
+    const totalConvoked = convokedPlayers.length;
+    const convokedIds = new Set(convokedPlayers.map(p => p.id));
+
+    // On ne compte que les réponses des joueurs réellement convoqués :
+    // une réponse orpheline (joueur dé-convoqué) ne doit pas fausser le compteur.
+    const responses = Object.keys(carpoolResponses)
+        .filter(id => convokedIds.has(id)).length;
+
+    // Résolution des noms : liste du match d'abord (contient les surclassés),
+    // puis effectif complet pour les réponses hors liste.
+    const playerById = new Map();
+    (playersForMatch || []).forEach(p => { if (p && p.id) playerById.set(p.id, p); });
+    (state.players || []).forEach(p => { if (p && p.id && !playerById.has(p.id)) playerById.set(p.id, p); });
+    const nameOf = id => (playerById.get(id) || {}).name || id;
 
     let drivers = 0;
     let passengers = 0;
@@ -6764,8 +7001,7 @@ function buildCarpoolSummary(m, playersForMatch) {
     Object.entries(carpoolResponses)
         .forEach(([playerId, r]) => {
 
-            const player = state.players.find(p => p.id === playerId);
-            const playerName = player?.name || playerId;
+            const playerName = nameOf(playerId);
 
             if (r.status === 'driver') {
 
@@ -6790,7 +7026,7 @@ function buildCarpoolSummary(m, playersForMatch) {
                         seats: r.seats || 0,
                         passengerIds,
                         passengerNames: passengerIds.map(
-                            id => state.players.find(p => p.id === id)?.name || id
+                            id => nameOf(id)
                         )
                     });
 
@@ -6830,11 +7066,11 @@ function buildCarpoolSummary(m, playersForMatch) {
         .map(([playerId]) => playerId);
 
     const toPlaceList = toPlaceListIds.map(
-        id => state.players.find(p => p.id === id)?.name || id
+        id => nameOf(id)
     );
 
     const availablePassengers = toPlaceListIds
-        .map(id => state.players.find(p => p.id === id))
+        .map(id => playerById.get(id))
         .filter(Boolean)
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
         .map(p => ({ id: p.id, name: p.name }));
@@ -7209,10 +7445,7 @@ function buildCarpoolRecapText(matchId) {
 
     if (!match) return '';
 
-    const matchPlayers = (match.convocations
-        ? state.players.filter(p => match.convocations[p.id] === 'convoke')
-        : []
-    );
+    const matchPlayers = getMatchConvoked(match);
 
     const s = buildCarpoolSummary(match, matchPlayers);
 
@@ -11070,7 +11303,9 @@ function getFirstName(player) {
         const jerseys = computeMatchJerseys(match);
         const teamHex = getTeamHex(match.team);
 
-        const convoked = state.players.filter(p => (match.convocations || {})[p.id] === 'convoke');
+        const squad = getMatchPlayers(match).map(item => item.p);
+        const squadById = new Map(squad.map(p => [p.id, p]));
+        const convoked = squad.filter(p => (match.convocations || {})[p.id] === 'convoke');
         const bench = getCompositionBenchPlayers(match);
         const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
         const maxSubs = Math.min(3, Math.max(0, targetConvoked - 11));
@@ -11078,13 +11313,13 @@ function getFirstName(player) {
 
         const duplicates = Object.entries(jerseys)
             .filter(([, j]) => j.duplicate)
-            .map(([id]) => state.players.find(p => p.id === id))
+            .map(([id]) => squadById.get(id))
             .filter(Boolean)
             .map(p => formatPlayerName(p));
 
         const slotHTML = (pos) => {
             const playerId = match.slotAssignments[pos.slot];
-            const player = playerId ? state.players.find(p => p.id === playerId) : null;
+            const player = playerId ? squadById.get(playerId) : null;
             const jersey = player ? jerseys[player.id] : null;
             const label = getSlotLabel(pos.slot);
             const style = `--px:${pos.x}%;--py:${pos.y}%;--lx:${(100 - pos.y).toFixed(2)}%;--ly:${pos.x}%;`;
@@ -11219,9 +11454,12 @@ function getFirstName(player) {
         const currentId = assigned[pickingSlot];
         const takenIds = Object.values(assigned).filter(id => id !== currentId);
 
-        const currentPlayer = currentId ? state.players.find(p => p.id === currentId) : null;
+        const squad = getMatchPlayers(match).map(item => item.p);
+        const squadById = new Map(squad.map(p => [p.id, p]));
 
-        const candidates = state.players
+        const currentPlayer = currentId ? squadById.get(currentId) : null;
+
+        const candidates = squad
             .filter(p => (match.convocations || {})[p.id] === 'convoke' && !takenIds.includes(p.id))
             .sort((a, b) => {
                 const na = jerseys[a.id]?.number;
@@ -11682,10 +11920,21 @@ function getNiveauIcon(niveau) {
 
 function generateBalancedTeams() {
 
-    showToast("Génération lancée");
-
     const session = state.trainings[currentTrainingId];
     if (!session) return;
+
+    const existingTeams = session.generatedTeams;
+    const hasComposition = !!(existingTeams && (
+        (existingTeams.teamA || []).length ||
+        (existingTeams.teamB || []).length ||
+        (existingTeams.gardiens || []).length
+    ));
+
+    if (hasComposition && !confirm('Une composition existe déjà pour cette séance. La remplacer ? Les ajustements manuels seront perdus.')) {
+        return;
+    }
+
+    showToast("Génération lancée");
 
     const presents = state.players.filter(p =>
     session.presence?.[p.id] === 'present' ||
@@ -11838,6 +12087,8 @@ function renderGeneratedTeams() {
         .map(id => state.players.find(p => p.id === id))
         .filter(Boolean);
 
+    const reserve = getReserveTrainingPlayers(session);
+
     let html = '';
 
     if (gardiens.length > 0) {
@@ -11886,6 +12137,13 @@ function renderGeneratedTeams() {
                                 ➡️
                             </button>
 
+                            <button
+                                onclick="removePlayerFromGeneratedTeam('${p.id}')"
+                                class="px-2 py-1 rounded bg-white hover:bg-red-50 text-red-500 text-xs"
+                                title="Retirer de l'équipe (le joueur reste présent)">
+                                ✕
+                            </button>
+
                         </div>
 
                     </div>
@@ -11916,6 +12174,13 @@ function renderGeneratedTeams() {
                                 ⬅️
                             </button>
 
+                            <button
+                                onclick="removePlayerFromGeneratedTeam('${p.id}')"
+                                class="px-2 py-1 rounded bg-white hover:bg-red-50 text-red-500 text-xs"
+                                title="Retirer de l'équipe (le joueur reste présent)">
+                                ✕
+                            </button>
+
                             <span class="text-slate-500">
                                 ${p.poste1 || '-'}
                             </span>
@@ -11927,6 +12192,48 @@ function renderGeneratedTeams() {
                 `).join('')}
 
             </div>
+
+        </div>
+
+        <div class="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
+
+            <h3 class="font-bold text-slate-700 mb-1">
+                🪑 En réserve (${reserve.length})
+            </h3>
+
+            <p class="text-[10px] text-slate-400 mb-2">
+                Présents non affectés · retire un joueur d'une équipe ou marque-le présent dans l'appel pour le retrouver ici
+            </p>
+
+            ${reserve.length ? reserve.map(p => `
+
+                <div class="flex justify-between items-center py-1 border-b border-slate-200 text-sm">
+
+                    <span>
+                        ${getNiveauIcon(p.niveau)} ${p.name}
+                    </span>
+
+                    <div class="flex items-center gap-2">
+
+                        <span class="text-slate-500">${p.poste1 || '-'}</span>
+
+                        <button
+                            onclick="addPlayerToGeneratedTeam('${p.id}', 'A')"
+                            class="px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 text-[11px] font-bold">
+                            + A
+                        </button>
+
+                        <button
+                            onclick="addPlayerToGeneratedTeam('${p.id}', 'B')"
+                            class="px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 text-[11px] font-bold">
+                            + B
+                        </button>
+
+                    </div>
+
+                </div>
+
+            `).join('') : '<p class="text-xs text-slate-400 italic">Aucun joueur en réserve.</p>'}
 
         </div>
 
@@ -11944,6 +12251,84 @@ function renderGeneratedTeams() {
     container.innerHTML = html;
 }
 
+function getGeneratedTeamIds(session) {
+
+    const gen = (session && session.generatedTeams) || {};
+
+    return new Set([
+        ...(gen.gardiens || []),
+        ...(gen.teamA || []),
+        ...(gen.teamB || [])
+    ]);
+}
+
+function getReserveTrainingPlayers(session) {
+
+    if (!session) return [];
+
+    const assigned = getGeneratedTeamIds(session);
+
+    return state.players.filter(p => {
+
+        const status = session.presence && session.presence[p.id];
+
+        if (status !== 'present' && status !== 'retard') return false;
+
+        return !assigned.has(p.id);
+    });
+}
+
+function removePlayerFromGeneratedTeam(playerId) {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session || !session.generatedTeams) return;
+
+    let removed = false;
+
+    ['teamA', 'teamB'].forEach(key => {
+
+        const ids = session.generatedTeams[key] || [];
+
+        if (ids.includes(playerId)) {
+            session.generatedTeams[key] = ids.filter(id => id !== playerId);
+            removed = true;
+        }
+    });
+
+    if (!removed) return;
+
+    saveStateToFirebase();
+    renderGeneratedTeams();
+
+    showToast('Joueur placé en réserve');
+}
+
+function addPlayerToGeneratedTeam(playerId, teamKey) {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session || !session.generatedTeams || !playerId) return;
+
+    const targetKey = teamKey === 'B' ? 'teamB' : 'teamA';
+    const gen = session.generatedTeams;
+
+    // Un joueur ne peut figurer que dans une seule liste
+    gen.teamA = (gen.teamA || []).filter(id => id !== playerId);
+    gen.teamB = (gen.teamB || []).filter(id => id !== playerId);
+    gen.gardiens = (gen.gardiens || []).filter(id => id !== playerId);
+
+    gen[targetKey] = [...(gen[targetKey] || []), playerId];
+
+    saveStateToFirebase();
+    renderGeneratedTeams();
+
+    showToast(`Joueur ajouté à l'équipe ${targetKey === 'teamB' ? 'B' : 'A'}`);
+}
+
+window.removePlayerFromGeneratedTeam = removePlayerFromGeneratedTeam;
+window.addPlayerToGeneratedTeam = addPlayerToGeneratedTeam;
+
 var exerciseUI = {
     selected: null,
     tool: 'move',
@@ -11952,8 +12337,35 @@ var exerciseUI = {
     slotMove: false,
     holdSlot: null,
     drag: null,
-    suppressClickUntil: 0
+    suppressClickUntil: 0,
+    squadQuery: ''
 };
+
+let exerciseResizeBound = false;
+
+function bindExerciseResize() {
+
+    if (exerciseResizeBound) return;
+
+    exerciseResizeBound = true;
+
+    let timer = null;
+
+    window.addEventListener('resize', () => {
+
+        clearTimeout(timer);
+
+        timer = setTimeout(() => {
+
+            const board = document.getElementById('training-exercise-board');
+            const session = state.trainings[currentTrainingId];
+
+            if (board && !board.classList.contains('hidden') && session && session.generatedTeams) {
+                renderExercise();
+            }
+        }, 150);
+    });
+}
 
 const EXERCISE_FORMATS = {
     '4v4': {
@@ -12097,6 +12509,366 @@ const EXERCISE_FORMATS = {
     }
 };
 
+function exerciseIsLandscape() {
+    return window.matchMedia('(min-width: 768px)').matches;
+}
+
+function exerciseTeamPlayerIds(teamKey) {
+
+    const session = state.trainings[currentTrainingId];
+    const gen = session && session.generatedTeams;
+
+    if (!gen) return [];
+
+    return teamKey === 'A'
+        ? [...(gen.teamA || []), ...(gen.gardiens || [])]
+        : (gen.teamB || []);
+}
+
+function getExercisePositions(setup, teamKey) {
+
+    const fmt = EXERCISE_FORMATS[setup && setup.format] || EXERCISE_FORMATS['8v8'];
+
+    return (fmt.positions || [])
+        .map((pos, idx) => ({ name: pos.name, x: pos.x, y: pos.y, idx: idx }))
+        .filter(p => teamKey === 'A' || p.name !== 'GB');
+}
+
+function exerciseTeamKeys(setup, teamKey) {
+    return new Set(getExercisePositions(setup, teamKey).map(p => teamKey + ':' + p.idx));
+}
+
+function getAutoExerciseFormat() {
+
+    const sizeA = exerciseTeamPlayerIds('A').length;
+    const sizeB = exerciseTeamPlayerIds('B').length;
+
+    if (!sizeA && !sizeB) return null;
+
+    // Le cote B n'a pas de poste gardien : il lui faut un poste de champ libre
+    const need = Math.max(sizeA, sizeB + 1);
+
+    const keys = Object.keys(EXERCISE_FORMATS)
+        .filter(k => (EXERCISE_FORMATS[k].positions || []).length >= need)
+        .sort((a, b) => EXERCISE_FORMATS[a].positions.length - EXERCISE_FORMATS[b].positions.length);
+
+    return keys[0] || '11v11';
+}
+
+function applyAutoExerciseFormat(setup) {
+
+    if (!setup || setup.autoFormatApplied) return null;
+
+    const hasPlayers = Object.keys((setup.byTeam && setup.byTeam.A) || {}).length +
+        Object.keys((setup.byTeam && setup.byTeam.B) || {}).length > 0;
+
+    setup.autoFormatApplied = true;
+
+    if (hasPlayers) return null;
+
+    const suggested = getAutoExerciseFormat();
+
+    if (!suggested || suggested === setup.format) return null;
+
+    setup.format = suggested;
+
+    return suggested;
+}
+
+function exerciseScreenToStored(x, y) {
+    return exerciseIsLandscape() ? { x: y, y: x } : { x: x, y: y };
+}
+
+function exercisePropPoint(x, y) {
+    return exerciseIsLandscape() ? { left: y, top: x } : { left: x, top: y };
+}
+
+function getSessionSquad(session) {
+
+    if (!session) return [];
+
+    const ids = Array.isArray(session.squad) ? session.squad : [];
+
+    return ids.filter(id => state.players.some(p => p.id === id));
+}
+
+function getSquadTarget(session) {
+
+    const fallback = parseInt(state.teams?.[(session && session.team) || '']?.targetConvocations) || 14;
+    const value = parseInt(session && session.squadTarget);
+
+    return value > 0 ? value : fallback;
+}
+
+function removePlayerFromSquadSilently(playerId) {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session || !Array.isArray(session.squad)) return;
+
+    const i = session.squad.indexOf(playerId);
+
+    if (i >= 0) session.squad.splice(i, 1);
+}
+
+function toggleSquadPlayer(playerId) {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session || !playerId) return;
+
+    if (!Array.isArray(session.squad)) session.squad = [];
+
+    if (session.squad.includes(playerId)) removePlayerFromSquadSilently(playerId);
+    else session.squad.push(playerId);
+
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function addPlayerToSquad(playerId) {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session || !playerId) return;
+
+    if (!Array.isArray(session.squad)) session.squad = [];
+
+    if (!session.squad.includes(playerId)) session.squad.push(playerId);
+
+    saveStateToFirebase();
+    renderExercise();
+    focusSquadSearch();
+}
+
+function removePlayerFromSquad(playerId) {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session) return;
+
+    removePlayerFromSquadSilently(playerId);
+
+    saveStateToFirebase();
+    renderExercise();
+    focusSquadSearch();
+}
+
+function setSquadTarget(value) {
+
+    const session = state.trainings[currentTrainingId];
+    const target = parseInt(value);
+
+    if (!session || !target || target < 1) return;
+
+    session.squadTarget = target;
+
+    saveStateToFirebase();
+    renderExercise();
+}
+
+function focusSquadSearch() {
+
+    const input = document.getElementById('squad-search');
+
+    if (!input) return;
+
+    input.focus();
+
+    try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) { }
+}
+
+function onSquadSearchInput(value) {
+
+    exerciseUI.squadQuery = value || '';
+
+    renderSquadSearchResults();
+}
+
+function renderSquadSearchResults() {
+
+    const el = document.getElementById('squad-search-results');
+
+    if (!el) return;
+
+    const session = state.trainings[currentTrainingId];
+    const query = String(exerciseUI.squadQuery || '').trim().toLowerCase();
+
+    if (!session || query.length < 2) {
+        el.innerHTML = '';
+        return;
+    }
+
+    const squad = getSessionSquad(session);
+
+    const results = state.players
+        .filter(p => !squad.includes(p.id))
+        .filter(p => {
+            const haystack = [p.name, p.team, state.teams?.[p.team]?.name, p.poste1]
+                .filter(Boolean).join(' ').toLowerCase();
+            return haystack.includes(query);
+        })
+        .slice(0, 8);
+
+    if (!results.length) {
+        el.innerHTML = '<p class="text-[11px] text-slate-400 italic">Aucun joueur trouve.</p>';
+        return;
+    }
+
+    el.innerHTML = results.map(p => `
+        <button onclick="addPlayerToSquad('${p.id}')"
+            class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-amber-50 border border-slate-200 text-left">
+            <span class="min-w-0 text-[11px] font-bold text-slate-700 truncate">
+                ${getNiveauIcon(p.niveau)} ${formatFirstName(playerFirstName(p))}
+                <span class="font-normal text-slate-400">${p.name || ''}</span>
+            </span>
+            <span class="text-[10px] font-extrabold text-amber-700 whitespace-nowrap">+ Ajouter</span>
+        </button>`).join('');
+}
+
+function renderExerciseSquad() {
+
+    const session = state.trainings[currentTrainingId];
+    const el = document.getElementById('exercise-squad');
+
+    if (!el || !session) return;
+
+    const squad = getSessionSquad(session);
+    const target = getSquadTarget(session);
+    const count = squad.length;
+
+    const badge = count > target
+        ? 'bg-red-50 text-red-700 border-red-200'
+        : (count === target ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200');
+
+    const players = squad.map(id => state.players.find(p => p.id === id)).filter(Boolean);
+
+    const gen = session.generatedTeams || {};
+
+    const fieldGroups = [
+        { label: '🧤 Gardien', ids: gen.gardiens || [] },
+        { label: '🔵 Équipe A', ids: gen.teamA || [] },
+        { label: '🔴 Équipe B', ids: gen.teamB || [] }
+    ]
+        .map(g => ({ label: g.label, players: g.ids.map(id => state.players.find(p => p.id === id)).filter(Boolean) }))
+        .filter(g => g.players.length);
+
+    const fieldIds = new Set(fieldGroups.reduce((acc, g) => acc.concat(g.players.map(p => p.id)), []));
+
+    const outside = players.filter(p => !fieldIds.has(p.id));
+
+    const squadChip = (p) => {
+
+        const inSquad = squad.includes(p.id);
+
+        return `<button onclick="toggleSquadPlayer('${p.id}')" title="${inSquad ? 'Retirer du groupe' : 'Ajouter au groupe'}"
+            class="px-2 py-1 rounded-lg border text-[11px] font-bold transition ${inSquad ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-white border-slate-200 text-slate-600 hover:bg-amber-50 hover:border-amber-200'}">
+            ${inSquad ? '✓ ' : ''}${getNiveauIcon(p.niveau)} ${formatFirstName(playerFirstName(p))}
+        </button>`;
+    };
+
+    el.innerHTML = `
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-xs font-bold text-slate-800">🎯 Groupe de travail</h3>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${badge}">${count} / ${target}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="squad-target" class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cible</label>
+                    <input id="squad-target" type="number" min="1" max="30" value="${target}" onchange="setSquadTarget(this.value)"
+                        class="w-14 px-2 py-1 text-xs font-bold text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400">
+                    <button onclick="pushSquadToNextMatch()"
+                        class="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold whitespace-nowrap">
+                        ➡️ Convocation
+                    </button>
+                </div>
+            </div>
+            <div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
+                    Sur le terrain · tape un joueur pour le tagger
+                </p>
+                ${fieldGroups.length ? fieldGroups.map(g => `
+                    <div class="flex items-start gap-2 py-0.5">
+                        <span class="text-[10px] font-bold text-slate-400 whitespace-nowrap pt-1.5 w-[70px]">${g.label}</span>
+                        <div class="flex flex-wrap gap-1 min-w-0">
+                            ${g.players.map(squadChip).join('')}
+                        </div>
+                    </div>`).join('') : `<p class="text-[11px] text-slate-400 italic">Génère les équipes pour tagger les joueurs présents d'un simple tap.</p>`}
+            </div>
+            ${outside.length ? `<div class="mt-2 flex flex-wrap items-center gap-1.5">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Hors terrain</span>
+                ${outside.map(p => `
+                    <button onclick="removePlayerFromSquad('${p.id}')" title="Retirer du groupe"
+                        class="px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-200 text-[11px] font-bold">
+                        ✓ ${getNiveauIcon(p.niveau)} ${formatFirstName(playerFirstName(p))} ✕
+                    </button>`).join('')}
+            </div>` : ''}
+            ${!players.length ? '<p class="text-[11px] text-slate-400 italic mt-2">Aucun joueur dans le groupe.</p>' : ''}
+            <div class="relative mt-2">
+                <input id="squad-search" type="text" oninput="onSquadSearchInput(this.value)" value="${escapeExerciseValue(exerciseUI.squadQuery || '')}"
+                    placeholder="Ajouter un joueur (U13, autre equipe...)"
+                    class="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <span class="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
+            </div>
+            <div id="squad-search-results" class="mt-1.5 space-y-1"></div>
+        </div>`;
+
+    renderSquadSearchResults();
+}
+
+function getNextSessionMatch(session) {
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const teamKey = String((session && session.team) || '');
+
+    return Object.values(state.matches || {})
+        .filter(m => m && m.date && new Date(m.date + 'T12:00:00') >= today)
+        .filter(m => !teamKey || String(m.team || '') === teamKey)
+        .sort((a, b) => new Date(a.date + 'T12:00:00') - new Date(b.date + 'T12:00:00'))[0] || null;
+}
+
+function pushSquadToNextMatch() {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session) return;
+
+    const squad = getSessionSquad(session);
+
+    if (!squad.length) {
+        showToast('Le groupe est vide', 'error');
+        return;
+    }
+
+    const match = getNextSessionMatch(session);
+
+    if (!match) {
+        showToast('Aucun match a venir pour cette equipe', 'error');
+        return;
+    }
+
+    const label = new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    if (!confirm(`Remplacer la convocation du match du ${label} par ces ${squad.length} joueurs ?`)) return;
+
+    match.convocations = {};
+
+    squad.forEach(id => { match.convocations[id] = 'convoke'; });
+
+    saveStateToFirebase();
+    showToast('Convocation du match mise a jour');
+}
+
+window.toggleSquadPlayer = toggleSquadPlayer;
+window.addPlayerToSquad = addPlayerToSquad;
+window.removePlayerFromSquad = removePlayerFromSquad;
+window.setSquadTarget = setSquadTarget;
+window.onSquadSearchInput = onSquadSearchInput;
+window.pushSquadToNextMatch = pushSquadToNextMatch;
+
 function makeExerciseTemplate(name) {
 
     return {
@@ -12185,7 +12957,13 @@ function openExerciseBoard() {
 
     container.classList.remove("hidden");
 
+    exerciseUI.squadQuery = '';
+
     const setup = getExerciseSetup(session);
+
+    if (applyAutoExerciseFormat(setup)) saveStateToFirebase();
+
+    bindExerciseResize();
 
     const fmtKeys = Object.keys(EXERCISE_FORMATS);
 
@@ -12254,6 +13032,8 @@ function openExerciseBoard() {
 
         <p id="exercise-hint" class="text-[11px] text-slate-400 mt-1.5"></p>
 
+        <div id="exercise-squad" class="mt-3"></div>
+
         <div id="exercise-bench" class="mt-3"></div>
 
         <div id="exercise-timer-overlay" class="hidden fixed inset-0 z-[100] bg-slate-900/85 flex-col flex items-center justify-center gap-5" style="display:none;">
@@ -12272,24 +13052,163 @@ function openExerciseBoard() {
     renderExercise();
 }
 
-function buildFieldLinesHTML() {
+function buildExercisePitchSVG(area, landscape) {
 
-    return `
-        <div style="position:absolute;inset:6px;border:3px solid rgba(255,255,255,.85);border-radius:12px;pointer-events:none;"></div>
-        <div style="position:absolute;left:0;right:0;top:50%;height:3px;background:rgba(255,255,255,.7);pointer-events:none;"></div>
-        <div style="position:absolute;left:50%;top:50%;width:80px;height:80px;border:2px solid rgba(255,255,255,.55);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;"></div>
-        <div style="position:absolute;left:50%;top:50%;width:9px;height:9px;background:rgba(255,255,255,.8);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;"></div>
-        <div style="position:absolute;left:20%;right:20%;top:0;height:22%;border-left:3px solid rgba(255,255,255,.7);border-right:3px solid rgba(255,255,255,.7);border-bottom:3px solid rgba(255,255,255,.7);border-radius:0 0 10px 10px;pointer-events:none;"></div>
-        <div style="position:absolute;left:34%;right:34%;top:0;height:10%;border-left:2px solid rgba(255,255,255,.6);border-right:2px solid rgba(255,255,255,.6);border-bottom:2px solid rgba(255,255,255,.6);border-radius:0 0 8px 8px;pointer-events:none;"></div>
-        <div style="position:absolute;left:20%;right:20%;bottom:0;height:22%;border-left:3px solid rgba(255,255,255,.7);border-right:3px solid rgba(255,255,255,.7);border-top:3px solid rgba(255,255,255,.7);border-radius:10px 10px 0 0;pointer-events:none;"></div>
-        <div style="position:absolute;left:34%;right:34%;bottom:0;height:10%;border-left:2px solid rgba(255,255,255,.6);border-right:2px solid rgba(255,255,255,.6);border-top:2px solid rgba(255,255,255,.6);border-radius:8px 8px 0 0;pointer-events:none;"></div>
-        <div style="position:absolute;left:50%;top:15%;width:7px;height:7px;background:rgba(255,255,255,.75);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;"></div>
-        <div style="position:absolute;left:50%;bottom:15%;width:7px;height:7px;background:rgba(255,255,255,.75);border-radius:50%;transform:translate(-50%,50%);pointer-events:none;"></div>
-        <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 26px,rgba(0,0,0,.045) 26px 52px);pointer-events:none;border-radius:12px;"></div>
-    `;
+    const half = area === 'half';
+    const L = half ? 52.5 : 105;
+    const W = 68;
+    const vbW = landscape ? L : W;
+    const vbH = landscape ? W : L;
+
+    const stroke = 'rgba(255,255,255,.85)';
+    const SW = 0.5;
+
+    // along (0 = ligne de but) / across (0..W) -> coordonnees SVG
+    const pt = (a, b) => landscape
+        ? { x: a, y: b }
+        : { x: b, y: half ? (L - a) : a };
+
+    const line = (a1, b1, a2, b2) => {
+        const p1 = pt(a1, b1);
+        const p2 = pt(a2, b2);
+        return `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${stroke}" stroke-width="${SW}" stroke-linecap="round"/>`;
+    };
+
+    const rectBox = (a1, b1, a2, b2) => {
+        const p1 = pt(a1, b1);
+        const p2 = pt(a2, b2);
+        const x = Math.min(p1.x, p2.x);
+        const y = Math.min(p1.y, p2.y);
+        return `<rect x="${x}" y="${y}" width="${Math.abs(p2.x - p1.x)}" height="${Math.abs(p2.y - p1.y)}" fill="none" stroke="${stroke}" stroke-width="${SW}"/>`;
+    };
+
+    const arc = (ca, cb, r, from, to) => {
+        const pts = [];
+        for (let i = 0; i <= 24; i++) {
+            const ang = from + (to - from) * (i / 24);
+            const p = pt(ca + Math.cos(ang) * r, cb + Math.sin(ang) * r);
+            pts.push(p.x.toFixed(2) + ',' + p.y.toFixed(2));
+        }
+        return `<polyline points="${pts.join(' ')}" fill="none" stroke="${stroke}" stroke-width="${SW}" stroke-linecap="round"/>`;
+    };
+
+    const goal = (aLine, dir) => {
+        const aNet = aLine + dir * 1.8;
+        const p1 = pt(Math.min(aNet, aLine), 30.34);
+        const p2 = pt(Math.max(aNet, aLine), 37.66);
+        const x = Math.min(p1.x, p2.x);
+        const y = Math.min(p1.y, p2.y);
+        const w = Math.abs(p2.x - p1.x);
+        const h = Math.abs(p2.y - p1.y);
+        return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.92)" stroke-width="${SW}"/><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#ex-net)" stroke="none"/></g>`;
+    };
+
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vbW} ${vbH}" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">`;
+    svg += `<defs><pattern id="ex-net" width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="1.6" stroke="rgba(255,255,255,.30)" stroke-width=".16"/></pattern></defs>`;
+
+    svg += rectBox(2, 1, L - 2, W - 1);
+    svg += line(half ? L - 2 : L / 2, 1, half ? L - 2 : L / 2, W - 1);
+
+    if (!half) {
+        const c = pt(L / 2, 34);
+        svg += `<circle cx="${c.x}" cy="${c.y}" r="9.15" fill="none" stroke="${stroke}" stroke-width="${SW}"/>`;
+        svg += `<circle cx="${c.x}" cy="${c.y}" r=".55" fill="rgba(255,255,255,.95)"/>`;
+    }
+
+    svg += rectBox(2, 13.84, 18.5, 54.16);
+    svg += rectBox(2, 24.84, 7.5, 43.16);
+
+    if (!half) {
+        svg += rectBox(L - 18.5, 13.84, L - 2, 54.16);
+        svg += rectBox(L - 7.5, 24.84, L - 2, 43.16);
+    }
+
+    const spotA = pt(13, 34);
+    svg += `<circle cx="${spotA.x}" cy="${spotA.y}" r=".55" fill="rgba(255,255,255,.95)"/>`;
+
+    if (!half) {
+        const spotB = pt(L - 13, 34);
+        svg += `<circle cx="${spotB.x}" cy="${spotB.y}" r=".55" fill="rgba(255,255,255,.95)"/>`;
+    }
+
+    const arcAngle = Math.acos(5.5 / 9.15);
+
+    svg += arc(13, 34, 9.15, -arcAngle, arcAngle);
+
+    if (!half) {
+        svg += arc(L - 13, 34, 9.15, Math.PI - arcAngle, Math.PI + arcAngle);
+        svg += arc(L - 2, 1, 1, Math.PI / 2, Math.PI);
+        svg += arc(L - 2, W - 1, 1, Math.PI, Math.PI * 1.5);
+    }
+
+    svg += arc(2, 1, 1, 0, Math.PI / 2);
+    svg += arc(2, W - 1, 1, -Math.PI / 2, 0);
+
+    svg += goal(2, -1);
+
+    if (!half) svg += goal(L - 2, 1);
+
+    svg += `</svg>`;
+
+    return svg;
 }
 
-function renderExerciseSlot(teamKey, key, playerId, pos, editable) {
+function buildFieldLinesHTML(landscape) {
+    return buildExercisePitchSVG('full', landscape);
+}
+
+function playerFirstName(player) {
+
+    if (!player) return '?';
+
+    // Même priorité que getPitchDisplayName : prénom usuel, puis prénom
+    const nickname = String(player.nickname || '').trim();
+
+    if (nickname) return nickname;
+
+    const prenom = String(player.prenom || '').trim();
+
+    if (prenom) return prenom;
+
+    const full = String(player.name || '').trim();
+
+    if (!full) return '?';
+
+    const parts = full.split(/\s+/);
+
+    if (parts.length === 1) return parts[0];
+
+    const looksUppercase = (s) => s.length > 1 && s === s.toUpperCase() && /[A-ZÀ-ÖØ-Þ]/.test(s);
+
+    // "NOM Prénom" -> dernier mot ; "Prénom NOM" -> premier mot
+    return looksUppercase(parts[0]) && !looksUppercase(parts[parts.length - 1])
+        ? parts[parts.length - 1]
+        : parts[0];
+}
+
+function formatFirstName(name) {
+
+    const value = String(name || '').trim();
+
+    if (!value) return '?';
+
+    return value.toLowerCase().replace(/(^|[\s'-])([a-zà-öø-ÿ])/g, (m, sep, ch) => sep + ch.toUpperCase());
+}
+
+function playerShortName(player) {
+
+    const first = formatFirstName(playerFirstName(player));
+    const parts = String((player && player.name) || '').trim().split(/\s+/);
+
+    if (parts.length < 2) return first;
+
+    const raw = playerFirstName(player);
+    const other = parts.find(p => p !== raw) || '';
+
+    return first + (other ? ' ' + other.charAt(0).toUpperCase() + '.' : '');
+}
+
+function renderExerciseSlot(teamKey, key, playerId, point, editable, isSquad) {
 
     const player = state.players.find(p => p.id === playerId);
 
@@ -12297,15 +13216,17 @@ function renderExerciseSlot(teamKey, key, playerId, pos, editable) {
 
     const held = exerciseUI.holdSlot === key;
 
-    const color = teamKey === 'A' ? '#2563eb' : '#dc2626';
+    const isGK = !!(player && (player.poste1 || '').toUpperCase() === 'GB');
+
+    const color = isGK ? '#059669' : (teamKey === 'A' ? '#2563eb' : '#dc2626');
 
     const filled = !!player;
 
-    const inner = filled
-        ? `<span style="font-size:10px;font-weight:700;line-height:1.1;text-align:center;padding:4px 2px;display:block;">${(player.name || '?').split(' ').pop()}</span>`
-        : `<span style="font-size:9px;opacity:.8;text-align:center;display:block;">${pos.name}</span>`;
+    const glow = held
+        ? 'drop-shadow(0 0 6px #22d3ee) drop-shadow(0 0 2px #22d3ee)'
+        : (selected ? 'drop-shadow(0 0 5px #fbbf24)' : 'drop-shadow(0 2px 2px rgba(0,0,0,.35))');
 
-    const dragHandlers = editable && exerciseUI.slotMove
+    const dragHandlers = editable
         ? ` onpointerdown="slotDragStart(event,'${key}')" onpointermove="slotDragMove(event,'${key}')" onpointerup="slotDragEnd(event,'${key}')"`
         : '';
 
@@ -12313,42 +13234,51 @@ function renderExerciseSlot(teamKey, key, playerId, pos, editable) {
         <div ${editable ? `onclick="pickExerciseSlot('${key}')"` : ''}
             ${dragHandlers}
             data-key="${key}"
-            style="position:absolute;left:${pos.x}%;top:${pos.y}%;
-                width:46px;height:46px;
+            ${filled ? `title="${player.name}${player.poste1 ? ' · ' + player.poste1 : ''}"` : ''}
+            style="position:absolute;left:${point.left}%;top:${point.top}%;
+                width:58px;
                 ${selected ? 'z-index:3;' : ''}
                 ${editable ? '' : 'pointer-events:none;'}
-                touch-action:${editable && exerciseUI.slotMove ? 'none' : 'auto'};
+                touch-action:${editable ? 'none' : 'auto'};
                 transform:translate(-50%,-50%);
-                border-radius:50%;
-                background:${filled ? color : 'rgba(255,255,255,.09)'};
-                border:${filled ? '2px solid rgba(255,255,255,.9)' : '2px dashed rgba(255,255,255,.6)'};
-                box-shadow:${held ? '0 0 0 4px #22d3ee, 0 0 18px rgba(34,211,238,.85), 0 2px 5px rgba(0,0,0,.25)' : (selected ? '0 0 0 4px #fbbf24' : '0 2px 5px rgba(0,0,0,.25)')};
-                color:white;
                 display:flex;
+                flex-direction:column;
                 align-items:center;
-                justify-content:center;
+                gap:1px;
+                user-select:none;
+                -webkit-user-select:none;
                 ${editable ? 'cursor:grab;' : ''}">
-            ${inner}
+            <div style="position:relative;width:44px;height:46px;filter:${glow};">
+                <svg viewBox="0 0 40 42" width="44" height="46" style="display:block;overflow:visible;" aria-hidden="true">
+                    <path d="M14 3 L5 8 L1 18 L9 21 L9 36 Q9 39 12 39 L28 39 Q31 39 31 36 L31 21 L39 18 L35 8 L26 3 Q20 8 14 3 Z"
+                        fill="${filled ? color : 'rgba(255,255,255,.10)'}"
+                        stroke="${filled ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.6)'}"
+                        stroke-width="${isSquad ? 2.2 : 1.5}"
+                        stroke-linejoin="round"
+                        ${filled ? '' : 'stroke-dasharray="4 3"'} />
+                </svg>
+                ${filled
+                    ? `<span style="position:absolute;top:-3px;right:-6px;font-size:9px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));">${getNiveauIcon(player.niveau)}</span>`
+                    : `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:rgba(255,255,255,.85);">${point.name}</span>`}
+                ${isSquad ? `<span style="position:absolute;top:-5px;left:-6px;width:12px;height:12px;border-radius:9999px;background:rgba(15,23,42,.82);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;line-height:1;color:#fff;">✓</span>` : ''}
+            </div>
+            ${filled ? `<span style="display:block;max-width:58px;background:rgba(255,255,255,.94);color:#0f172a;font-size:9px;font-weight:800;line-height:13px;border-radius:6px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(0,0,0,.25);">${formatFirstName(playerFirstName(player))}</span>` : ''}
         </div>
     `;
 }
 
-function effPos(setup, idx, pos) {
+function effPos(setup, teamKey, idx, pos) {
 
     const ov = (setup.posOverrides || {})[setup.area] || {};
 
-    const o = ov[setup.format + ':' + idx];
+    // Cle par equipe : deplacer un poste de A ne doit jamais bouger le poste de B
+    const o = ov[setup.format + ':' + teamKey + ':' + idx];
 
     return o ? { x: o.x, y: o.y } : pos;
 }
 
 function exerciseTeamSize(teamKey) {
-
-    const s = state.trainings[currentTrainingId];
-
-    if (!s || !s.generatedTeams) return 0;
-
-    return (teamKey === 'A' ? s.generatedTeams.teamA : s.generatedTeams.teamB || []).length;
+    return exerciseTeamPlayerIds(teamKey).length;
 }
 
 function posteCategory(name) {
@@ -12365,6 +13295,8 @@ function posteCategory(name) {
 }
 
 function renderExercise() {
+
+    closeExercisePicker();
 
     const session = state.trainings[currentTrainingId];
 
@@ -12415,7 +13347,14 @@ function renderExercise() {
     const exCount = (session.exercises || []).length;
     const exName = setup.name || fmt.label;
 
-    info.innerHTML = `⚽ ${exIdx + 1}/${exCount} — ${exName} · ${fmt.label} · 🔵 A (${exerciseTeamSize('A')}) · 🔴 B (${exerciseTeamSize('B')})${isHalf ? ' · ✂️' : ''}`;
+    const genA = (session.generatedTeams.teamA || []).length;
+    const genB = (session.generatedTeams.teamB || []).length;
+    const genGK = (session.generatedTeams.gardiens || []).length;
+
+    const squadSet = new Set(getSessionSquad(session));
+    const squadTarget = getSquadTarget(session);
+
+    info.innerHTML = `⚽ ${exIdx + 1}/${exCount} — ${exName} · ${fmt.label} · 🔵 A (${genA}${genGK ? ' + ' + genGK + ' 🧤' : ''}) · 🔴 B (${genB}) · 🎯 ${squadSet.size}/${squadTarget}${isHalf ? ' · ✂️' : ''}`;
 
     tgl.innerHTML = `
         <button onclick="selectExerciseTeam('A')"
@@ -12429,23 +13368,32 @@ function renderExercise() {
             🔴 Équipe B
         </button>
         ${isEdit ? '' : `
-        <button onclick="toggleSlotMove()"
-            class="px-3 py-2 rounded-lg text-xs font-bold transition
-                ${exerciseUI.slotMove ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-cyan-100 hover:bg-cyan-200 text-cyan-700'}">
-            📍 Déplacer postes
-        </button>
         <button onclick="resetExercisePositions()"
-            class="px-3 py-2 rounded-lg text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-600">
-            ↺
+            class="px-3 py-2 rounded-lg text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-600"
+            title="Remettre tous les postes a leur place d'origine">
+            ↺ Positions
         </button>`}
-        <button onclick="autoAssignExerciseTeam()"
+        <button onclick="autoAssignExerciseBoth()"
             class="px-3 py-2 rounded-lg text-xs font-bold bg-amber-400 hover:bg-amber-500 text-amber-900">
-            🎲 Auto
+            🎲 Auto A+B
         </button>
         <button onclick="resetExerciseTeam()"
             class="px-3 py-2 rounded-lg text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-600">
             ♻️ Reset
         </button>`;
+
+    const landscape = exerciseIsLandscape();
+
+    field.style.width = '100%';
+    field.style.height = 'auto';
+    field.style.aspectRatio = landscape ? '105 / 68' : '68 / 105';
+    field.style.maxWidth = landscape ? '980px' : '520px';
+    field.style.margin = '0 auto';
+    field.style.backgroundImage = 'repeating-linear-gradient(' + (landscape ? '90deg' : '180deg') + ', rgba(255,255,255,.05) 0 7%, rgba(0,0,0,.05) 7% 14%), linear-gradient(160deg, #35863c 0%, #256b2c 100%)';
+
+    const toScreen = (visual) => landscape
+        ? { left: visual.y, top: visual.x }
+        : { left: visual.x, top: visual.y };
 
     let slotsHTML = '';
 
@@ -12454,9 +13402,13 @@ function renderExercise() {
         const teamKey = setup.team;
         const map = setup.byTeam[teamKey] || {};
 
-        slotsHTML = fmt.positions.map((pos, idx) => {
-            const key = teamKey + ':' + idx;
-            return renderExerciseSlot(teamKey, key, map[key], effPos(setup, idx, { ...pos, y: Math.max(4, (50 - pos.y) * 2) }), !isEdit);
+        slotsHTML = getExercisePositions(setup, teamKey).map(slot => {
+            const key = teamKey + ':' + slot.idx;
+            const visual = effPos(setup, teamKey, slot.idx, { x: slot.x, y: Math.max(4, (50 - slot.y) * 2) });
+            const screen = landscape
+                ? { left: 100 - visual.y, top: visual.x }
+                : { left: visual.x, top: visual.y };
+            return renderExerciseSlot(teamKey, key, map[key], { left: screen.left, top: screen.top, name: slot.name }, !isEdit, squadSet.has(map[key]));
         }).join('');
 
     } else {
@@ -12464,22 +13416,31 @@ function renderExercise() {
         const byA = setup.byTeam.A || {};
         const byB = setup.byTeam.B || {};
 
-        slotsHTML = fmt.positions.map((pos, idx) => renderExerciseSlot('A', 'A:' + idx, byA['A:' + idx], effPos(setup, idx, pos), !isEdit)).join('')
-            + fmt.positions.map((pos, idx) => renderExerciseSlot('B', 'B:' + idx, byB['B:' + idx], effPos(setup, idx, { ...pos, y: 100 - pos.y }), !isEdit)).join('');
+        slotsHTML = ['A', 'B'].map(teamKey => {
+            const map = teamKey === 'A' ? byA : byB;
+            return getExercisePositions(setup, teamKey).map(slot => {
+                const key = teamKey + ':' + slot.idx;
+                const visual = effPos(setup, teamKey, slot.idx, { x: slot.x, y: teamKey === 'B' ? 100 - slot.y : slot.y });
+                const screen = toScreen(visual);
+                return renderExerciseSlot(teamKey, key, map[key], { left: screen.left, top: screen.top, name: slot.name }, !isEdit, squadSet.has(map[key]));
+            }).join('');
+        }).join('');
     }
 
-    field.innerHTML = (isHalf ? buildHalfFieldLinesHTML() : buildFieldLinesHTML())
+    field.innerHTML = (isHalf ? buildHalfFieldLinesHTML(landscape) : buildFieldLinesHTML(landscape))
         + renderZonesAndProps(setup)
         + renderZoneMarker()
         + slotsHTML;
 
-    field.onclick = isEdit ? exerciseFieldClick : (exerciseUI.slotMove ? placeHeldSlot : null);
+    field.onclick = isEdit ? exerciseFieldClick : null;
 
     renderExerciseTools(setup);
 
     bench.innerHTML = '';
 
     if (!isEdit) renderExerciseBench(setup);
+
+    renderExerciseSquad();
 
     renderExerciseStrip();
 
@@ -12492,9 +13453,12 @@ function renderExerciseBench(setup) {
     const gen = session.generatedTeams || {};
     const team = setup.team;
     const map = setup.byTeam[team] || {};
-    const assigned = Object.values(map);
+    const validKeys = exerciseTeamKeys(setup, team);
+    const assigned = Object.keys(map).filter(k => validKeys.has(k)).map(k => map[k]);
 
-    const ids = team === 'A' ? (gen.teamA || []) : (gen.teamB || []);
+    const ids = exerciseTeamPlayerIds(team);
+
+    const squadSet = new Set(getSessionSquad(session));
 
     const players = ids.map(id => state.players.find(p => p.id === id)).filter(Boolean);
 
@@ -12521,7 +13485,7 @@ function renderExerciseBench(setup) {
             ${onBench.map(p => `
                 <button onclick="assignExercisePlayer('${p.id}')"
                     class="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold ${team === 'A' ? 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100' : 'bg-red-50 text-red-800 border border-red-200 hover:bg-red-100'}">
-                    ${getNiveauIcon(p.niveau)} ${p.name}
+                    ${squadSet.has(p.id) ? '✓ ' : ''}${getNiveauIcon(p.niveau)} ${playerShortName(p)}
                 </button>`).join('')}
         </div>`;
 }
@@ -12541,6 +13505,7 @@ function chooseExercise(formatKey) {
 
         setup.format = formatKey;
         setup.byTeam = { A: {}, B: {} };
+        setup.autoFormatApplied = true;
         exerciseUI.selected = null;
         saveStateToFirebase();
     }
@@ -12575,17 +13540,9 @@ function pickExerciseSlot(key) {
         return;
     }
 
-    if (map[key]) {
-
-        delete map[key];
-        saveStateToFirebase();
-
-    } else {
-
-        exerciseUI.selected = (exerciseUI.selected === key) ? null : key;
+    if (team === 'A' || team === 'B') {
+        openExercisePlayerPicker(team, key);
     }
-
-    renderExercise();
 }
 
 function toggleSlotMove() {
@@ -12599,62 +13556,86 @@ function toggleSlotMove() {
 
 function slotDragStart(e, key) {
 
-    if (!exerciseUI.slotMove) return;
-
-    if (e.cancelable) e.preventDefault();
-
-    exerciseUI.suppressClickUntil = Date.now() + 400;
-
     try { if (e.currentTarget.setPointerCapture) e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { }
 
-    exerciseUI.drag = { key: key, active: true, moved: false, el: e.currentTarget, lastX: e.clientX, lastY: e.clientY };
+    const field = document.getElementById('exercise-field');
+    const rect = field ? field.getBoundingClientRect() : null;
 
-    if (exerciseUI.holdSlot === key) {
+    exerciseUI.drag = {
+        key: key,
+        el: e.currentTarget,
+        rect: rect,
+        startX: e.clientX,
+        startY: e.clientY,
+        lastX: e.clientX,
+        lastY: e.clientY,
+        moved: false
+    };
 
-        exerciseUI.holdSlot = null;
-        renderExercise();
-        return;
-    }
-
-    exerciseUI.holdSlot = key;
-    e.currentTarget.style.boxShadow = '0 0 0 4px #22d3ee, 0 0 18px rgba(34,211,238,.85), 0 2px 5px rgba(0,0,0,.25)';
+    e.currentTarget.style.zIndex = '5';
 }
 
 function slotDragMove(e, key) {
 
     const d = exerciseUI.drag;
-    if (!d || !d.active) return;
+    if (!d) return;
 
     if (e.cancelable) e.preventDefault();
 
-    d.moved = true;
     d.lastX = e.clientX;
     d.lastY = e.clientY;
+
+    if (!d.moved) {
+
+        if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;
+
+        d.moved = true;
+
+        // Un vrai deplacement : on bloque le clic (qui ouvrirait le selecteur)
+        exerciseUI.suppressClickUntil = Date.now() + 500;
+
+        d.el.style.transform = 'translate(-50%,-50%) scale(1.15)';
+        d.el.style.filter = 'drop-shadow(0 8px 12px rgba(0,0,0,.45))';
+    }
+
+    if (!d.rect) return;
+
+    const left = Math.max(2, Math.min(98, ((e.clientX - d.rect.left) / d.rect.width) * 100));
+    const top = Math.max(2, Math.min(98, ((e.clientY - d.rect.top) / d.rect.height) * 100));
+
+    d.el.style.left = left + '%';
+    d.el.style.top = top + '%';
 }
 
 function slotDragEnd(e, key) {
 
     const d = exerciseUI.drag;
-    if (!d || !d.active) return;
+    if (!d) return;
 
     if (e.cancelable) e.preventDefault();
 
-    const rect = document.getElementById('exercise-field').getBoundingClientRect();
-
-    const x = Math.max(4, Math.min(96, ((d.lastX - rect.left) / rect.width) * 100));
-    const y = Math.max(4, Math.min(96, ((d.lastY - rect.top) / rect.height) * 100));
-
     exerciseUI.drag = null;
 
+    d.el.style.zIndex = '';
+    d.el.style.transform = 'translate(-50%,-50%)';
+    d.el.style.filter = '';
+
     if (d.moved) {
+
+        const fieldEl = document.getElementById('exercise-field');
+        const rect = d.rect || (fieldEl ? fieldEl.getBoundingClientRect() : null);
+
+        if (!rect) { renderExercise(); return; }
+
+        const x = Math.max(4, Math.min(96, ((d.lastX - rect.left) / rect.width) * 100));
+        const y = Math.max(4, Math.min(96, ((d.lastY - rect.top) / rect.height) * 100));
 
         exerciseUI.holdSlot = null;
         commitSlotPos(key, x, y);
         return;
     }
 
-    exerciseUI.holdSlot = key;
-    renderExercise();
+    // Simple tap : on laisse le clic ouvrir le selecteur de joueur
 }
 
 function placeHeldSlot(e) {
@@ -12677,9 +13658,17 @@ function commitSlotPos(key, x, y) {
     const session = state.trainings[currentTrainingId];
     const setup = getExerciseSetup(session);
 
-    const idx = key.split(':')[1];
+    const parts = key.split(':');
+    const teamKey = parts[0] === 'B' ? 'B' : 'A';
+    const idx = parts[1];
+    const stored = exerciseScreenToStored(x, y);
 
-    setup.posOverrides[setup.area][setup.format + ':' + idx] = { x: x, y: y };
+    // En demi-terrain paysage, l'affichage inverse l'axe horizontal (but a gauche)
+    if (setup.area === 'half' && exerciseIsLandscape()) {
+        stored.y = 100 - stored.y;
+    }
+
+    setup.posOverrides[setup.area][setup.format + ':' + teamKey + ':' + idx] = { x: stored.x, y: stored.y };
 
     saveStateToFirebase();
     showToast('Poste déplacé');
@@ -12691,11 +13680,15 @@ function resetExercisePositions() {
     const session = state.trainings[currentTrainingId];
     const setup = getExerciseSetup(session);
 
-    setup.posOverrides[setup.area] = {};
+    // On repart de zero sur les deux zones, tous formats et toutes equipes confondus
+    setup.posOverrides = { full: {}, half: {} };
 
     exerciseUI.holdSlot = null;
+    exerciseUI.selected = null;
+    exerciseUI.drag = null;
+
     saveStateToFirebase();
-    showToast('Postes réinitialisés');
+    showToast('Postes remis a leur place');
     renderExercise();
 }
 
@@ -12728,10 +13721,10 @@ function assignExercisePlayer(playerId) {
 
     if (!target) {
 
-        const num = (EXERCISE_FORMATS[setup.format] || EXERCISE_FORMATS['8v8']).positions.length;
+        const slots = getExercisePositions(setup, team);
 
-        for (let i = 0; i < num; i++) {
-            const k = team + ':' + i;
+        for (let i = 0; i < slots.length; i++) {
+            const k = team + ':' + slots[i].idx;
             if (map[k] === undefined) { target = k; break; }
         }
     }
@@ -12742,14 +13735,120 @@ function assignExercisePlayer(playerId) {
     renderExercise();
 }
 
-function autoAssignExerciseTeam() {
+function closeExercisePicker() {
+
+    const el = document.getElementById('exercise-player-picker');
+
+    if (el) el.remove();
+}
+
+function openExercisePlayerPicker(teamKey, key) {
+
+    const session = state.trainings[currentTrainingId];
+
+    if (!session) return;
+
+    const setup = getExerciseSetup(session);
+    const map = setup.byTeam[teamKey] = setup.byTeam[teamKey] || {};
+    const slots = getExercisePositions(setup, teamKey);
+    const slot = slots.find(s => teamKey + ':' + s.idx === key);
+
+    if (!slot) return;
+
+    const currentId = map[key];
+    const players = exerciseTeamPlayerIds(teamKey)
+        .map(id => state.players.find(p => p.id === id))
+        .filter(Boolean);
+
+    const placement = {};
+
+    Object.keys(map).forEach(k => {
+        const s = slots.find(x => teamKey + ':' + x.idx === k);
+        if (s && map[k]) placement[map[k]] = s.name;
+    });
+
+    closeExercisePicker();
+
+    const overlay = document.createElement('div');
+
+    overlay.id = 'exercise-player-picker';
+    overlay.className = 'fixed inset-0 z-[110] bg-slate-900/60 flex items-end sm:items-center justify-center';
+    overlay.onclick = (e) => { if (e.target === overlay) closeExercisePicker(); };
+
+    overlay.innerHTML = `
+        <div class="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[80vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-slate-100 flex items-start justify-between gap-3">
+                <div>
+                    <p class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">${teamKey === 'A' ? '🔵 Équipe A' : '🔴 Équipe B'} · ${slot.name}</p>
+                    <h3 class="font-bold text-slate-800 text-sm">Qui place-t-on à ce poste ?</h3>
+                </div>
+                <button onclick="closeExercisePicker()" class="text-slate-400 hover:text-slate-700 text-lg" aria-label="Fermer">✕</button>
+            </div>
+            <div class="overflow-y-auto p-2 space-y-1">
+                ${players.length ? players.map(p => {
+                    const used = placement[p.id];
+                    const isCurrent = p.id === currentId;
+                    return `<button onclick="assignExercisePlayerToSlot('${teamKey}', '${key}', '${p.id}')"
+                        class="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl border text-left transition ${isCurrent ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200 hover:bg-sky-50 hover:border-sky-300'}">
+                        <span class="min-w-0">
+                            <span class="block text-xs font-bold text-slate-800 truncate">${getNiveauIcon(p.niveau)} ${formatFirstName(playerFirstName(p))}</span>
+                            <span class="block text-[10px] text-slate-400 truncate">${p.name || ''}${p.poste1 ? ' · ' + p.poste1 : ''}</span>
+                        </span>
+                        <span class="text-[10px] font-extrabold whitespace-nowrap ${isCurrent ? 'text-amber-700' : used ? 'text-amber-600' : 'text-emerald-600'}">${isCurrent ? 'à ce poste' : used ? '→ ' + used : 'libre'}</span>
+                    </button>`;
+                }).join('') : `<p class="text-xs text-slate-400 italic text-center py-6">Aucun joueur disponible dans cette équipe.</p>`}
+            </div>
+            ${currentId ? `<div class="p-3 border-t border-slate-100">
+                <button onclick="clearExerciseSlot('${teamKey}', '${key}')"
+                    class="w-full px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold">
+                    Retirer ce joueur du poste
+                </button>
+            </div>` : ''}
+        </div>`;
+
+    document.body.appendChild(overlay);
+}
+
+function assignExercisePlayerToSlot(teamKey, key, playerId) {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    const map = setup.byTeam[teamKey] = setup.byTeam[teamKey] || {};
+
+    Object.keys(map).forEach(k => { if (map[k] === playerId) delete map[k]; });
+
+    map[key] = playerId;
+
+    saveStateToFirebase();
+    closeExercisePicker();
+    renderExercise();
+}
+
+function clearExerciseSlot(teamKey, key) {
+
+    const session = state.trainings[currentTrainingId];
+    const setup = getExerciseSetup(session);
+    const map = setup.byTeam[teamKey] = setup.byTeam[teamKey] || {};
+
+    delete map[key];
+
+    saveStateToFirebase();
+    closeExercisePicker();
+    renderExercise();
+}
+
+window.closeExercisePicker = closeExercisePicker;
+window.assignExercisePlayerToSlot = assignExercisePlayerToSlot;
+window.clearExerciseSlot = clearExerciseSlot;
+
+function autoAssignExerciseTeam(teamArg) {
 
     const session = state.trainings[currentTrainingId];
     if (!session || !session.generatedTeams) return;
 
     const setup = getExerciseSetup(session);
-    const team = setup.team;
-    const ids = team === 'A' ? (session.generatedTeams.teamA || []) : (session.generatedTeams.teamB || []);
+    const team = teamArg || setup.team;
+    const ids = exerciseTeamPlayerIds(team);
 
     const players = ids.map(id => state.players.find(p => p.id === id)).filter(Boolean);
 
@@ -12762,14 +13861,13 @@ function autoAssignExerciseTeam() {
 
     Object.keys(buckets).forEach(k => buckets[k].sort((a, b) => (b.niveau || 2) - (a.niveau || 2)));
 
-    const fmt = EXERCISE_FORMATS[setup.format] || EXERCISE_FORMATS['8v8'];
     const map = {};
     const free = [];
 
-    fmt.positions.forEach((pos, idx) => {
+    getExercisePositions(setup, team).forEach(slot => {
 
-        const key = team + ':' + idx;
-        const pick = buckets[posteCategory(pos.name)].shift();
+        const key = team + ':' + slot.idx;
+        const pick = buckets[posteCategory(slot.name)].shift();
 
         if (pick) map[key] = pick.id;
         else free.push(key);
@@ -12784,8 +13882,23 @@ function autoAssignExerciseTeam() {
 
     setup.byTeam[team] = map;
     saveStateToFirebase();
+
+    if (!teamArg) {
+        renderExercise();
+        showToast('Dispositif auto généré pour l\'équipe ' + team);
+    }
+}
+
+function autoAssignExerciseBoth() {
+
+    const session = state.trainings[currentTrainingId];
+    if (!session || !session.generatedTeams) return;
+
+    autoAssignExerciseTeam('A');
+    autoAssignExerciseTeam('B');
+
     renderExercise();
-    showToast('Dispositif auto généré pour l\'équipe ' + team);
+    showToast('Dispositifs auto générés pour les deux équipes');
 }
 
 function resetExerciseTeam() {
@@ -12806,17 +13919,8 @@ const PROP_STYLES = {
 
 const ZONE_COLORS = ['#f59e0b', '#10b981', '#8b5cf6', '#0ea5e9', '#f43f5e', '#84cc16'];
 
-function buildHalfFieldLinesHTML() {
-
-    return `
-        <div style="position:absolute;inset:6px;border:3px solid rgba(255,255,255,.85);border-radius:12px;pointer-events:none;"></div>
-        <div style="position:absolute;left:0;right:0;top:2%;height:3px;background:rgba(255,255,255,.7);pointer-events:none;"></div>
-        <div style="position:absolute;left:20%;right:20%;bottom:0;height:26%;border-left:3px solid rgba(255,255,255,.7);border-right:3px solid rgba(255,255,255,.7);border-top:3px solid rgba(255,255,255,.7);border-radius:10px 10px 0 0;pointer-events:none;"></div>
-        <div style="position:absolute;left:34%;right:34%;bottom:0;height:12%;border-left:2px solid rgba(255,255,255,.6);border-right:2px solid rgba(255,255,255,.6);border-top:2px solid rgba(255,255,255,.6);border-radius:8px 8px 0 0;pointer-events:none;"></div>
-        <div style="position:absolute;left:50%;bottom:28%;width:7px;height:7px;background:rgba(255,255,255,.75);border-radius:50%;transform:translate(-50%,50%);pointer-events:none;"></div>
-        <div style="position:absolute;left:50%;bottom:0;width:16%;height:6px;border:2px solid rgba(255,255,255,.95);background:rgba(255,255,255,.15);transform:translateX(-50%);border-radius:3px 3px 0 0;pointer-events:none;"></div>
-        <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 26px,rgba(0,0,0,.045) 26px 52px);pointer-events:none;border-radius:12px;"></div>
-    `;
+function buildHalfFieldLinesHTML(landscape) {
+    return buildExercisePitchSVG('half', landscape);
 }
 
 function renderZonesAndProps(setup) {
@@ -12825,12 +13929,16 @@ function renderZonesAndProps(setup) {
 
     (setup.props || []).forEach(p => {
 
+        const sp = exercisePropPoint(p.x, p.y);
+
         if (p.type === 'zone') {
 
-            const x1 = Math.min(p.x1, p.x2);
-            const x2 = Math.max(p.x1, p.x2);
-            const y1 = Math.min(p.y1, p.y2);
-            const y2 = Math.max(p.y1, p.y2);
+            const zoneA = exercisePropPoint(p.x1, p.y1);
+            const zoneB = exercisePropPoint(p.x2, p.y2);
+            const x1 = Math.min(zoneA.left, zoneB.left);
+            const x2 = Math.max(zoneA.left, zoneB.left);
+            const y1 = Math.min(zoneA.top, zoneB.top);
+            const y2 = Math.max(zoneA.top, zoneB.top);
             const w = x2 - x1;
             const h = y2 - y1;
             const color = ZONE_COLORS[((p.label || 'A').charCodeAt(0) - 65) % ZONE_COLORS.length] || ZONE_COLORS[0];
@@ -12852,7 +13960,7 @@ function renderZonesAndProps(setup) {
         if (p.type === 'plot') {
 
             parts.push(`
-                <div data-prop="${p.id}" style="position:absolute;left:${p.x}%;top:${p.y}%;
+                <div data-prop="${p.id}" style="position:absolute;left:${sp.left}%;top:${sp.top}%;
                     width:26px;height:16px;transform:translate(-50%,-50%);cursor:pointer;user-select:none;${sel}">
                     <svg width="26" height="16" viewBox="0 0 26 16" style="display:block;">
                         <polygon points="1,15 25,15 18,5 8,5" fill="#ff8c00" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
@@ -12888,7 +13996,7 @@ function renderZonesAndProps(setup) {
                 <div style="position:absolute;left:0;right:0;top:0;height:${post}px;background:rgba(255,255,255,.95);border-radius:2px;"></div>`;
 
             parts.push(`
-                <div data-prop="${p.id}" style="position:absolute;left:${p.x}%;top:${p.y}%;
+                <div data-prop="${p.id}" style="position:absolute;left:${sp.left}%;top:${sp.top}%;
                     width:${w}px;height:${h}px;transform:translate(-50%,-50%);cursor:pointer;${sel}">
                     ${inner}
                 </div>`);
@@ -12897,7 +14005,7 @@ function renderZonesAndProps(setup) {
         }
 
         parts.push(`
-            <div data-prop="${p.id}" style="position:absolute;left:${p.x}%;top:${p.y}%;
+            <div data-prop="${p.id}" style="position:absolute;left:${sp.left}%;top:${sp.top}%;
                 font-size:${style.size}px;transform:translate(-50%,-50%);cursor:pointer;user-select:none;${sel}">
                 ${style.emoji}
             </div>`);
@@ -12910,7 +14018,9 @@ function renderZoneMarker() {
 
     if (!exerciseUI.zoneP1) return '';
 
-    return `<div style="position:absolute;left:${exerciseUI.zoneP1.x}%;top:${exerciseUI.zoneP1.y}%;
+    const p = exercisePropPoint(exerciseUI.zoneP1.x, exerciseUI.zoneP1.y);
+
+    return `<div style="position:absolute;left:${p.left}%;top:${p.top}%;
         width:14px;height:14px;border-radius:50%;background:#fbbf24;border:2px solid white;
         transform:translate(-50%,-50%);box-shadow:0 0 0 3px rgba(251,191,36,.4);"></div>`;
 }
@@ -12924,8 +14034,12 @@ function exerciseFieldClick(e) {
 
     const tool = exerciseUI.tool || 'move';
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const stored = exerciseScreenToStored(
+        ((e.clientX - rect.left) / rect.width) * 100,
+        ((e.clientY - rect.top) / rect.height) * 100
+    );
+    const x = stored.x;
+    const y = stored.y;
 
     const propEl = e.target && e.target.closest ? e.target.closest('[data-prop]') : null;
     const propId = propEl ? propEl.dataset.prop : null;
@@ -13156,9 +14270,7 @@ function renderExerciseTools(setup) {
 
     if (!isEdit) {
 
-        hint.innerHTML = exerciseUI.slotMove
-            ? "📍 Postes : attrapez une pastille et glissez-la, ou touchez-la puis touchez l'endroit voulu. Touchez-la à nouveau pour décrocher. ↺ réinitialise."
-            : "👥 Mode joueurs : touchez une pastille vide (jaune) puis un joueur du banc pour l'ajouter. Touchez un joueur placé pour le remettre au banc. Bouton « 📍 Déplacer postes » pour repositionner les pastilles.";
+        hint.innerHTML = "👥 Touchez un maillot pour choisir le joueur de ce poste · glissez un maillot pour ajuster sa position · « ↺ Positions » remet tout en place.";
         return;
     }
 
