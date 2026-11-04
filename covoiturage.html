@@ -352,7 +352,20 @@ function renderMatchInfo() {
             <a href="${mapsUrl}" target="_blank" rel="noopener"
                title="Ouvrir l'itinéraire dans Google Maps, sans péage"
                class="group flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-700 hover:to-sky-600 text-white shadow-md shadow-sky-200 transition">
-                <span class="flex items-center justify-center w-10 h-10 rounded-full bg-white/20 text-xl shrink-0">🗺️</span>
+                <span class="flex items-center justify-center w-10 h-10 rounded-full bg-white shrink-0">
+                    <svg viewBox="0 0 48 48" class="w-7 h-7" aria-hidden="true" focusable="false">
+                        <defs>
+                            <linearGradient id="gmapPinGradient" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#4285F4"/>
+                                <stop offset="35%" stop-color="#34A853"/>
+                                <stop offset="68%" stop-color="#FBBC04"/>
+                                <stop offset="100%" stop-color="#EA4335"/>
+                            </linearGradient>
+                        </defs>
+                        <path fill="url(#gmapPinGradient)" d="M24 4C15.7 4 9 10.7 9 19c0 11.2 12.8 23 13.4 23.5.8.7 2 .7 2.8 0C25.8 42 39 30.2 39 19 39 10.7 32.3 4 24 4z"/>
+                        <circle cx="24" cy="19" r="6.5" fill="#fff"/>
+                    </svg>
+                </span>
                 <span class="min-w-0 flex-1">
                     <span class="block text-sm font-extrabold leading-tight">Itinéraire vers le stade</span>
                     <span class="block text-[11px] font-semibold text-sky-50 truncate">
