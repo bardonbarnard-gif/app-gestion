@@ -741,7 +741,7 @@ return colorMap[colorName] || colorMap.slate;
         }
     }
 
-    ['dashboard', 'dashboard-cards', 'dashboard-bilan', 'effectif', 'matchs', 'entrainements', 'calendrier','district','staff','admin'].forEach(t => {
+    ['dashboard', 'dashboard-cards', 'dashboard-bilan', 'dashboard-stats', 'effectif', 'matchs', 'entrainements', 'calendrier','district','staff','admin'].forEach(t => {
                 const sec = document.getElementById(`sec-${t}`);
                 if(sec) sec.classList.add('hidden');
                 const btn = document.getElementById(`tab-${t}`);
@@ -2034,44 +2034,252 @@ else {
 }
 
 
-        function renderTopScorersAndPassers() {
+        // Périmètre des statistiques du tableau de bord :
+        //  - coach : uniquement son équipe
+        //  - responsable : ses équipes
+        //  - autres rôles : tout le club
+        function getDashboardStatsRows() {
             const role = window.currentUserRole || 'public';
-const userTeam = window.currentUserTeam || 'all';
+            const userTeam = window.currentUserTeam || 'all';
 
-let playersSource = state.players;
+            let playersSource = state.players;
 
-if (role === 'coach') {
+            if (role === 'coach') {
 
-    playersSource = state.players.filter(
-        p =>
-            (p.team || p.cat || '').toLowerCase() ===
-            userTeam.toLowerCase()
-    );
+                playersSource = state.players.filter(
+                    p =>
+                        (p.team || p.cat || '').toLowerCase() ===
+                        userTeam.toLowerCase()
+                );
 
-} else if (role === 'responsable') {
+            } else if (role === 'responsable') {
 
-    const teams = userTeam
-        .split(',')
-        .map(t => t.trim().toLowerCase());
+                const teams = userTeam
+                    .split(',')
+                    .map(t => t.trim().toLowerCase());
 
-    playersSource = state.players.filter(
-        p =>
-            teams.includes(
-                (p.team || p.cat || '').toLowerCase()
-            )
-    );
-}
-            let playersWithStats = playersSource.map(p => {
-                let s = state.stats[p.id] || { goals: 0, assists: 0 };
-                return { name: p.name, goals: s.goals || 0, assists: s.assists || 0 };
+                playersSource = state.players.filter(
+                    p =>
+                        teams.includes(
+                            (p.team || p.cat || '').toLowerCase()
+                        )
+                );
+            }
+
+            return playersSource.map(p => {
+                const s = state.stats[p.id] || { goals: 0, assists: 0 };
+                const goals = s.goals || 0;
+                const assists = s.assists || 0;
+
+                return {
+                    id: p.id,
+                    name: p.name,
+                    team: p.team || p.cat || '',
+                    goals,
+                    assists,
+                    total: goals + assists
+                };
             });
-
-            document.getElementById('dashboard-top-scorers').innerHTML = [...playersWithStats].sort((a,b) => b.goals - a.goals).slice(0, 3).map((p, i) => `
-                <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs"><span class="font-bold text-slate-700">${i+1}. ${p.name}</span><span class="bg-amber-100 text-amber-800 font-extrabold px-2 py-0.5 rounded">${p.goals} ⚽</span></div>`).join('');
-
-            document.getElementById('dashboard-top-passers').innerHTML = [...playersWithStats].sort((a,b) => b.assists - a.assists).slice(0, 3).map((p, i) => `
-                <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs"><span class="font-bold text-slate-700">${i+1}. ${p.name}</span><span class="bg-sky-100 text-sky-800 font-extrabold px-2 py-0.5 rounded">${p.assists} 🎯</span></div>`).join('');
         }
+
+        // Classements complets : buts, passes décisives, efficacité (buts + passes)
+        const DASHBOARD_STATS_KINDS = {
+            scorers: {
+                label: 'Buteurs',
+                icon: 'fa-futbol',
+                key: 'goals',
+                unit: '⚽',
+                totalLabel: 'buts marqués',
+                badge: 'bg-amber-100 text-amber-800',
+                hero: 'grad-card-blue'
+            },
+            passers: {
+                label: 'Passeurs',
+                icon: 'fa-handshake',
+                key: 'assists',
+                unit: '🎯',
+                totalLabel: 'passes décisives',
+                badge: 'bg-sky-100 text-sky-800',
+                hero: 'grad-card-sky'
+            },
+            efficiency: {
+                label: 'Efficacité',
+                icon: 'fa-bolt',
+                key: 'total',
+                unit: '⚡',
+                totalLabel: 'buts + passes',
+                badge: 'bg-emerald-100 text-emerald-800',
+                hero: 'grad-card-emerald'
+            }
+        };
+
+        let dashboardStatsKind = 'scorers';
+
+        function dashboardStatsSortedRows(kind) {
+            const key = (DASHBOARD_STATS_KINDS[kind] || DASHBOARD_STATS_KINDS.scorers).key;
+
+            return getDashboardStatsRows().sort((a, b) =>
+                b[key] - a[key]
+                || b.goals - a.goals
+                || b.assists - a.assists
+                || String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' })
+            );
+        }
+
+        function dashboardTopRowHTML(p, i, key, badgeClass, unit) {
+            return `
+                <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs"><span class="font-bold text-slate-700 truncate">${i+1}. ${p.name}</span><span class="shrink-0 ml-2 ${badgeClass} font-extrabold px-2 py-0.5 rounded">${p[key]} ${unit}</span></div>`;
+        }
+
+        function renderTopScorersAndPassers() {
+            const scorersEl = document.getElementById('dashboard-top-scorers');
+            if (scorersEl) {
+                scorersEl.innerHTML = dashboardStatsSortedRows('scorers')
+                    .slice(0, 3)
+                    .map((p, i) => dashboardTopRowHTML(p, i, 'goals', 'bg-amber-100 text-amber-800', '⚽'))
+                    .join('');
+            }
+
+            const passersEl = document.getElementById('dashboard-top-passers');
+            if (passersEl) {
+                passersEl.innerHTML = dashboardStatsSortedRows('passers')
+                    .slice(0, 3)
+                    .map((p, i) => dashboardTopRowHTML(p, i, 'assists', 'bg-sky-100 text-sky-800', '🎯'))
+                    .join('');
+            }
+
+            const efficiencyEl = document.getElementById('dashboard-top-efficiency');
+            if (efficiencyEl) {
+                efficiencyEl.innerHTML = dashboardStatsSortedRows('efficiency')
+                    .slice(0, 3)
+                    .map((p, i) => dashboardTopRowHTML(p, i, 'total', 'bg-emerald-100 text-emerald-800', '⚡'))
+                    .join('');
+            }
+        }
+
+        // --- Vue détaillée des classements (depuis les cartes du tableau de bord) ---
+        function setDashboardStatsKind(kind) {
+            if (!DASHBOARD_STATS_KINDS[kind]) return;
+            dashboardStatsKind = kind;
+            renderDashboardStats();
+        }
+
+        function renderDashboardStatsTabs() {
+            const tabsEl = document.getElementById('dashboard-stats-tabs');
+            if (!tabsEl) return;
+
+            tabsEl.innerHTML = Object.entries(DASHBOARD_STATS_KINDS).map(([kind, meta]) => {
+                const active = kind === dashboardStatsKind;
+                return `<button onclick="setDashboardStatsKind('${kind}')" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 active:bg-slate-100'}"><i class="fa-solid ${meta.icon} mr-1" aria-hidden="true"></i>${meta.label}</button>`;
+            }).join('');
+        }
+
+        function renderDashboardStats() {
+            renderDashboardStatsTabs();
+
+            const meta = DASHBOARD_STATS_KINDS[dashboardStatsKind] || DASHBOARD_STATS_KINDS.scorers;
+            const rows = dashboardStatsSortedRows(dashboardStatsKind);
+            const ranked = rows.filter(r => r[meta.key] > 0);
+            const total = rows.reduce((sum, r) => sum + r[meta.key], 0);
+
+            const heroEl = document.getElementById('dashboard-stats-hero');
+            if (heroEl) {
+                const heroDetail = dashboardStatsKind === 'efficiency'
+                    ? `${rows.reduce((sum, r) => sum + r.goals, 0)} ⚽ + ${rows.reduce((sum, r) => sum + r.assists, 0)} 🎯`
+                    : meta.totalLabel;
+
+                heroEl.innerHTML = `
+                    <div class="grad-card ${meta.hero}">
+                        <div class="grad-card-content flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <h2 class="text-lg font-extrabold drop-shadow-sm">Top ${meta.label.toLowerCase()}</h2>
+                                <p class="text-[11px] font-medium opacity-90">${ranked.length} joueur${ranked.length > 1 ? 's' : ''} classé${ranked.length > 1 ? 's' : ''} · tous les matchs</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-2xl font-extrabold drop-shadow-sm tabular-nums">${total}</p>
+                                <p class="text-[11px] font-bold opacity-90">${heroDetail}</p>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            const titleEl = document.getElementById('dashboard-stats-title');
+            if (titleEl) {
+                titleEl.innerHTML = `<i class="fa-solid ${meta.icon} text-slate-600 mr-1"></i>Classement des ${meta.label.toLowerCase()}`;
+            }
+
+            const subtitleEl = document.getElementById('dashboard-stats-subtitle');
+            if (subtitleEl) {
+                subtitleEl.innerText = ranked.length
+                    ? `${ranked.length} joueur${ranked.length > 1 ? 's' : ''} · ${total} ${meta.totalLabel}`
+                    : 'Aucune statistique enregistrée pour le moment';
+            }
+
+            const listEl = document.getElementById('dashboard-stats-list');
+            if (!listEl) return;
+
+            if (!ranked.length) {
+                listEl.innerHTML = `
+                    <div class="p-6 text-center">
+                        <i class="fa-solid fa-chart-simple text-slate-300 text-2xl" aria-hidden="true"></i>
+                        <p class="mt-2 text-xs font-bold text-slate-700">Aucune statistique enregistrée</p>
+                        <p class="mt-1 text-[11px] text-slate-500">Les buts et les passes saisis dans le bilan d'un match apparaîtront ici.</p>
+                    </div>`;
+                return;
+            }
+
+            listEl.innerHTML = ranked.map((r, i) => {
+                const detail = dashboardStatsKind === 'scorers'
+                    ? `${r.goals} ⚽ · ${r.assists} 🎯`
+                    : dashboardStatsKind === 'passers'
+                        ? `${r.assists} 🎯 · ${r.goals} ⚽`
+                        : `${r.goals} ⚽ + ${r.assists} 🎯`;
+
+                const rankClass = i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-slate-400' : i === 2 ? 'bg-orange-700' : 'bg-slate-700';
+
+                return `
+                    <div class="flex items-center justify-between gap-2 px-3 py-2.5">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="w-6 h-6 shrink-0 rounded-full ${rankClass} text-white text-[11px] font-extrabold flex items-center justify-center" title="Rang ${i + 1}">${i + 1}</span>
+                            <div class="min-w-0">
+                                <p class="font-bold text-xs truncate text-slate-800">${r.name}</p>
+                                <p class="text-[10px] text-slate-400">${detail}${r.team ? ' · <span class="uppercase">' + r.team + '</span>' : ''}</p>
+                            </div>
+                        </div>
+                        <span class="shrink-0 ${meta.badge} font-extrabold px-2 py-0.5 rounded text-xs">${r[meta.key]} ${meta.unit}</span>
+                    </div>`;
+            }).join('');
+        }
+
+        function openDashboardStats(kind) {
+            if (DASHBOARD_STATS_KINDS[kind]) dashboardStatsKind = kind;
+
+            renderDashboardStats();
+
+            const dashboardSec = document.getElementById('sec-dashboard');
+            const statsSec = document.getElementById('sec-dashboard-stats');
+
+            if (dashboardSec) dashboardSec.classList.add('hidden');
+            if (!statsSec) return;
+
+            statsSec.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function closeDashboardStats() {
+            const dashboardSec = document.getElementById('sec-dashboard');
+            const statsSec = document.getElementById('sec-dashboard-stats');
+
+            if (statsSec) statsSec.classList.add('hidden');
+            if (dashboardSec) dashboardSec.classList.remove('hidden');
+
+            renderDashboard();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.openDashboardStats = openDashboardStats;
+        window.closeDashboardStats = closeDashboardStats;
+        window.setDashboardStatsKind = setDashboardStatsKind;
 
         // Rendu Effectif
         function renderEffectif() {
@@ -2661,6 +2869,18 @@ renderMatchSummary(m);
 
                 return '';
             };
+
+            // Liste triée par ordre alphabétique des prénoms
+            // (cartes mobile et tableau PC de l'onglet Convocations)
+            const firstNameSortKey = (p) => {
+                const { prenom, nom } = getPlayerNameParts(p);
+                return String(prenom || nom || p.name || '');
+            };
+
+            playerItems.sort((a, b) =>
+                firstNameSortKey(a.p).localeCompare(firstNameSortKey(b.p), 'fr', { sensitivity: 'base' })
+                || String(a.p.name || '').localeCompare(String(b.p.name || ''), 'fr', { sensitivity: 'base' })
+            );
 
             playerItems.forEach(({ p, invite }) => {
                 const currentStatus = m.convocations[p.id] || 'none';
