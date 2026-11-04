@@ -596,21 +596,7 @@
 
 <div id="subtab-composition" class="space-y-4 hidden">
 
-    <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
-
-        <div class="mb-4">
-            <h2 class="text-base font-bold text-slate-800">
-                ⚽ Composition d'équipe
-            </h2>
-
-            <p class="text-xs text-slate-500">
-                Organisation des titulaires et remplaçants
-            </p>
-        </div>
-
-        <div id="match-composition-container">
-        </div>
-
+    <div id="match-composition-container">
     </div>
 
 </div>
@@ -641,18 +627,24 @@
 
 <div id="subtab-convocations" class="space-y-4 hidden">
 
-    <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
+    <div id="convoc-match-hero" class="hidden"></div>
+
+    <div class="card card-pad space-y-3">
 
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
 
-            <div>
-                <h2 class="text-base font-bold text-slate-800">
-                    Feuille de Convocations & WhatsApp
-                </h2>
-
-                <p class="text-xs text-slate-500">
-                    Postes, maillots, licences et covoiturages
-                </p>
+            <div class="flex items-center gap-2.5 min-w-0">
+                <span class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0" aria-hidden="true">
+                    <i class="fa-solid fa-clipboard-user"></i>
+                </span>
+                <div class="min-w-0">
+                    <h2 class="text-sm font-extrabold text-slate-800 leading-tight">
+                        Convocations & WhatsApp
+                    </h2>
+                    <p class="text-[11px] text-slate-500">
+                        Postes, licences et covoiturage du match
+                    </p>
+                </div>
             </div>
 
             <div class="flex items-center space-x-2 w-full sm:w-auto">
@@ -677,29 +669,21 @@
         </div>
 
 
-    <div class="flex flex-wrap gap-2 mt-3">
+    <div class="conv-actions">
 
-        <button onclick="generateWhatsAppMessage()"
-            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition">
-
-            <i class="fa-brands fa-whatsapp"></i>
+        <button onclick="generateWhatsAppMessage()" class="conv-action conv-action-wa">
+            <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
             <span>WhatsApp</span>
-
         </button>
 
-        <button onclick="generateCarpoolReminder()"
-            class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition">
-
-            <span>📲 Relance covoiturage</span>
-
+        <button onclick="generateCarpoolReminder()" class="conv-action conv-action-carpool">
+            <i class="fa-solid fa-car" aria-hidden="true"></i>
+            <span>Relance covoiturage</span>
         </button>
 
-        <button onclick="openFeuilleDeMatch()"
-            class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition">
-
-            <i class="fa-solid fa-file-lines"></i>
+        <button onclick="openFeuilleDeMatch()" class="conv-action conv-action-sheet">
+            <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
             <span>Feuille de match</span>
-
         </button>
 
     </div>
@@ -741,14 +725,13 @@
 
                   <div id="mobile-players-container" class="block sm:hidden space-y-3"></div>
 
-<div class="hidden sm:block overflow-x-auto touch-scroll -mx-4 sm:mx-0">
-    <table class="w-full text-left border-collapse">
+<div class="hidden sm:block overflow-x-auto touch-scroll -mx-4 sm:mx-0 sm:rounded-2xl sm:border sm:border-slate-100 sm:bg-white">
+    <table class="conv-table w-full text-left border-collapse">
         <thead class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider border-b border-slate-100">
             <tr>
                 <th class="p-3 pl-4">Joueur</th>
                 <th class="p-3">N° Licence</th>
                 <th class="p-3">Poste</th>
-                <th class="p-3 text-center">N° Maillot</th>
                 <th class="p-3 text-center">Statut</th>
             </tr>
         </thead>

@@ -761,6 +761,7 @@ return colorMap[colorName] || colorMap.slate;
         }
 
     function switchMatchSubTab(subTabId) {
+        document.body.classList.remove('comp-fullscreen-open');
 
     if (!subTabId) {
         subTabId = 'results';
@@ -2343,7 +2344,7 @@ const niveauBadge =
         ? '<span class="font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700">🟡 Niveau 2</span>'
         : '<span class="font-bold px-2 py-0.5 rounded bg-red-100 text-red-700">🔴 Niveau 1</span>';
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
-                const hasBlessure = p.blessure === true;
+                const injuryInfo = getPlayerInjuryInfo(p);
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
                 const teamKey = p.team || p.cat; 
@@ -2354,10 +2355,9 @@ const niveauBadge =
     </span>`;
 
 
-                // Badge blessure
-                const blessureBadge = hasBlessure ?
-                    `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500 text-purple-100">🤕 Blessé</span>` :
-                    '';
+                // Badge blessure (durée calculée depuis les appels)
+                const blessureBadge = renderInjuryBadge(injuryInfo);
+                const injuryHistoryText = formatPlayerInjuryHistory(injuryInfo);
 
 
                 // Calcul présences entraînements (nouveau format)
@@ -2416,6 +2416,7 @@ Object.values(state.trainings).forEach(session => {
                 // Bilan convocations sur les matchs passés de son équipe
                 const convocHistory = getConvocationHistoryForTeam(p.team || p.cat);
                 const matchStats = convocHistory.history[p.id] || emptyConvocationStats();
+                const playerRecord = (convocHistory.records || {})[p.id] || null;
                 const matchPct = matchStats.total > 0 ? Math.round((matchStats.played / matchStats.total) * 100) : null;
                 const matchColor = matchPct === null ? 'text-slate-400' : matchPct >= 75 ? 'text-emerald-600' : matchPct >= 50 ? 'text-amber-600' : 'text-red-600';
 
@@ -2431,79 +2432,106 @@ Object.values(state.trainings).forEach(session => {
                     : (convocHistory.matches.length ? 'Aucun statut enregistré' : 'Aucun match passé');
 
                 return `
-                <article class="player-row border-slate-200">
+                <article class="player-row" style="--team-color:${getTeamHex(p.team || p.cat)}">
                     <div class="player-avatar ${teamColors.badge}" aria-hidden="true">${initials}</div>
 
                     <div class="min-w-0 flex-1">
                         <div class="flex items-start justify-between gap-2">
                             <div class="min-w-0">
-                                <h3 class="player-name truncate">${p.name}</h3>
-                                <p class="player-meta truncate">
-                                    ${p1 !== '-' ? p1 : 'Poste non défini'}
-                                    <span class="text-slate-300 px-1">·</span>
-                                    <span class="${hasLicence ? '' : 'text-amber-700 font-bold'}">${hasLicence ? 'Lic. ' + p.licence : '⚠️ Licence manquante'}</span>
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <h3 class="player-name truncate">${p.name}</h3>
+                                    <span class="player-team-chip ${teamColors.badge}">${teamName}</span>
+                                    ${blessureBadge}
+                                </div>
+                                <p class="player-meta">
+                                    <span><i class="fa-solid fa-location-dot mr-1 opacity-60" aria-hidden="true"></i>${p1 !== '-' ? p1 : 'Poste non défini'}</span>
+                                    <span class="text-slate-300" aria-hidden="true">·</span>
+                                    <span class="${hasLicence ? '' : 'text-amber-700 font-bold'}"><i class="fa-solid fa-id-card mr-1 opacity-60" aria-hidden="true"></i>${hasLicence ? 'Lic. ' + p.licence : 'Licence manquante'}</span>
                                 </p>
                             </div>
 
-                            <div class="flex items-center gap-1 shrink-0">
-                                <span class="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-extrabold ${teamColors.badge}">${teamName}</span>
+                            <div class="player-actions shrink-0">
                                 <button onclick="openModalPlayer('${p.id}')" class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs" aria-hidden="true"></i></button>
                                 <button onclick="deletePlayer('${p.id}')" class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs" aria-hidden="true"></i></button>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5 mt-2.5">
-                            <div class="metric" title="${matchHint}">
-                                <span class="metric-label">Matchs</span>
-                                <span class="metric-value ${matchColor}">${matchPct !== null ? matchPct + '%' : '—'}</span>
+                        <div class="player-stats">
+                            <div class="player-gauge ${matchPct === null ? 'is-empty' : ''}" title="${matchHint}">
+                                <span class="player-gauge-ring" style="--pct:${matchPct !== null ? matchPct : 0}">
+                                    <span class="player-gauge-value ${matchColor}">${matchPct !== null ? matchPct + '%' : '—'}</span>
+                                </span>
+                                <span class="player-gauge-label"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i>Matchs</span>
                             </div>
-                            <div class="metric" title="${presencePct !== null ? presences + ' présence(s) sur ' + totalSessions + ' séance(s)' : 'Aucune séance passée'}">
-                                <span class="metric-label">Séances</span>
-                                <span class="metric-value ${presenceColor}">${presencePct !== null ? presencePct + '%' : '—'}</span>
+                            <div class="player-gauge ${presencePct === null ? 'is-empty' : ''}" title="${presencePct !== null ? presences + ' présence(s) sur ' + totalSessions + ' séance(s)' : 'Aucune séance passée'}">
+                                <span class="player-gauge-ring" style="--pct:${presencePct !== null ? presencePct : 0}">
+                                    <span class="player-gauge-value ${presenceColor}">${presencePct !== null ? presencePct + '%' : '—'}</span>
+                                </span>
+                                <span class="player-gauge-label"><i class="fa-solid fa-dumbbell" aria-hidden="true"></i>Séances</span>
                             </div>
-                            <div class="metric" title="${pStats.goals} but(s), ${pStats.assists} passe(s) décisive(s)">
-                                <span class="metric-label">Buts</span>
-                                <span class="metric-value">${pStats.goals}⚽ ${pStats.assists}🎯</span>
-                            </div>
-                            <div class="metric" title="${cards.yellows} jaune(s), ${cards.reds} rouge(s)">
-                                <span class="metric-label">Cartons</span>
-                                <span class="metric-value"><span class="text-amber-600">${cards.yellows}🟨</span> <span class="text-red-600">${cards.reds}🟥</span></span>
-                            </div>
-                            <div class="metric" title="${carpoolHint}">
-                                <span class="metric-label">Trajets</span>
-                                <span class="metric-value ${carpoolStats.withPassengers ? 'text-sky-700' : 'text-slate-400'}">${carpoolStats.withPassengers ? carpoolStats.withPassengers + '🚗' : '—'}</span>
+
+                            <div class="player-stat-chips">
+                                <div class="player-stat-chip" title="${pStats.goals} but(s), ${pStats.assists} passe(s) décisive(s)">
+                                    <span class="player-stat-icon"><i class="fa-solid fa-futbol" aria-hidden="true"></i></span>
+                                    <span class="player-stat-text">
+                                        <span class="player-stat-label">Buts / passes</span>
+                                        <span class="player-stat-value">${pStats.goals} ⚽ · ${pStats.assists} 🎯</span>
+                                    </span>
+                                </div>
+                                <div class="player-stat-chip" title="${cards.yellows} jaune(s), ${cards.reds} rouge(s)">
+                                    <span class="player-stat-icon"><i class="fa-solid fa-scroll" aria-hidden="true"></i></span>
+                                    <span class="player-stat-text">
+                                        <span class="player-stat-label">Cartons</span>
+                                        <span class="player-stat-value"><span class="text-amber-600">${cards.yellows} 🟨</span> <span class="text-red-600">${cards.reds} 🟥</span></span>
+                                    </span>
+                                </div>
+                                <div class="player-stat-chip" title="${carpoolHint}">
+                                    <span class="player-stat-icon"><i class="fa-solid fa-car" aria-hidden="true"></i></span>
+                                    <span class="player-stat-text">
+                                        <span class="player-stat-label">Trajets</span>
+                                        <span class="player-stat-value ${carpoolStats.withPassengers ? 'text-sky-700' : 'text-slate-400'}">${carpoolStats.withPassengers ? carpoolStats.withPassengers + ' 🚗' : '—'}</span>
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="flex flex-wrap items-center gap-1 mt-2">
+                        <div class="flex flex-wrap items-center gap-1 mt-2.5">
                             ${niveauBadge}
-                            ${blessureBadge}
                             ${attendanceBadge}
                             ${autoBadge}
+                            ${playerRecordBadges(playerRecord, { compact: true })}
                         </div>
 
-                        <details class="player-details mt-2">
+                        <details class="player-details mt-2.5">
                             <summary><i class="fa-solid fa-chevron-right" aria-hidden="true"></i>Détails et postes</summary>
                             <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
-                                    <span class="text-slate-500">Postes :</span>
-                                    <span class="font-bold text-slate-800">${p1}${p2 !== '-' ? ' · ' + p2 : ''}${p3 !== '-' ? ' · ' + p3 : ''}</span>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Postes</span>
+                                    <span class="player-detail-value">${p1}${p2 !== '-' ? ' · ' + p2 : ''}${p3 !== '-' ? ' · ' + p3 : ''}</span>
                                 </div>
-                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
-                                    <span class="text-slate-500">Convocations :</span>
-                                    <span class="font-bold text-slate-800">${matchStats.total > 0 ? `${matchStats.played} retenu(s) · ${matchStats.choix} choix · ${matchStats.indispo} indispo` : '—'}</span>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Convocations</span>
+                                    <span class="player-detail-value">${matchStats.total > 0 ? `${matchStats.played} retenu(s) · ${matchStats.choix} choix · ${matchStats.indispo} indispo` : '—'}</span>
                                 </div>
-                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
-                                    <span class="text-slate-500">Entraînements :</span>
-                                    <span class="font-bold text-slate-800">${presencePct !== null ? `${presences}/${totalSessions} séances` : '—'}</span>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Résultats</span>
+                                    <span class="player-detail-value">${playerRecordBadges(playerRecord)}</span>
                                 </div>
-                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
-                                    <span class="text-slate-500">Covoiturage :</span>
-                                    <span class="font-bold text-slate-800">${carpoolStats.answered ? `${carpoolStats.withPassengers} avec passagers${carpoolStats.withoutSeats ? ` (dont ${carpoolStats.withoutSeats} sans place)` : ''} · ${carpoolStats.rides} passager · ${carpoolStats.directs} direct` : '—'}</span>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Blessures</span>
+                                    <span class="player-detail-value">${injuryHistoryText}</span>
                                 </div>
-                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
-                                    <span class="text-slate-500">Équipe :</span>
-                                    <span class="font-bold text-slate-800">${teamName}</span>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Entraînements</span>
+                                    <span class="player-detail-value">${presencePct !== null ? `${presences}/${totalSessions} séances` : '—'}</span>
+                                </div>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Covoiturage</span>
+                                    <span class="player-detail-value">${carpoolStats.answered ? `${carpoolStats.withPassengers} avec passagers${carpoolStats.withoutSeats ? ` (dont ${carpoolStats.withoutSeats} sans place)` : ''} · ${carpoolStats.rides} passager · ${carpoolStats.directs} direct` : '—'}</span>
+                                </div>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Équipe</span>
+                                    <span class="player-detail-value">${teamName}</span>
                                 </div>
                             </div>
                         </details>
@@ -2595,18 +2623,8 @@ Object.values(state.trainings).forEach(session => {
     );
 }
 
-    // Tri par date
-    matches.sort((a, b) => {
-        const dateA = a.date
-            ? new Date(a.date + 'T12:00:00')
-            : new Date('9999-12-31');
-
-        const dateB = b.date
-            ? new Date(b.date + 'T12:00:00')
-            : new Date('9999-12-31');
-
-        return dateA - dateB;
-    });
+    // Matchs à venir d'abord (chronologiques), déjà joués à la fin
+    matches = sortMatchesUpcomingFirst(matches);
 
     if (matches.length === 0) {
         selector.innerHTML =
@@ -2614,28 +2632,29 @@ Object.values(state.trainings).forEach(session => {
         return;
     }
 
+    const optionForMatch = (m) => {
+        const formattedDate = m.date
+            ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            })
+            : '--/--/--';
+
+        return `<option value="${m.id}">${m.opponent} (${formattedDate})</option>`;
+    };
+
+    const upcoming = matches.filter(m => !matchHasBeenPlayed(m));
+    const played = matches.filter(m => matchHasBeenPlayed(m));
+
     selector.innerHTML =
         '<option value="">-- Sélectionner un match --</option>' +
-        matches.map(m => {
-
-            const formattedDate = m.date
-                ? new Date(m.date + 'T12:00:00').toLocaleDateString(
-                    'fr-FR',
-                    {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    }
-                )
-                : '--/--/--';
-
-            return `
-                <option value="${m.id}">
-                    ${m.opponent} (${formattedDate})
-                </option>
-            `;
-
-        }).join('');
+        (upcoming.length
+            ? `<optgroup label="À venir (${upcoming.length})">${upcoming.map(optionForMatch).join('')}</optgroup>`
+            : '') +
+        (played.length
+            ? `<optgroup label="Déjà joués (${played.length})">${played.map(optionForMatch).join('')}</optgroup>`
+            : '');
 
     // Aucune sélection automatique
     selector.value = state.selectedMatchId || '';
@@ -2688,6 +2707,8 @@ const userTeam = window.currentUserTeam || 'all';
     carpoolBanner.style.display = 'none';
 }
     if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
+    const convHeroIdle = document.getElementById('convoc-match-hero');
+    if (convHeroIdle) convHeroIdle.classList.add('hidden');
 
     return;
 }
@@ -2704,6 +2725,8 @@ if (counterBanner) counterBanner.style.display = 'none';
 if (carpoolBanner) carpoolBanner.style.display = 'none';  
                 if(validationStatus) validationStatus.innerHTML = '';
                 if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
+                const convHeroEmpty = document.getElementById('convoc-match-hero');
+                if (convHeroEmpty) convHeroEmpty.classList.add('hidden');
                 return;
             }
 
@@ -2719,6 +2742,8 @@ if (carpoolBanner) carpoolBanner.style.display = 'block';
 ) {
     updateTransportCarpoolLink(null);
     if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
+    const convHeroOther = document.getElementById('convoc-match-hero');
+    if (convHeroOther) convHeroOther.classList.add('hidden');
     return;
 }
 
@@ -2730,6 +2755,7 @@ if (carpoolBanner) carpoolBanner.style.display = 'block';
             const playersForMatch = playerItems.map(item => item.p);
 
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
+            const teamHex = getTeamHex(m.team);
             const teamColors = getTeamColorClasses(m.team);
             const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
                 day: '2-digit',
@@ -2745,7 +2771,6 @@ if (carpoolBanner) carpoolBanner.style.display = 'block';
             // Bilan des convocations sur les matchs passés de cette équipe
             const convocHistory = buildConvocationHistory(m.team);
             const cardsIndex = getCardsByPlayerIndex();
-            const jerseysForMatch = computeMatchJerseys(m);
 
             if (inviteSearchBlock) {
                 inviteSearchBlock.classList.toggle('hidden', role !== 'coach' && role !== 'responsable');
@@ -2820,10 +2845,29 @@ if (carpoolBanner) carpoolBanner.style.display = 'block';
             }
 
             let convokedCount = 0;
+            let indispoCount = 0;
+            let nonConvokedCount = 0;
             const targetConvoked = parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
             playerItems.forEach(({ p }) => {
-                if (m.convocations[p.id] === 'convoke') convokedCount++;
+                const status = m.convocations[p.id] || 'none';
+                if (status === 'convoke') convokedCount++;
+                else if (status === 'indisponible') indispoCount++;
+                else if (status === 'nonconvoke') nonConvokedCount++;
             });
+
+            const convHero = document.getElementById('convoc-match-hero');
+            if (convHero) {
+                convHero.classList.remove('hidden');
+                convHero.innerHTML = renderConvocationHero(m, {
+                    teamName,
+                    teamHex,
+                    formattedDate,
+                    convokedCount,
+                    targetConvoked,
+                    indispoCount,
+                    nonConvokedCount
+                });
+            }
 
             counterBanner.className = 'bg-white p-4 rounded-xl border border-slate-100 card-shadow';
             counterBanner.innerHTML = renderConvocationOverviewCard(m, playerItems, convokedCount, targetConvoked);
@@ -2885,19 +2929,26 @@ renderMatchSummary(m);
             playerItems.forEach(({ p, invite }) => {
                 const currentStatus = m.convocations[p.id] || 'none';
                 const selectedPosition = m.positions[p.id] || p.poste1 || '-';
-                const jerseyNumber = jerseysForMatch[p.id]?.number ?? '';
                 const disciplineChip = renderDisciplineChip(computePlayerDiscipline(p.id, cardsIndex));
                 const postes = getPlayerPostesList(p);
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
+
+                // Initiales pour l'avatar de la liste (tableau et cartes mobiles)
+                const { prenom: pPrenom, nom: pNom } = getPlayerNameParts(p);
+                const playerInitials = ((pPrenom || '').charAt(0) + (pNom || '').charAt(0)).toUpperCase()
+                    || String(p.name || '?').charAt(0).toUpperCase();
 
                 // --- HTML POUR MOBILE (Cartes) ---
                 htmlMobileCards += `
                     <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 shadow-sm space-y-2.5 mb-2.5">
                         <div class="flex items-start justify-between gap-2">
-                            <div class="min-w-0">
+                            <div class="flex items-start gap-2.5 min-w-0">
+                                <span class="conv-avatar" style="--team:${teamHex}" aria-hidden="true">${playerInitials}</span>
+                                <div class="min-w-0">
                                 <div class="font-bold text-slate-800 text-[13px]">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}${carpoolChip(p.id)}</div>
                                 <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
                                 ${convocationBadgeHtml(convocHistory.history[p.id])}
+                                </div>
                             </div>
                             ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg shrink-0" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                         </div>
@@ -2924,21 +2975,22 @@ renderMatchSummary(m);
                                     <option value="Remplaçant" ${selectedPosition === 'Remplaçant' ? 'selected' : ''}>Remplaçant</option>
                                 </select>
                             </div>
-                            <div class="flex items-center justify-between gap-2">
-                                <span class="text-[10px] text-slate-500 uppercase font-bold">Maillot</span>
-                                <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-16 p-1 border rounded text-center font-bold text-xs bg-white">
-                            </div>
                         </div>
                     </div>
                 `;
 
                 // --- HTML POUR PC (Lignes de tableau classiques) ---
                 htmlTableRows += `
-                    <tr class="${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
+                    <tr class="conv-row ${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
                         <td class="p-3 pl-4">
+                            <div class="flex items-start gap-2.5">
+                                <span class="conv-avatar conv-avatar-sm" style="--team:${teamHex}" aria-hidden="true">${playerInitials}</span>
+                                <div class="min-w-0">
                             <div class="font-bold text-slate-800">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}${carpoolChip(p.id)}</div>
                             <div class="text-[10px] text-slate-400">Poste favori : ${p.poste1 || '-'}</div>
                             ${convocationBadgeHtml(convocHistory.history[p.id])}
+                                </div>
+                            </div>
                         </td>
                         <td class="p-3">
                             <div class="flex items-center space-x-1.5">
@@ -2954,10 +3006,6 @@ renderMatchSummary(m);
                             </select>
                         </td>
                         <td class="p-3 text-center">
-                            <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-14 p-1 border rounded text-center font-bold text-xs bg-white">
-                        </td>
-                        
-<td class="p-3 text-center">
                              <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
                                  <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn status-convoke ${currentStatus === 'convoke' ? 'active-convoke' : ''}">Conv.</button>
                                  <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn status-nonconvoke ${currentStatus === 'nonconvoke' ? 'active-nonconvoke' : ''}">Non</button>
@@ -3708,6 +3756,7 @@ const nbTotal = playersForTraining.length;
 
     playersToMark.forEach(player => {
         state.trainings[currentTrainingId].presence[player.id] = 'present';
+        clearPlayerInjuryFlag(player, state.trainings[currentTrainingId].date);
     });
 
     saveStateToFirebase();
@@ -3739,6 +3788,7 @@ function setAllTrainingAbsent() {
 
     playersToMark.forEach(player => {
         state.trainings[currentTrainingId].presence[player.id] = 'absent';
+        clearPlayerInjuryFlag(player, state.trainings[currentTrainingId].date);
     });
 
     // Tous absents : le groupe de travail se vide aussi
@@ -4060,12 +4110,8 @@ function duplicateTraining() {
     );
 }
 
-    // Trier les matchs par date (prochain d'abord)
-    matches.sort((a, b) => {
-        const dateA = a.date ? new Date(a.date + 'T12:00:00') : new Date('9999-12-31');
-        const dateB = b.date ? new Date(b.date + 'T12:00:00') : new Date('9999-12-31');
-        return dateA - dateB;
-    });
+    // Matchs à venir d'abord (chronologiques), déjà joués à la fin
+    matches = sortMatchesUpcomingFirst(matches);
 
     if (matches.length === 0) {
         container.innerHTML = `
@@ -4075,7 +4121,17 @@ function duplicateTraining() {
         return;
     }
 
-    container.innerHTML = matches.map(m => {
+    const upcomingMatches = matches.filter(m => !matchHasBeenPlayed(m));
+    const playedMatches = matches.filter(m => matchHasBeenPlayed(m));
+
+    const sectionTitle = (label, icon, count) => `
+        <div class="flex items-center gap-2 pt-1">
+            <span class="text-[10px] font-extrabold uppercase tracking-[.12em] text-slate-500"><i class="fa-solid ${icon} mr-1"></i>${label}</span>
+            <span class="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-extrabold">${count}</span>
+            <span class="flex-1 h-px bg-slate-200"></span>
+        </div>`;
+
+    const renderMatchCard = (m) => {
                 const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
                 const teamColors = getTeamColorClasses(m.team);
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
@@ -4090,12 +4146,8 @@ function duplicateTraining() {
                     }
                 }
 
-                // Vérifier si le match est passé
-                const matchDateTime = m.date && m.heure 
-                    ? new Date(m.date + 'T' + (m.heure || '14:30'))
-                    : new Date('9999-12-31');
-                const now = new Date();
-                const isMatchPassed = matchDateTime < now;
+                // Match passé ou score déjà saisi
+                const isMatchPassed = matchHasBeenPlayed(m);
 
                 // Déterminer si l'équipe joue à domicile ou à l'extérieur
                 const isHome = m.location?.toLowerCase().includes('domicile') || m.location?.toLowerCase().includes('home');
@@ -4149,7 +4201,11 @@ else if (m.type === 'Amical') {
                             ${bilanButtonHTML}
                         </div>
                     </div>`;
-            }).join('');
+            };
+
+    container.innerHTML =
+        (upcomingMatches.length ? sectionTitle('À venir', 'fa-clock', upcomingMatches.length) + upcomingMatches.map(renderMatchCard).join('') : '') +
+        (playedMatches.length ? sectionTitle('Déjà joués', 'fa-flag-checkered', playedMatches.length) + playedMatches.map(renderMatchCard).join('') : '');
         }
 
         function deleteMatch(matchId) {
@@ -4282,6 +4338,185 @@ else if (m.type === 'Amical') {
         function copyLicence(licence) {
             navigator.clipboard.writeText(licence).then(() => showToast(`Licence ${licence} copiée !`));
         }
+/* ---------- Blessures : durée calculée depuis les appels ---------- */
+
+function toDateKey(value) {
+    if (!value || typeof value !== 'string') return null;
+    const key = value.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
+}
+
+function dateKeyToDate(key) {
+    if (!key) return null;
+    const parts = key.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function todayDateKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function injuryDays(startKey, endKey) {
+    const start = dateKeyToDate(startKey);
+    const end = dateKeyToDate(endKey);
+    if (!start || !end) return null;
+    return Math.max(0, Math.round((end - start) / 86400000));
+}
+
+function formatInjuryDuration(days, short) {
+    if (days === null || days === undefined || Number.isNaN(days)) return '';
+    if (days <= 0) return short ? '< 1 j' : 'moins d’un jour';
+    if (days < 14) return `${days}${short ? ' j' : (days > 1 ? ' jours' : ' jour')}`;
+    if (days < 60) {
+        const weeks = Math.round(days / 7);
+        return `${weeks}${short ? ' sem.' : ' semaines'}`;
+    }
+    return `${Math.round(days / 30.4375)} mois`;
+}
+
+function formatInjuryDay(key) {
+    const date = dateKeyToDate(key);
+    return date ? date.toLocaleDateString('fr-FR') : '';
+}
+
+// Un joueur redevient disponible : on efface le drapeau « blessé » de sa fiche.
+function clearPlayerInjuryFlag(player, returnDate) {
+    if (!player || player.blessure !== true) return;
+    const sessionDate = toDateKey(returnDate);
+    if (sessionDate && sessionDate > todayDateKey()) return;
+    player.blessure = false;
+    player.blessureDateDebut = null;
+    player.blessureRetour = toDateKey(returnDate) || todayDateKey();
+}
+
+// Reconstitue les épisodes de blessure à partir des appels d'entraînement :
+// un épisode s'ouvre sur un statut « blessé » et se referme au premier autre statut.
+function getPlayerInjuryInfo(player) {
+    const result = { isInjured: false, current: null, past: [], hasAny: false, lastPast: null };
+    if (!player) return result;
+
+    const today = todayDateKey();
+    const teamKey = (player.team || player.cat || '').toLowerCase();
+    const entries = [];
+
+    Object.values(state.trainings || {}).forEach(session => {
+        if (!session || !session.date) return;
+        if ((session.team || '').toLowerCase() !== teamKey) return;
+        const status = session.presence && session.presence[player.id];
+        const date = toDateKey(session.date);
+        if (!status || !date) return;
+        // Une séance future pré-remplie ne doit pas clore une blessure en cours.
+        if (date > today) return;
+        entries.push({ date, status });
+    });
+
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+
+    let spells = [];
+    let openSpell = null;
+
+    entries.forEach(entry => {
+        if (entry.status === 'blesse') {
+            if (!openSpell) openSpell = { start: entry.date, end: null };
+            return;
+        }
+        if (openSpell) {
+            openSpell.end = entry.date;
+            spells.push(openSpell);
+            openSpell = null;
+        }
+    });
+
+    if (openSpell) spells.push(openSpell);
+
+    // Drapeau « blessé » de la fiche : on ne le retient que s'il apporte une info plus récente
+    // que le dernier appel (sinon c'est un ancien statut resté bloqué, ex. appel groupé).
+    const startFlag = toDateKey(player.blessureDateDebut);
+    if (player.blessure === true && startFlag) {
+        const lastEntryDate = entries.length ? entries[entries.length - 1].date : null;
+        const alreadyOpen = spells.some(spell => !spell.end);
+        if (!alreadyOpen && (!lastEntryDate || startFlag > lastEntryDate)) {
+            spells.push({ start: startFlag, end: null });
+        }
+    }
+
+    // Une date de retour enregistrée referme une blessure encore ouverte (une date
+    // future annonce juste le retour, elle ne doit pas déclarer le joueur guéri).
+    const returnDate = toDateKey(player.blessureRetour);
+    if (returnDate && returnDate <= today) {
+        spells = spells.map(spell =>
+            (!spell.end && (!spell.start || spell.start <= returnDate))
+                ? { ...spell, end: returnDate }
+                : spell
+        );
+    }
+
+    const decorated = spells
+        .filter(spell => spell.start)
+        .sort((a, b) => a.start.localeCompare(b.start))
+        .map(spell => ({
+            start: spell.start,
+            end: spell.end || null,
+            ongoing: !spell.end,
+            days: injuryDays(spell.start, spell.end || today)
+        }));
+
+    const current = decorated.find(spell => spell.ongoing) || null;
+    const past = decorated.filter(spell => !spell.ongoing);
+    const flagOnly = player.blessure === true && decorated.length === 0;
+
+    return {
+        isInjured: !!current || flagOnly,
+        current: current || (flagOnly ? { start: null, end: null, ongoing: true, days: null } : null),
+        past,
+        hasAny: decorated.length > 0 || flagOnly,
+        lastPast: past.length ? past[past.length - 1] : null
+    };
+}
+
+function renderInjuryBadge(info) {
+    if (!info) return '';
+
+    if (info.current) {
+        const duration = formatInjuryDuration(info.current.days, true);
+        const since = info.current.start ? ` depuis le ${formatInjuryDay(info.current.start)}` : '';
+        const title = `Blessé${since}${duration ? ` · ${formatInjuryDuration(info.current.days, false)}` : ''}`;
+        return `<span class="injury-badge is-active" title="${title}">🤕 ${duration ? 'Blessé · ' + duration : 'Blessé'}</span>`;
+    }
+
+    const last = info.lastPast;
+    if (last) {
+        const duration = formatInjuryDuration(last.days, true);
+        if (!duration) return '';
+        const title = `Blessé du ${formatInjuryDay(last.start)} au ${formatInjuryDay(last.end)} · ${formatInjuryDuration(last.days, false)}`;
+        return `<span class="injury-badge is-past" title="${title}">🤕 Guéri · ${duration}</span>`;
+    }
+
+    return '';
+}
+
+function formatPlayerInjuryHistory(info) {
+    if (!info || !info.hasAny) return '—';
+
+    const all = [];
+    if (info.current) all.push(info.current);
+    all.push(...(info.past || []));
+    all.sort((a, b) => (b.start || '').localeCompare(a.start || ''));
+
+    const parts = all.slice(0, 3).map(spell => {
+        const duration = formatInjuryDuration(spell.days, false);
+        if (!spell.start) return `en cours${duration ? ' · ' + duration : ''}`;
+        if (spell.ongoing) return `depuis le ${formatInjuryDay(spell.start)} · ${duration}`;
+        return `${formatInjuryDay(spell.start)} → ${formatInjuryDay(spell.end)} · ${duration}`;
+    });
+
+    if (all.length > 3) parts.push(`+${all.length - 3} autre(s)`);
+
+    return parts.join('<br>');
+}
+
 function formatDateFr(dateString) {
 
     if (!dateString) return '';
@@ -5280,8 +5515,25 @@ Un passager non déclaré = un enfant sans siège prévu.
             );
 
             const history = {};
+            const records = {};
+
             pastMatches.forEach(m => {
+                const home = parseInt(m.scoreHome, 10);
+                const away = parseInt(m.scoreAway, 10);
+                const hasScore =
+                    m.scoreHome !== undefined && m.scoreHome !== null && String(m.scoreHome).trim() !== '' &&
+                    m.scoreAway !== undefined && m.scoreAway !== null && String(m.scoreAway).trim() !== '' &&
+                    !isNaN(home) && !isNaN(away);
+                const resultKey = !hasScore ? null : home > away ? 'wins' : home === away ? 'draws' : 'losses';
+
                 Object.entries(m.convocations || {}).forEach(([pId, status]) => {
+                    // Bilan victoires / nuls / défaites des matchs où le joueur était convoqué
+                    if (resultKey && status === 'convoke') {
+                        if (!records[pId]) records[pId] = { wins: 0, draws: 0, losses: 0, matches: 0 };
+                        records[pId][resultKey]++;
+                        records[pId].matches++;
+                    }
+
                     let bucket = null;
                     if (status === 'convoke') bucket = 'played';
                     else if (status === 'nonconvoke') bucket = 'choix';
@@ -5293,7 +5545,7 @@ Un passager non déclaré = un enfant sans siège prévu.
                 });
             });
 
-            return { matches: pastMatches, history };
+            return { matches: pastMatches, history, records };
         }
 
         function convocationBadgeHtml(stats) {
@@ -5308,6 +5560,21 @@ Un passager non déclaré = un enfant sans siège prévu.
                         <span class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-600 font-bold">⚪ ${s.choix}</span>
                         <span class="text-[10px] font-extrabold text-slate-400">${pct}%</span>
                     </div>`;
+        }
+
+        // Pastilles Victoires / Nuls / Défaites pour un joueur
+        function playerRecordBadges(record, options) {
+            const r = record || { wins: 0, draws: 0, losses: 0, matches: 0 };
+            const compact = !!(options && options.compact);
+            if (!r.matches) {
+                return compact ? '' : `<span class="text-[10px] text-slate-400 italic">Aucun résultat</span>`;
+            }
+            const title = `${r.matches} match(s) joué(s) : ${r.wins} victoire(s), ${r.draws} nul(s), ${r.losses} défaite(s)`;
+            return `<span class="inline-flex flex-wrap items-center gap-1" title="${title}">
+                        <span class="px-1.5 py-0.5 rounded border border-emerald-100 bg-emerald-50 text-emerald-700 text-[10px] font-bold">${r.wins}V</span>
+                        <span class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-600 text-[10px] font-bold">${r.draws}N</span>
+                        <span class="px-1.5 py-0.5 rounded border border-red-100 bg-red-50 text-red-600 text-[10px] font-bold">${r.losses}D</span>
+                    </span>`;
         }
 
         function renderConvocationHistory(m, playerItems, convocHistory) {
@@ -5326,7 +5593,12 @@ Un passager non déclaré = un enfant sans siège prévu.
                     const s = data.history[p.id];
                     return ownTeam || (s && s.total > 0);
                 })
-                .map(({ p, invite }) => ({ p, invite, s: data.history[p.id] || emptyConvocationStats() }))
+                .map(({ p, invite }) => ({
+                    p,
+                    invite,
+                    s: data.history[p.id] || emptyConvocationStats(),
+                    r: (data.records || {})[p.id] || null
+                }))
                 .sort((a, b) =>
                     (b.s.played - a.s.played) ||
                     (a.s.choix - b.s.choix) ||
@@ -5336,13 +5608,13 @@ Un passager non déclaré = un enfant sans siège prévu.
             if (!data.matches.length) {
                 container.innerHTML = `
                 <div class="card card-pad">
-                    <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations</h3>
+                    <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations et résultats</h3>
                     <p class="card-sub">Aucun match passé pour ${teamName} : le bilan apparaîtra dès le premier match joué.</p>
                 </div>`;
                 return;
             }
 
-            const rowsHtml = rows.map(({ p, invite, s }) => {
+            const rowsHtml = rows.map(({ p, invite, s, r }) => {
                 const pct = s.total ? Math.round((s.played / s.total) * 100) : 0;
                 const originTeam = invite
                     ? (state.teams?.[p.team]?.name || String(p.team || p.cat || '').toUpperCase())
@@ -5357,6 +5629,7 @@ Un passager non déclaré = un enfant sans siège prévu.
                             <span class="px-1.5 py-0.5 rounded border border-sky-100 bg-sky-50 text-sky-700 text-[10px] font-bold" title="Convoqué">✅ ${s.played}</span>
                             <span class="px-1.5 py-0.5 rounded border border-orange-100 bg-orange-50 text-orange-700 text-[10px] font-bold" title="Indisponible">🟠 ${s.indispo}</span>
                             <span class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-600 text-[10px] font-bold" title="Non retenu (choix)">⚪ ${s.choix}</span>
+                            ${playerRecordBadges(r, { compact: true })}
                             <div class="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden hidden sm:block" title="${pct}% de convocations">
                                 <div class="h-full bg-sky-500" style="width:${pct}%"></div>
                             </div>
@@ -5370,8 +5643,8 @@ Un passager non déclaré = un enfant sans siège prévu.
                 <details class="group">
                     <summary class="list-none cursor-pointer p-4 flex items-start justify-between gap-2 hover:bg-slate-50 transition-colors">
                         <div>
-                            <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations</h3>
-                            <p class="card-sub">${teamName} · ${data.matches.length} match(s) passé(s) · ✅ convoqué · 🟠 indispo · ⚪ choix</p>
+                            <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations et résultats</h3>
+                            <p class="card-sub">${teamName} · ${data.matches.length} match(s) passé(s) · ✅ convoqué · 🟠 indispo · ⚪ choix · V/N/D résultats</p>
                         </div>
                         <span class="flex items-center gap-2 shrink-0">
                             <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">${rows.length} joueurs</span>
@@ -6264,18 +6537,18 @@ if (role === 'responsable') {
             let table = '';
             let mobile = '';
 
-            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">🎽 Encadrement & Dirigeants</td></tr>';
+            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="4" class="p-2 pl-4 uppercase tracking-wider">🎽 Encadrement & Dirigeants</td></tr>';
             mobile += '<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">🎽 Encadrement & Dirigeants</div>';
 
             if (staff.length === 0) {
                 const hint = 'Ajoutez d\'abord coaches et dirigeants dans Effectif → Staff & Dirigeants.';
-                table += '<tr><td colspan="6" class="p-2 pl-4 text-[10px] text-slate-400 italic">' + hint + '</td></tr>';
+                table += '<tr><td colspan="4" class="p-2 pl-4 text-[10px] text-slate-400 italic">' + hint + '</td></tr>';
                 mobile += '<div class="text-[10px] text-slate-400 italic mb-2">' + hint + '</div>';
             } else {
                 const coachRow = (label, field, current) => `
                     <tr class="border-b border-slate-100 bg-slate-50/40">
                         <td class="p-2 pl-4 font-bold text-slate-700 text-xs">${label}</td>
-                        <td colspan="5" class="p-2">
+                        <td colspan="3" class="p-2">
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <select id="entourage-coach-select-${m.id}-${field}-table" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg">
                                     ${staffSelectOptions(sortedStaff, current ? staffId(current) : '', true)}
@@ -6312,12 +6585,12 @@ if (role === 'responsable') {
                 mobile += mobileCoach('Coach adjoint', 'adjoint', adjoint);
             }
 
-            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">👥 Dirigeants convoqués</td></tr>';
+            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="4" class="p-2 pl-4 uppercase tracking-wider">👥 Dirigeants convoqués</td></tr>';
 
             table += `
                 <tr class="border-b border-slate-100">
                     <td class="p-2 pl-4 font-bold text-slate-700 text-xs">Ajouter</td>
-                    <td colspan="5" class="p-2">
+                    <td colspan="3" class="p-2">
                         <div class="flex flex-wrap items-center gap-1.5">
                             <select id="entourage-dirigeant-select-${m.id}-table" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg">
                                 ${staffSelectOptions(sortedStaff, '', false)}
@@ -6357,13 +6630,13 @@ if (role === 'responsable') {
                             </select>
                         </td>
                         <td class="p-2 text-center">
-                            <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
-                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','convoque')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Oui</button>
-                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','non')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'text-slate-600' : 'active-nonconvoke bg-slate-600 text-white'}">Non</button>
+                            <div class="inline-flex items-center gap-1">
+                                <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
+                                    <button onclick="setMatchDirigeantStatus('${m.id}','${id}','convoque')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Oui</button>
+                                    <button onclick="setMatchDirigeantStatus('${m.id}','${id}','non')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'text-slate-600' : 'active-nonconvoke bg-slate-600 text-white'}">Non</button>
+                                </div>
+                                <button onclick="retirerMatchDirigeant('${m.id}','${id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>
                             </div>
-                        </td>
-                        <td class="p-2 text-center">
-                            <button onclick="retirerMatchDirigeant('${m.id}','${id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>
                         </td>
                     </tr>`;
 
@@ -7252,6 +7525,36 @@ firebase.database().ref('teams').on('value', (snapshot) => {
 //
 // options.includeAll : true pour un admin/responsable (tout l'effectif
 // est listé, afin de pouvoir convoquer n'importe quel joueur).
+// Un match est considéré comme joué dès qu'un score est saisi
+// ou que son coup d'envoi est déjà passé.
+function matchHasBeenPlayed(m) {
+    if (!m) return false;
+
+    const hasScore = m.scoreHome !== undefined && m.scoreHome !== null && String(m.scoreHome).trim() !== ''
+        && m.scoreAway !== undefined && m.scoreAway !== null && String(m.scoreAway).trim() !== '';
+    if (hasScore) return true;
+
+    if (!m.date) return false;
+    const start = new Date(m.date + 'T' + (m.heure || '14:30'));
+    return !isNaN(start.getTime()) && start < new Date();
+}
+
+function matchStartTimestamp(m) {
+    if (!m || !m.date) return Number.MAX_SAFE_INTEGER;
+    const t = new Date(m.date + 'T' + (m.heure || '14:30')).getTime();
+    return isNaN(t) ? Number.MAX_SAFE_INTEGER : t;
+}
+
+// Non joués d'abord (ordre chronologique), puis déjà joués (ordre chronologique).
+function sortMatchesUpcomingFirst(list) {
+    return (list || []).slice().sort((a, b) => {
+        const playedA = matchHasBeenPlayed(a) ? 1 : 0;
+        const playedB = matchHasBeenPlayed(b) ? 1 : 0;
+        if (playedA !== playedB) return playedA - playedB;
+        return matchStartTimestamp(a) - matchStartTimestamp(b);
+    });
+}
+
 function getMatchPlayers(m, options) {
     const opts = options || {};
     const includeAll = !!opts.includeAll;
@@ -7613,6 +7916,48 @@ function renderConvocationOverviewCard(m, playerItems, convokedCount, targetConv
             ${convoked.length ? infoNameGroup('Convoqués', '✅', infoSortByFirstName(convoked), 'sky') : '<p class="text-[11px] italic text-slate-400">Aucun joueur convoqué pour l\'instant.</p>'}
             ${infoNameGroup('Indisponibles', '🟠', infoSortByFirstName(indisponibles), 'orange')}
             ${infoNameGroup('Non convoqués', '⚪', infoSortByFirstName(nonConvoked), 'slate')}
+        </div>`;
+}
+
+function renderConvocationHero(m, info) {
+    const target = info.targetConvoked || 0;
+    const pct = target ? Math.min(100, Math.round((info.convokedCount / target) * 100)) : 0;
+    const missing = Math.max(0, target - info.convokedCount);
+    const statusPill = m.isValidated ? '🔒 Verrouillée' : '✏️ Brouillon';
+    const heure = m.heure || '14:30';
+    const lieu = m.location || 'Domicile';
+
+    return `
+        <div class="conv-hero" style="--team:${info.teamHex}">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="conv-hero-tag">${info.teamName} · Convocations</p>
+                    <p class="conv-hero-title">${m.opponent || 'Adversaire à définir'}</p>
+                    <p class="conv-hero-sub">${info.formattedDate} · ${heure} · ${lieu}</p>
+                </div>
+                <span class="conv-hero-pill">${statusPill}</span>
+            </div>
+
+            <div class="conv-hero-stats">
+                <div class="conv-hero-stat">
+                    <span class="conv-hero-stat-value">${info.convokedCount}<span class="conv-hero-stat-target">/${target}</span></span>
+                    <span class="conv-hero-stat-label">Convoqués</span>
+                </div>
+                <div class="conv-hero-stat">
+                    <span class="conv-hero-stat-value">${missing}</span>
+                    <span class="conv-hero-stat-label">À compléter</span>
+                </div>
+                <div class="conv-hero-stat">
+                    <span class="conv-hero-stat-value">${info.indispoCount}</span>
+                    <span class="conv-hero-stat-label">Indispo</span>
+                </div>
+                <div class="conv-hero-stat">
+                    <span class="conv-hero-stat-value">${info.nonConvokedCount}</span>
+                    <span class="conv-hero-stat-label">Non convoqués</span>
+                </div>
+            </div>
+
+            <div class="conv-hero-bar"><span style="width:${pct}%"></span></div>
         </div>`;
 }
 
@@ -12794,6 +13139,20 @@ function getFirstName(player) {
         { key: '4222', label: '4-2-2-2' }
     ];
 
+    // Mini-terrain du sélecteur de formation : attaque vers la droite
+    function formationMiniPitch(system) {
+        const dots = getFormationSlots(system).map(pos =>
+            `<circle cx="${(100 - pos.y).toFixed(1)}" cy="${pos.x.toFixed(1)}" r="4.6"/>`
+        ).join('');
+
+        return `<svg class="comp-form-pitch" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><g fill="#fff">${dots}</g></svg>`;
+    }
+
+    // Abréviation d'un poste : DC1 -> DC, MDF2 -> MDF
+    function slotAbbreviation(slot) {
+        return String(slot || '').replace(/\d+$/, '');
+    }
+
     const JERSEY_PATH = 'M25 6 Q32 12 39 6 L52 13 L58 29 L46 35 L46 58 Q46 62 42 62 L22 62 Q18 62 18 58 L18 35 L6 29 L12 13 Z';
 
     // Un numéro doit rester lisible : on choisit blanc ou encre selon la clarté du maillot
@@ -12879,6 +13238,22 @@ function getFirstName(player) {
         const maxSubs = Math.min(3, Math.max(0, targetConvoked - 11));
         const placedCount = slots.filter(s => match.slotAssignments[s.slot]).length;
 
+        const popSlot = window.__compPopSlot || null;
+        window.__compPopSlot = null;
+        const animateFormation = !!window.__compAnimateFormation;
+        window.__compAnimateFormation = false;
+        document.body.classList.remove('comp-fullscreen-open');
+
+        const teamLabel = state.teams?.[match.team]?.name || match.team || 'Équipe';
+        const opponentLabel = match.opponent ? `vs ${match.opponent}` : '';
+        const matchDateLabel = match.date
+            ? new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+            : '';
+        const metaLine = [opponentLabel, matchDateLabel].filter(Boolean).join(' · ');
+        const formationLabel = FORMATIONS.find(f => f.key === formation)?.label || formation;
+        const placedPct = Math.round((placedCount / 11) * 100);
+        const subsOnSheet = Math.min(bench.length, maxSubs);
+
         const returnTraining = window.compositionReturnTrainingId
             ? state.trainings?.[window.compositionReturnTrainingId]
             : null;
@@ -12910,57 +13285,68 @@ function getFirstName(player) {
             const player = playerId ? squadById.get(playerId) : null;
             const jersey = player ? jerseys[player.id] : null;
             const label = getSlotLabel(pos.slot);
+            const abbr = slotAbbreviation(pos.slot);
             const style = `--px:${pos.x}%;--py:${pos.y}%;--lx:${(100 - pos.y).toFixed(2)}%;--ly:${pos.x}%;`;
 
             if (!player) {
                 return `
                 <button type="button" class="pitch-slot" style="${style}"
                         onclick="openPlayerPicker('${pos.slot}')"
+                        title="${label}"
                         aria-label="Placer un joueur : ${label}">
-                    <span class="slot-empty"><i class="fa-solid fa-plus" aria-hidden="true"></i></span>
-                    <span class="pitch-name">${label}</span>
+                    <span class="slot-empty">${abbr}</span>
                 </button>`;
             }
 
             return `
-                <button type="button" class="pitch-slot" style="${style}"
+                <button type="button" class="pitch-slot${popSlot === pos.slot ? ' is-pop' : ''}" style="${style}"
                         onclick="openPlayerPicker('${pos.slot}')"
-                        title="${formatPlayerName(player)}"
+                        title="${formatPlayerName(player)} · ${label}"
                         aria-label="Changer ${formatPlayerName(player)} : ${label}">
                     ${jerseyMarkup(teamHex, jersey ? jersey.number : null, jersey && jersey.duplicate)}
                     <span class="pitch-name">${getPitchDisplayName(player)}</span>
                 </button>`;
         };
 
-        const benchHTML = bench.length
-            ? bench.map((p, i) => {
-                const off = i >= maxSubs;
-                const jersey = jerseys[p.id] || {};
-                const number = jersey.number;
-                const divider = (i === maxSubs && bench.length > maxSubs)
-                    ? `<div class="flex items-center gap-2 pt-2">
-                           <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Hors feuille</span>
-                           <span class="flex-1 h-px bg-slate-200"></span>
-                       </div>`
-                    : '';
+        const benchRowHTML = (p, i) => {
+            const off = i >= maxSubs;
+            const jersey = jerseys[p.id] || {};
+            const number = jersey.number;
+            const parts = getPlayerNameParts(p);
+            const initials = (`${(parts.prenom || '').charAt(0)}${(parts.nom || '').charAt(0)}`.toUpperCase())
+                || String(getPitchDisplayName(p) || '?').charAt(0).toUpperCase();
 
-                return `${divider}
-                <div class="flex items-center gap-2 ${off ? 'opacity-60' : ''}">
-                    <span class="bench-num ${number ? '' : 'is-off'}" ${number ? 'style="background:' + teamHex + '"' : ''}>${number || '—'}</span>
+            return `
+                <div class="bench-row ${off ? 'is-off opacity-70' : ''}">
+                    <span class="bench-avatar" style="background:${teamHex}">${initials}</span>
                     <div class="min-w-0 flex-1">
-                        <p class="font-bold text-[12.5px] text-slate-800 truncate">${formatPlayerName(p)}${jersey.duplicate ? ' <span class="text-red-600">!</span>' : ''}</p>
-                        <p class="text-[10.5px] text-slate-500 truncate">${getPosteLabel(p.poste1)}</p>
+                        <p class="flex items-center gap-1 font-bold text-[12px] text-slate-800">
+                            <span class="truncate">${formatPlayerName(p)}</span>
+                            ${jersey.duplicate ? '<span class="text-red-600" title="Numéro en double">!</span>' : ''}
+                        </p>
+                        <p class="text-[10px] text-slate-500 truncate">${getPosteLabel(p.poste1)}${number ? ' · n°' + number : ''}</p>
                     </div>
                     <div class="flex flex-col gap-0.5">
-                        <button onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'up')" ${i === 0 ? 'disabled' : ''}
-                                class="w-7 h-7 rounded-md border border-slate-200 text-slate-600 flex items-center justify-center text-[10px] ${i === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
-                                aria-label="Monter ${formatPlayerName(p)}">▲</button>
-                        <button onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'down')" ${i === bench.length - 1 ? 'disabled' : ''}
-                                class="w-7 h-7 rounded-md border border-slate-200 text-slate-600 flex items-center justify-center text-[10px] ${i === bench.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
-                                aria-label="Descendre ${formatPlayerName(p)}">▼</button>
+                        <button type="button" onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'up')" ${i === 0 ? 'disabled' : ''}
+                                class="bench-move" aria-label="Monter ${formatPlayerName(p)}">▲</button>
+                        <button type="button" onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'down')" ${i === bench.length - 1 ? 'disabled' : ''}
+                                class="bench-move" aria-label="Descendre ${formatPlayerName(p)}">▼</button>
                     </div>
                 </div>`;
-            }).join('')
+        };
+
+        const onSheet = bench.slice(0, maxSubs);
+        const offSheet = bench.slice(maxSubs);
+
+        const benchHTML = bench.length
+            ? `
+                ${onSheet.length ? `
+                    <div class="bench-section"><span>Sur la feuille</span><span class="flex-1 h-px bg-slate-200"></span><span>${onSheet.length}</span></div>
+                    <div class="bench-list">${onSheet.map(p => benchRowHTML(p, bench.indexOf(p))).join('')}</div>` : ''}
+                ${offSheet.length ? `
+                    <div class="bench-section"><span>Hors feuille</span><span class="flex-1 h-px bg-slate-200"></span><span>${offSheet.length}</span></div>
+                    <div class="bench-list">${offSheet.map(p => benchRowHTML(p, bench.indexOf(p))).join('')}</div>` : ''}
+            `
             : '<p class="text-xs text-slate-400 italic">Aucun remplaçant : tous les convoqués sont sur le terrain.</p>';
 
         container.innerHTML = `
@@ -12968,15 +13354,42 @@ function getFirstName(player) {
 
             ${returnBanner}
 
-            <div class="flex flex-wrap items-center gap-1.5">
+            <div class="comp-hero" style="--team:${teamHex}">
+                <div class="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="comp-hero-tag">Composition</p>
+                        <h2 class="text-xl font-extrabold leading-tight truncate">${teamLabel}</h2>
+                        <p class="text-[11.5px] font-semibold opacity-90 truncate">
+                            ${metaLine || 'Date et adversaire non renseignés'}
+                        </p>
+                        <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                            <span class="comp-hero-pill"><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>${formationLabel}</span>
+                            <span class="comp-hero-pill"><i class="fa-solid fa-users" aria-hidden="true"></i>${convoked.length} convoqué(s)</span>
+                        </div>
+                    </div>
+                    <div class="shrink-0 sm:text-right sm:min-w-[7.5rem]">
+                        <p class="text-2xl font-extrabold tabular-nums leading-none">${placedCount}<span class="text-sm opacity-70">/11</span></p>
+                        <p class="text-[9.5px] font-extrabold uppercase tracking-[.12em] opacity-85 mt-1">titulaires</p>
+                        <div class="h-1.5 rounded-full bg-white/25 mt-1.5 overflow-hidden sm:ml-auto sm:w-28">
+                            <div class="h-full rounded-full bg-white transition-all" style="width:${placedPct}%"></div>
+                        </div>
+                        <p class="text-[10px] font-bold opacity-85 mt-1">${subsOnSheet}/${maxSubs} remplaçant(s)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comp-form-bar">
                 ${FORMATIONS.map(f => `
-                    <button onclick="applyFormation('${f.key}')"
-                            class="formation-btn ${formation === f.key ? 'is-active' : ''}">${f.label}</button>
+                    <button type="button" onclick="applyFormation('${f.key}')"
+                            class="comp-form ${formation === f.key ? 'is-active' : ''}"
+                            aria-pressed="${formation === f.key}"
+                            title="Système ${f.label}">
+                        ${formationMiniPitch(f.key)}
+                        <span>${f.label}</span>
+                    </button>
                 `).join('')}
-                <button onclick="resetComposition()"
-                        class="formation-btn ml-auto"
-                        style="border-color:#fecaca;color:#b91c1c">
-                    <i class="fa-solid fa-rotate-left mr-1" aria-hidden="true"></i>Tout au banc
+                <button type="button" onclick="resetComposition()" class="comp-reset">
+                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>Tout au banc
                 </button>
             </div>
 
@@ -12989,31 +13402,66 @@ function getFirstName(player) {
             <div class="grid lg:grid-cols-4 gap-3">
 
                 <div class="lg:col-span-3">
-                    <div class="pitch-wrap" id="composition-terrain">
+                    <div class="pitch-wrap${animateFormation ? ' is-switching' : ''}" id="composition-terrain">
                         ${buildPitchSVG('portrait')}
                         ${buildPitchSVG('landscape')}
                         ${slots.map(slotHTML).join('')}
+                        <button type="button" class="pitch-fs-btn is-open" onclick="togglePitchFullscreen(true)"
+                                aria-label="Agrandir le terrain" title="Plein écran">
+                            <i class="fa-solid fa-expand" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="pitch-fs-btn is-close" onclick="togglePitchFullscreen(false)"
+                                aria-label="Quitter le plein écran" title="Réduire">
+                            <i class="fa-solid fa-compress" aria-hidden="true"></i>
+                        </button>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-slate-500">
-                        <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>
-                        <span>Touche une position pour y placer un joueur.</span>
-                        <span class="ml-auto font-bold text-slate-600">${placedCount}/11 titulaires</span>
+                    <div class="flex flex-wrap items-center gap-1.5 mt-2.5">
+                        <span class="comp-chip ${placedCount === 11 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}">
+                            <i class="fa-solid fa-users" aria-hidden="true"></i>${placedCount}/11 titulaires
+                        </span>
+                        <span class="comp-chip bg-slate-50 text-slate-600 border-slate-200">
+                            <i class="fa-solid fa-arrows-up-down" aria-hidden="true"></i>${bench.length} remplaçant(s)
+                        </span>
+                        <span class="comp-chip ${duplicates.length ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}">
+                            <i class="fa-solid ${duplicates.length ? 'fa-triangle-exclamation' : 'fa-circle-check'}" aria-hidden="true"></i>${duplicates.length ? 'Numéros en double' : 'Numéros OK'}
+                        </span>
+                        <span class="ml-auto text-[10.5px] text-slate-400 flex items-center gap-1">
+                            <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>Touche une position
+                        </span>
                     </div>
                 </div>
 
-                <aside class="card card-pad space-y-3">
+                <aside class="card card-pad space-y-3 lg:sticky lg:top-20 lg:self-start">
                     <div>
                         <h3 class="card-title"><i class="fa-solid fa-arrows-up-down"></i>Banc</h3>
                         <p class="card-sub" ${convoked.length > targetConvoked ? 'style="color:#dc2626;font-weight:700"' : ''}>
                             ${convoked.length} convoqué(s) / ${targetConvoked} · ${maxSubs} remplaçant(s)
                         </p>
                     </div>
-                    <div class="space-y-1.5">${benchHTML}</div>
+                    <div class="space-y-1.5 lg:max-h-[calc(100dvh-11rem)] lg:overflow-y-auto lg:pr-1">${benchHTML}</div>
                 </aside>
 
             </div>
         </div>`;
     }
+
+    function togglePitchFullscreen(force) {
+        const pitch = document.getElementById('composition-terrain');
+        if (!pitch) return;
+
+        const on = typeof force === 'boolean' ? force : !pitch.classList.contains('is-fullscreen');
+
+        pitch.classList.toggle('is-fullscreen', on);
+        document.body.classList.toggle('comp-fullscreen-open', on);
+    }
+
+    window.togglePitchFullscreen = togglePitchFullscreen;
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const pitch = document.getElementById('composition-terrain');
+        if (pitch && pitch.classList.contains('is-fullscreen')) togglePitchFullscreen(false);
+    });
 
     /* ---- Choix du joueur pour une position ---- */
 
@@ -13109,6 +13557,8 @@ function getFirstName(player) {
 
         if (!match.slotAssignments) match.slotAssignments = {};
         match.slotAssignments[pickingSlot] = playerId;
+
+        window.__compPopSlot = pickingSlot;
 
         saveStateToFirebase();
         toggleModal('modal-pick-player', false);
@@ -13220,6 +13670,8 @@ function applyFormation(system) {
     // Les joueurs dont la place n'existe plus dans le nouveau système
     // repartent automatiquement sur le banc.
     pruneSlotAssignments(match);
+
+    window.__compAnimateFormation = true;
 
     saveStateToFirebase();
 
