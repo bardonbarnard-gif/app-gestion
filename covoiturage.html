@@ -290,6 +290,17 @@ function renderMatchInfo() {
     const isAway = !!(match.location && match.location !== 'Domicile');
     const place = match.meetingPlace || 'Point de rendez-vous non renseigne';
 
+    // Itinéraire Google Maps : point de rendez-vous -> stade du match, sans péages
+    const destination = (match.adresse || '').trim();
+    const origin = (match.meetingPlace || '').trim();
+
+    const mapsUrl = destination
+        ? 'https://www.google.com/maps/dir/?api=1'
+          + (origin ? '&origin=' + encodeURIComponent(origin) : '')
+          + '&destination=' + encodeURIComponent(destination)
+          + '&travelmode=driving&avoid=tolls'
+        : '';
+
     el.innerHTML = `
         <div class="font-bold text-sky-900 text-lg">
             🏆 ${match.type || ''}
@@ -313,6 +324,11 @@ function renderMatchInfo() {
                     </p>
                     <p class="text-2xl font-black text-slate-800 leading-tight">${rdv}</p>
                     <p class="text-[11px] text-slate-600 truncate">📍 ${place}</p>
+                    ${mapsUrl ? `
+                    <a href="${mapsUrl}" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 mt-1.5 px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold rounded-lg">
+                        🗺️ Itinéraire sans péage
+                    </a>` : ''}
                     ${isAway && (travel || security) ? `<p class="text-[11px] text-slate-500">🚗 ${travel} min de trajet${security ? ' + ' + security + ' min de marge' : ''}</p>` : ''}
                 </div>
             </div>
