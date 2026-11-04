@@ -251,7 +251,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div class="card card-pad space-y-3 cursor-pointer transition hover:border-slate-300 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
                      role="button" tabindex="0"
                      onclick="openDashboardStats('scorers')"
@@ -284,6 +284,28 @@
                         <i class="fa-solid fa-chevron-right text-[10px] text-slate-300" aria-hidden="true"></i>
                     </div>
                     <div id="dashboard-top-efficiency" class="space-y-1.5"></div>
+                </div>
+                <div class="card card-pad space-y-3 cursor-pointer transition hover:border-slate-300 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                     role="button" tabindex="0"
+                     onclick="openDashboardStats('convocations')"
+                     onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDashboardStats('convocations'); }"
+                     aria-label="Voir le classement complet des joueurs les plus convoqués">
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="card-title"><i class="fa-solid fa-clipboard-check"></i>Top convoqués</h3>
+                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-300" aria-hidden="true"></i>
+                    </div>
+                    <div id="dashboard-top-convocations" class="space-y-1.5"></div>
+                </div>
+                <div class="card card-pad space-y-3 cursor-pointer transition hover:border-slate-300 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                     role="button" tabindex="0"
+                     onclick="openDashboardStats('winners')"
+                     onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDashboardStats('winners'); }"
+                     aria-label="Voir le classement complet des joueurs ayant gagné le plus de matchs">
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="card-title"><i class="fa-solid fa-trophy"></i>Top vainqueurs</h3>
+                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-300" aria-hidden="true"></i>
+                    </div>
+                    <div id="dashboard-top-wins" class="space-y-1.5"></div>
                 </div>
             </div>
         </section>
@@ -376,7 +398,7 @@
                 <div class="p-3 border-t border-slate-100">
                     <p class="text-[10px] text-slate-400 leading-relaxed">
                         <i class="fa-solid fa-circle-info mr-1" aria-hidden="true"></i>
-                        L'efficacité additionne les buts marqués et les passes décisives enregistrés dans le bilan des matchs. Départage des égalités : buts, puis passes, puis ordre alphabétique.
+                        L'efficacité additionne les buts marqués et les passes décisives enregistrés dans le bilan des matchs. Les convocations et les victoires sont comptées sur les matchs passés, uniquement pour les joueurs convoqués (les victoires ne comptent que si le score est saisi). Départage des égalités : buts, puis passes, puis ordre alphabétique — ou le meilleur taux pour les convoqués et les vainqueurs.
                     </p>
                 </div>
             </div>

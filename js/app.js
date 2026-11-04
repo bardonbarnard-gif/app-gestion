@@ -2067,10 +2067,42 @@ else {
                 );
             }
 
+            // Convocations et victoires : agrégées sur tous les matchs passés du club.
+            const todayStr = getTodayStr();
+            const matchTotals = {};
+
+            Object.values(state.matches || {}).forEach(m => {
+                if (!m || !m.date || m.date > todayStr) return;
+
+                const home = parseInt(m.scoreHome, 10);
+                const away = parseInt(m.scoreAway, 10);
+                const hasScore =
+                    m.scoreHome !== undefined && m.scoreHome !== null && String(m.scoreHome).trim() !== '' &&
+                    m.scoreAway !== undefined && m.scoreAway !== null && String(m.scoreAway).trim() !== '' &&
+                    !isNaN(home) && !isNaN(away);
+
+                Object.entries(m.convocations || {}).forEach(([pId, status]) => {
+                    if (status !== 'convoke' && status !== 'nonconvoke' && status !== 'indisponible') return;
+                    if (!matchTotals[pId]) {
+                        matchTotals[pId] = { convoked: 0, opportunities: 0, wins: 0, draws: 0, losses: 0, matches: 0 };
+                    }
+                    const t = matchTotals[pId];
+                    t.opportunities++;
+                    if (status !== 'convoke') return;
+                    t.convoked++;
+                    if (!hasScore) return;
+                    t.matches++;
+                    if (home > away) t.wins++;
+                    else if (home === away) t.draws++;
+                    else t.losses++;
+                });
+            });
+
             return playersSource.map(p => {
                 const s = state.stats[p.id] || { goals: 0, assists: 0 };
                 const goals = s.goals || 0;
                 const assists = s.assists || 0;
+                const totals = matchTotals[p.id] || { convoked: 0, opportunities: 0, wins: 0, draws: 0, losses: 0, matches: 0 };
 
                 return {
                     id: p.id,
@@ -2078,12 +2110,20 @@ else {
                     team: p.team || p.cat || '',
                     goals,
                     assists,
-                    total: goals + assists
+                    total: goals + assists,
+                    convoked: totals.convoked,
+                    convocationRate: totals.opportunities ? Math.round((totals.convoked / totals.opportunities) * 100) : 0,
+                    wins: totals.wins,
+                    draws: totals.draws,
+                    losses: totals.losses,
+                    matches: totals.matches,
+                    winRate: totals.matches ? Math.round((totals.wins / totals.matches) * 100) : 0
                 };
             });
         }
 
-        // Classements complets : buts, passes décisives, efficacité (buts + passes)
+        // Classements complets : buts, passes décisives, efficacité (buts + passes),
+        // convocations et victoires (ces deux derniers calculés depuis les matchs passés).
         const DASHBOARD_STATS_KINDS = {
             scorers: {
                 label: 'Buteurs',
@@ -2111,6 +2151,24 @@ else {
                 totalLabel: 'buts + passes',
                 badge: 'bg-emerald-100 text-emerald-800',
                 hero: 'grad-card-emerald'
+            },
+            convocations: {
+                label: 'Convoqués',
+                icon: 'fa-clipboard-check',
+                key: 'convoked',
+                unit: '📋',
+                totalLabel: 'convocations',
+                badge: 'bg-sky-100 text-sky-800',
+                hero: 'grad-card-sky'
+            },
+            winners: {
+                label: 'Vainqueurs',
+                icon: 'fa-trophy',
+                key: 'wins',
+                unit: '🏆',
+                totalLabel: 'victoires',
+                badge: 'bg-emerald-100 text-emerald-800',
+                hero: 'grad-card-emerald'
             }
         };
 
@@ -2119,12 +2177,19 @@ else {
         function dashboardStatsSortedRows(kind) {
             const key = (DASHBOARD_STATS_KINDS[kind] || DASHBOARD_STATS_KINDS.scorers).key;
 
-            return getDashboardStatsRows().sort((a, b) =>
-                b[key] - a[key]
-                || b.goals - a.goals
-                || b.assists - a.assists
-                || String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' })
-            );
+            return getDashboardStatsRows().sort((a, b) => {
+                if (b[key] !== a[key]) return b[key] - a[key];
+                // À égalité : le meilleur taux départage (convocations / victoires).
+                if (kind === 'convocations' && b.convocationRate !== a.convocationRate) {
+                    return b.convocationRate - a.convocationRate;
+                }
+                if (kind === 'winners' && b.winRate !== a.winRate) {
+                    return b.winRate - a.winRate;
+                }
+                return b.goals - a.goals
+                    || b.assists - a.assists
+                    || String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' });
+            });
         }
 
         function dashboardTopRowHTML(p, i, key, badgeClass, unit) {
@@ -2154,6 +2219,22 @@ else {
                 efficiencyEl.innerHTML = dashboardStatsSortedRows('efficiency')
                     .slice(0, 3)
                     .map((p, i) => dashboardTopRowHTML(p, i, 'total', 'bg-emerald-100 text-emerald-800', '⚡'))
+                    .join('');
+            }
+
+            const convocationsEl = document.getElementById('dashboard-top-convocations');
+            if (convocationsEl) {
+                convocationsEl.innerHTML = dashboardStatsSortedRows('convocations')
+                    .slice(0, 3)
+                    .map((p, i) => dashboardTopRowHTML(p, i, 'convoked', 'bg-sky-100 text-sky-800', '📋'))
+                    .join('');
+            }
+
+            const winnersEl = document.getElementById('dashboard-top-wins');
+            if (winnersEl) {
+                winnersEl.innerHTML = dashboardStatsSortedRows('winners')
+                    .slice(0, 3)
+                    .map((p, i) => dashboardTopRowHTML(p, i, 'wins', 'bg-emerald-100 text-emerald-800', '🏆'))
                     .join('');
             }
         }
@@ -2224,7 +2305,7 @@ else {
                     <div class="p-6 text-center">
                         <i class="fa-solid fa-chart-simple text-slate-300 text-2xl" aria-hidden="true"></i>
                         <p class="mt-2 text-xs font-bold text-slate-700">Aucune statistique enregistrée</p>
-                        <p class="mt-1 text-[11px] text-slate-500">Les buts et les passes saisis dans le bilan d'un match apparaîtront ici.</p>
+                        <p class="mt-1 text-[11px] text-slate-500">Les buts, passes et convocations saisis dans le bilan d'un match apparaîtront ici.</p>
                     </div>`;
                 return;
             }
@@ -2234,7 +2315,11 @@ else {
                     ? `${r.goals} ⚽ · ${r.assists} 🎯`
                     : dashboardStatsKind === 'passers'
                         ? `${r.assists} 🎯 · ${r.goals} ⚽`
-                        : `${r.goals} ⚽ + ${r.assists} 🎯`;
+                        : dashboardStatsKind === 'convocations'
+                            ? `${r.convoked} 📋 · ${r.convocationRate}% de convocations`
+                            : dashboardStatsKind === 'winners'
+                                ? `${r.wins}V · ${r.draws}N · ${r.losses}D · ${r.winRate}% de victoires`
+                                : `${r.goals} ⚽ + ${r.assists} 🎯`;
 
                 const rankClass = i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-slate-400' : i === 2 ? 'bg-orange-700' : 'bg-slate-700';
 
