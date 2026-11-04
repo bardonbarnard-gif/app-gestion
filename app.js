@@ -542,6 +542,9 @@ db.ref('rangueil_data').update(dataToSave);
                     renderTeamFilters();
                     renderEntrainements();
                     break;
+                case 'district':
+                    // Accès direct aux sites officiels : aucun import automatique.
+                    break;
                 case 'calendrier':
                     renderCalendar();
                     break;
@@ -738,7 +741,7 @@ return colorMap[colorName] || colorMap.slate;
         }
     }
 
-    ['dashboard', 'dashboard-cards', 'dashboard-bilan', 'effectif', 'matchs', 'entrainements', 'calendrier','staff','admin'].forEach(t => {
+    ['dashboard', 'dashboard-cards', 'dashboard-bilan', 'dashboard-stats', 'effectif', 'matchs', 'entrainements', 'calendrier','district','staff','admin'].forEach(t => {
                 const sec = document.getElementById(`sec-${t}`);
                 if(sec) sec.classList.add('hidden');
                 const btn = document.getElementById(`tab-${t}`);
@@ -758,6 +761,7 @@ return colorMap[colorName] || colorMap.slate;
         }
 
     function switchMatchSubTab(subTabId) {
+        document.body.classList.remove('comp-fullscreen-open');
 
     if (!subTabId) {
         subTabId = 'results';
@@ -797,6 +801,11 @@ return colorMap[colorName] || colorMap.slate;
     if (activeButton) {
         activeButton.className =
             "pb-2 text-xs font-bold border-b-2 border-sky-600 text-sky-600 flex items-center space-x-1.5 transition";
+    }
+
+    // Toute ouverture manuelle de la composition annule le retour vers la séance
+    if (subTabId === 'composition') {
+        window.compositionReturnTrainingId = null;
     }
 
     if (subTabId === 'results') {
@@ -2026,44 +2035,337 @@ else {
 }
 
 
-        function renderTopScorersAndPassers() {
+        // Périmètre des statistiques du tableau de bord :
+        //  - coach : uniquement son équipe
+        //  - responsable : ses équipes
+        //  - autres rôles : tout le club
+        function getDashboardStatsRows() {
             const role = window.currentUserRole || 'public';
-const userTeam = window.currentUserTeam || 'all';
+            const userTeam = window.currentUserTeam || 'all';
 
-let playersSource = state.players;
+            let playersSource = state.players;
 
-if (role === 'coach') {
+            if (role === 'coach') {
 
-    playersSource = state.players.filter(
-        p =>
-            (p.team || p.cat || '').toLowerCase() ===
-            userTeam.toLowerCase()
-    );
+                playersSource = state.players.filter(
+                    p =>
+                        (p.team || p.cat || '').toLowerCase() ===
+                        userTeam.toLowerCase()
+                );
 
-} else if (role === 'responsable') {
+            } else if (role === 'responsable') {
 
-    const teams = userTeam
-        .split(',')
-        .map(t => t.trim().toLowerCase());
+                const teams = userTeam
+                    .split(',')
+                    .map(t => t.trim().toLowerCase());
 
-    playersSource = state.players.filter(
-        p =>
-            teams.includes(
-                (p.team || p.cat || '').toLowerCase()
-            )
-    );
-}
-            let playersWithStats = playersSource.map(p => {
-                let s = state.stats[p.id] || { goals: 0, assists: 0 };
-                return { name: p.name, goals: s.goals || 0, assists: s.assists || 0 };
+                playersSource = state.players.filter(
+                    p =>
+                        teams.includes(
+                            (p.team || p.cat || '').toLowerCase()
+                        )
+                );
+            }
+
+            // Convocations et victoires : agrégées sur tous les matchs passés du club.
+            const todayStr = getTodayStr();
+            const matchTotals = {};
+
+            Object.values(state.matches || {}).forEach(m => {
+                if (!m || !m.date || m.date > todayStr) return;
+
+                const home = parseInt(m.scoreHome, 10);
+                const away = parseInt(m.scoreAway, 10);
+                const hasScore =
+                    m.scoreHome !== undefined && m.scoreHome !== null && String(m.scoreHome).trim() !== '' &&
+                    m.scoreAway !== undefined && m.scoreAway !== null && String(m.scoreAway).trim() !== '' &&
+                    !isNaN(home) && !isNaN(away);
+
+                Object.entries(m.convocations || {}).forEach(([pId, status]) => {
+                    if (status !== 'convoke' && status !== 'nonconvoke' && status !== 'indisponible') return;
+                    if (!matchTotals[pId]) {
+                        matchTotals[pId] = { convoked: 0, opportunities: 0, wins: 0, draws: 0, losses: 0, matches: 0 };
+                    }
+                    const t = matchTotals[pId];
+                    t.opportunities++;
+                    if (status !== 'convoke') return;
+                    t.convoked++;
+                    if (!hasScore) return;
+                    t.matches++;
+                    if (home > away) t.wins++;
+                    else if (home === away) t.draws++;
+                    else t.losses++;
+                });
             });
 
-            document.getElementById('dashboard-top-scorers').innerHTML = [...playersWithStats].sort((a,b) => b.goals - a.goals).slice(0, 3).map((p, i) => `
-                <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs"><span class="font-bold text-slate-700">${i+1}. ${p.name}</span><span class="bg-amber-100 text-amber-800 font-extrabold px-2 py-0.5 rounded">${p.goals} ⚽</span></div>`).join('');
+            return playersSource.map(p => {
+                const s = state.stats[p.id] || { goals: 0, assists: 0 };
+                const goals = s.goals || 0;
+                const assists = s.assists || 0;
+                const totals = matchTotals[p.id] || { convoked: 0, opportunities: 0, wins: 0, draws: 0, losses: 0, matches: 0 };
 
-            document.getElementById('dashboard-top-passers').innerHTML = [...playersWithStats].sort((a,b) => b.assists - a.assists).slice(0, 3).map((p, i) => `
-                <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs"><span class="font-bold text-slate-700">${i+1}. ${p.name}</span><span class="bg-sky-100 text-sky-800 font-extrabold px-2 py-0.5 rounded">${p.assists} 🎯</span></div>`).join('');
+                return {
+                    id: p.id,
+                    name: p.name,
+                    team: p.team || p.cat || '',
+                    goals,
+                    assists,
+                    total: goals + assists,
+                    convoked: totals.convoked,
+                    convocationRate: totals.opportunities ? Math.round((totals.convoked / totals.opportunities) * 100) : 0,
+                    wins: totals.wins,
+                    draws: totals.draws,
+                    losses: totals.losses,
+                    matches: totals.matches,
+                    winRate: totals.matches ? Math.round((totals.wins / totals.matches) * 100) : 0
+                };
+            });
         }
+
+        // Classements complets : buts, passes décisives, efficacité (buts + passes),
+        // convocations et victoires (ces deux derniers calculés depuis les matchs passés).
+        const DASHBOARD_STATS_KINDS = {
+            scorers: {
+                label: 'Buteurs',
+                icon: 'fa-futbol',
+                key: 'goals',
+                unit: '⚽',
+                totalLabel: 'buts marqués',
+                badge: 'bg-amber-100 text-amber-800',
+                hero: 'grad-card-blue'
+            },
+            passers: {
+                label: 'Passeurs',
+                icon: 'fa-handshake',
+                key: 'assists',
+                unit: '🎯',
+                totalLabel: 'passes décisives',
+                badge: 'bg-sky-100 text-sky-800',
+                hero: 'grad-card-sky'
+            },
+            efficiency: {
+                label: 'Efficacité',
+                icon: 'fa-bolt',
+                key: 'total',
+                unit: '⚡',
+                totalLabel: 'buts + passes',
+                badge: 'bg-emerald-100 text-emerald-800',
+                hero: 'grad-card-emerald'
+            },
+            convocations: {
+                label: 'Convoqués',
+                icon: 'fa-clipboard-check',
+                key: 'convoked',
+                unit: '📋',
+                totalLabel: 'convocations',
+                badge: 'bg-sky-100 text-sky-800',
+                hero: 'grad-card-sky'
+            },
+            winners: {
+                label: 'Vainqueurs',
+                icon: 'fa-trophy',
+                key: 'wins',
+                unit: '🏆',
+                totalLabel: 'victoires',
+                badge: 'bg-emerald-100 text-emerald-800',
+                hero: 'grad-card-emerald'
+            }
+        };
+
+        let dashboardStatsKind = 'scorers';
+
+        function dashboardStatsSortedRows(kind) {
+            const key = (DASHBOARD_STATS_KINDS[kind] || DASHBOARD_STATS_KINDS.scorers).key;
+
+            return getDashboardStatsRows().sort((a, b) => {
+                if (b[key] !== a[key]) return b[key] - a[key];
+                // À égalité : le meilleur taux départage (convocations / victoires).
+                if (kind === 'convocations' && b.convocationRate !== a.convocationRate) {
+                    return b.convocationRate - a.convocationRate;
+                }
+                if (kind === 'winners' && b.winRate !== a.winRate) {
+                    return b.winRate - a.winRate;
+                }
+                return b.goals - a.goals
+                    || b.assists - a.assists
+                    || String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' });
+            });
+        }
+
+        function dashboardTopRowHTML(p, i, key, badgeClass, unit) {
+            return `
+                <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs"><span class="font-bold text-slate-700 truncate">${i+1}. ${p.name}</span><span class="shrink-0 ml-2 ${badgeClass} font-extrabold px-2 py-0.5 rounded">${p[key]} ${unit}</span></div>`;
+        }
+
+        function renderTopScorersAndPassers() {
+            const scorersEl = document.getElementById('dashboard-top-scorers');
+            if (scorersEl) {
+                scorersEl.innerHTML = dashboardStatsSortedRows('scorers')
+                    .slice(0, 3)
+                    .map((p, i) => dashboardTopRowHTML(p, i, 'goals', 'bg-amber-100 text-amber-800', '⚽'))
+                    .join('');
+            }
+
+            const passersEl = document.getElementById('dashboard-top-passers');
+            if (passersEl) {
+                passersEl.innerHTML = dashboardStatsSortedRows('passers')
+                    .slice(0, 3)
+                    .map((p, i) => dashboardTopRowHTML(p, i, 'assists', 'bg-sky-100 text-sky-800', '🎯'))
+                    .join('');
+            }
+
+            const efficiencyEl = document.getElementById('dashboard-top-efficiency');
+            if (efficiencyEl) {
+                efficiencyEl.innerHTML = dashboardStatsSortedRows('efficiency')
+                    .slice(0, 3)
+                    .map((p, i) => dashboardTopRowHTML(p, i, 'total', 'bg-emerald-100 text-emerald-800', '⚡'))
+                    .join('');
+            }
+
+            const convocationsEl = document.getElementById('dashboard-top-convocations');
+            if (convocationsEl) {
+                convocationsEl.innerHTML = dashboardStatsSortedRows('convocations')
+                    .slice(0, 3)
+                    .map((p, i) => dashboardTopRowHTML(p, i, 'convoked', 'bg-sky-100 text-sky-800', '📋'))
+                    .join('');
+            }
+
+            const winnersEl = document.getElementById('dashboard-top-wins');
+            if (winnersEl) {
+                winnersEl.innerHTML = dashboardStatsSortedRows('winners')
+                    .slice(0, 3)
+                    .map((p, i) => dashboardTopRowHTML(p, i, 'wins', 'bg-emerald-100 text-emerald-800', '🏆'))
+                    .join('');
+            }
+        }
+
+        // --- Vue détaillée des classements (depuis les cartes du tableau de bord) ---
+        function setDashboardStatsKind(kind) {
+            if (!DASHBOARD_STATS_KINDS[kind]) return;
+            dashboardStatsKind = kind;
+            renderDashboardStats();
+        }
+
+        function renderDashboardStatsTabs() {
+            const tabsEl = document.getElementById('dashboard-stats-tabs');
+            if (!tabsEl) return;
+
+            tabsEl.innerHTML = Object.entries(DASHBOARD_STATS_KINDS).map(([kind, meta]) => {
+                const active = kind === dashboardStatsKind;
+                return `<button onclick="setDashboardStatsKind('${kind}')" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 active:bg-slate-100'}"><i class="fa-solid ${meta.icon} mr-1" aria-hidden="true"></i>${meta.label}</button>`;
+            }).join('');
+        }
+
+        function renderDashboardStats() {
+            renderDashboardStatsTabs();
+
+            const meta = DASHBOARD_STATS_KINDS[dashboardStatsKind] || DASHBOARD_STATS_KINDS.scorers;
+            const rows = dashboardStatsSortedRows(dashboardStatsKind);
+            const ranked = rows.filter(r => r[meta.key] > 0);
+            const total = rows.reduce((sum, r) => sum + r[meta.key], 0);
+
+            const heroEl = document.getElementById('dashboard-stats-hero');
+            if (heroEl) {
+                const heroDetail = dashboardStatsKind === 'efficiency'
+                    ? `${rows.reduce((sum, r) => sum + r.goals, 0)} ⚽ + ${rows.reduce((sum, r) => sum + r.assists, 0)} 🎯`
+                    : meta.totalLabel;
+
+                heroEl.innerHTML = `
+                    <div class="grad-card ${meta.hero}">
+                        <div class="grad-card-content flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <h2 class="text-lg font-extrabold drop-shadow-sm">Top ${meta.label.toLowerCase()}</h2>
+                                <p class="text-[11px] font-medium opacity-90">${ranked.length} joueur${ranked.length > 1 ? 's' : ''} classé${ranked.length > 1 ? 's' : ''} · tous les matchs</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-2xl font-extrabold drop-shadow-sm tabular-nums">${total}</p>
+                                <p class="text-[11px] font-bold opacity-90">${heroDetail}</p>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            const titleEl = document.getElementById('dashboard-stats-title');
+            if (titleEl) {
+                titleEl.innerHTML = `<i class="fa-solid ${meta.icon} text-slate-600 mr-1"></i>Classement des ${meta.label.toLowerCase()}`;
+            }
+
+            const subtitleEl = document.getElementById('dashboard-stats-subtitle');
+            if (subtitleEl) {
+                subtitleEl.innerText = ranked.length
+                    ? `${ranked.length} joueur${ranked.length > 1 ? 's' : ''} · ${total} ${meta.totalLabel}`
+                    : 'Aucune statistique enregistrée pour le moment';
+            }
+
+            const listEl = document.getElementById('dashboard-stats-list');
+            if (!listEl) return;
+
+            if (!ranked.length) {
+                listEl.innerHTML = `
+                    <div class="p-6 text-center">
+                        <i class="fa-solid fa-chart-simple text-slate-300 text-2xl" aria-hidden="true"></i>
+                        <p class="mt-2 text-xs font-bold text-slate-700">Aucune statistique enregistrée</p>
+                        <p class="mt-1 text-[11px] text-slate-500">Les buts, passes et convocations saisis dans le bilan d'un match apparaîtront ici.</p>
+                    </div>`;
+                return;
+            }
+
+            listEl.innerHTML = ranked.map((r, i) => {
+                const detail = dashboardStatsKind === 'scorers'
+                    ? `${r.goals} ⚽ · ${r.assists} 🎯`
+                    : dashboardStatsKind === 'passers'
+                        ? `${r.assists} 🎯 · ${r.goals} ⚽`
+                        : dashboardStatsKind === 'convocations'
+                            ? `${r.convoked} 📋 · ${r.convocationRate}% de convocations`
+                            : dashboardStatsKind === 'winners'
+                                ? `${r.wins}V · ${r.draws}N · ${r.losses}D · ${r.winRate}% de victoires`
+                                : `${r.goals} ⚽ + ${r.assists} 🎯`;
+
+                const rankClass = i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-slate-400' : i === 2 ? 'bg-orange-700' : 'bg-slate-700';
+
+                return `
+                    <div class="flex items-center justify-between gap-2 px-3 py-2.5">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="w-6 h-6 shrink-0 rounded-full ${rankClass} text-white text-[11px] font-extrabold flex items-center justify-center" title="Rang ${i + 1}">${i + 1}</span>
+                            <div class="min-w-0">
+                                <p class="font-bold text-xs truncate text-slate-800">${r.name}</p>
+                                <p class="text-[10px] text-slate-400">${detail}${r.team ? ' · <span class="uppercase">' + r.team + '</span>' : ''}</p>
+                            </div>
+                        </div>
+                        <span class="shrink-0 ${meta.badge} font-extrabold px-2 py-0.5 rounded text-xs">${r[meta.key]} ${meta.unit}</span>
+                    </div>`;
+            }).join('');
+        }
+
+        function openDashboardStats(kind) {
+            if (DASHBOARD_STATS_KINDS[kind]) dashboardStatsKind = kind;
+
+            renderDashboardStats();
+
+            const dashboardSec = document.getElementById('sec-dashboard');
+            const statsSec = document.getElementById('sec-dashboard-stats');
+
+            if (dashboardSec) dashboardSec.classList.add('hidden');
+            if (!statsSec) return;
+
+            statsSec.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function closeDashboardStats() {
+            const dashboardSec = document.getElementById('sec-dashboard');
+            const statsSec = document.getElementById('sec-dashboard-stats');
+
+            if (statsSec) statsSec.classList.add('hidden');
+            if (dashboardSec) dashboardSec.classList.remove('hidden');
+
+            renderDashboard();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.openDashboardStats = openDashboardStats;
+        window.closeDashboardStats = closeDashboardStats;
+        window.setDashboardStatsKind = setDashboardStatsKind;
 
         // Rendu Effectif
         function renderEffectif() {
@@ -2127,7 +2429,7 @@ const niveauBadge =
         ? '<span class="font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700">🟡 Niveau 2</span>'
         : '<span class="font-bold px-2 py-0.5 rounded bg-red-100 text-red-700">🔴 Niveau 1</span>';
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
-                const hasBlessure = p.blessure === true;
+                const injuryInfo = getPlayerInjuryInfo(p);
                 const cards = getPlayerCardsCount(p.id);
                 const pStats = state.stats[p.id] || { goals: 0, assists: 0 };
                 const teamKey = p.team || p.cat; 
@@ -2138,10 +2440,9 @@ const niveauBadge =
     </span>`;
 
 
-                // Badge blessure
-                const blessureBadge = hasBlessure ?
-                    `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500 text-purple-100">🤕 Blessé</span>` :
-                    '';
+                // Badge blessure (durée calculée depuis les appels)
+                const blessureBadge = renderInjuryBadge(injuryInfo);
+                const injuryHistoryText = formatPlayerInjuryHistory(injuryInfo);
 
 
                 // Calcul présences entraînements (nouveau format)
@@ -2200,6 +2501,7 @@ Object.values(state.trainings).forEach(session => {
                 // Bilan convocations sur les matchs passés de son équipe
                 const convocHistory = getConvocationHistoryForTeam(p.team || p.cat);
                 const matchStats = convocHistory.history[p.id] || emptyConvocationStats();
+                const playerRecord = (convocHistory.records || {})[p.id] || null;
                 const matchPct = matchStats.total > 0 ? Math.round((matchStats.played / matchStats.total) * 100) : null;
                 const matchColor = matchPct === null ? 'text-slate-400' : matchPct >= 75 ? 'text-emerald-600' : matchPct >= 50 ? 'text-amber-600' : 'text-red-600';
 
@@ -2215,79 +2517,106 @@ Object.values(state.trainings).forEach(session => {
                     : (convocHistory.matches.length ? 'Aucun statut enregistré' : 'Aucun match passé');
 
                 return `
-                <article class="player-row border-slate-200">
+                <article class="player-row" style="--team-color:${getTeamHex(p.team || p.cat)}">
                     <div class="player-avatar ${teamColors.badge}" aria-hidden="true">${initials}</div>
 
                     <div class="min-w-0 flex-1">
                         <div class="flex items-start justify-between gap-2">
                             <div class="min-w-0">
-                                <h3 class="player-name truncate">${p.name}</h3>
-                                <p class="player-meta truncate">
-                                    ${p1 !== '-' ? p1 : 'Poste non défini'}
-                                    <span class="text-slate-300 px-1">·</span>
-                                    <span class="${hasLicence ? '' : 'text-amber-700 font-bold'}">${hasLicence ? 'Lic. ' + p.licence : '⚠️ Licence manquante'}</span>
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <h3 class="player-name truncate">${p.name}</h3>
+                                    <span class="player-team-chip ${teamColors.badge}">${teamName}</span>
+                                    ${blessureBadge}
+                                </div>
+                                <p class="player-meta">
+                                    <span><i class="fa-solid fa-location-dot mr-1 opacity-60" aria-hidden="true"></i>${p1 !== '-' ? p1 : 'Poste non défini'}</span>
+                                    <span class="text-slate-300" aria-hidden="true">·</span>
+                                    <span class="${hasLicence ? '' : 'text-amber-700 font-bold'}"><i class="fa-solid fa-id-card mr-1 opacity-60" aria-hidden="true"></i>${hasLicence ? 'Lic. ' + p.licence : 'Licence manquante'}</span>
                                 </p>
                             </div>
 
-                            <div class="flex items-center gap-1 shrink-0">
-                                <span class="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-extrabold ${teamColors.badge}">${teamName}</span>
+                            <div class="player-actions shrink-0">
                                 <button onclick="openModalPlayer('${p.id}')" class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition" aria-label="Modifier le joueur ${p.name}"><i class="fa-solid fa-pen-to-square text-xs" aria-hidden="true"></i></button>
                                 <button onclick="deletePlayer('${p.id}')" class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition" aria-label="Supprimer le joueur ${p.name}"><i class="fa-solid fa-trash-can text-xs" aria-hidden="true"></i></button>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5 mt-2.5">
-                            <div class="metric" title="${matchHint}">
-                                <span class="metric-label">Matchs</span>
-                                <span class="metric-value ${matchColor}">${matchPct !== null ? matchPct + '%' : '—'}</span>
+                        <div class="player-stats">
+                            <div class="player-gauge ${matchPct === null ? 'is-empty' : ''}" title="${matchHint}">
+                                <span class="player-gauge-ring" style="--pct:${matchPct !== null ? matchPct : 0}">
+                                    <span class="player-gauge-value ${matchColor}">${matchPct !== null ? matchPct + '%' : '—'}</span>
+                                </span>
+                                <span class="player-gauge-label"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i>Matchs</span>
                             </div>
-                            <div class="metric" title="${presencePct !== null ? presences + ' présence(s) sur ' + totalSessions + ' séance(s)' : 'Aucune séance passée'}">
-                                <span class="metric-label">Séances</span>
-                                <span class="metric-value ${presenceColor}">${presencePct !== null ? presencePct + '%' : '—'}</span>
+                            <div class="player-gauge ${presencePct === null ? 'is-empty' : ''}" title="${presencePct !== null ? presences + ' présence(s) sur ' + totalSessions + ' séance(s)' : 'Aucune séance passée'}">
+                                <span class="player-gauge-ring" style="--pct:${presencePct !== null ? presencePct : 0}">
+                                    <span class="player-gauge-value ${presenceColor}">${presencePct !== null ? presencePct + '%' : '—'}</span>
+                                </span>
+                                <span class="player-gauge-label"><i class="fa-solid fa-dumbbell" aria-hidden="true"></i>Séances</span>
                             </div>
-                            <div class="metric" title="${pStats.goals} but(s), ${pStats.assists} passe(s) décisive(s)">
-                                <span class="metric-label">Buts</span>
-                                <span class="metric-value">${pStats.goals}⚽ ${pStats.assists}🎯</span>
-                            </div>
-                            <div class="metric" title="${cards.yellows} jaune(s), ${cards.reds} rouge(s)">
-                                <span class="metric-label">Cartons</span>
-                                <span class="metric-value"><span class="text-amber-600">${cards.yellows}🟨</span> <span class="text-red-600">${cards.reds}🟥</span></span>
-                            </div>
-                            <div class="metric" title="${carpoolHint}">
-                                <span class="metric-label">Trajets</span>
-                                <span class="metric-value ${carpoolStats.withPassengers ? 'text-sky-700' : 'text-slate-400'}">${carpoolStats.withPassengers ? carpoolStats.withPassengers + '🚗' : '—'}</span>
+
+                            <div class="player-stat-chips">
+                                <div class="player-stat-chip" title="${pStats.goals} but(s), ${pStats.assists} passe(s) décisive(s)">
+                                    <span class="player-stat-icon"><i class="fa-solid fa-futbol" aria-hidden="true"></i></span>
+                                    <span class="player-stat-text">
+                                        <span class="player-stat-label">Buts / passes</span>
+                                        <span class="player-stat-value">${pStats.goals} ⚽ · ${pStats.assists} 🎯</span>
+                                    </span>
+                                </div>
+                                <div class="player-stat-chip" title="${cards.yellows} jaune(s), ${cards.reds} rouge(s)">
+                                    <span class="player-stat-icon"><i class="fa-solid fa-scroll" aria-hidden="true"></i></span>
+                                    <span class="player-stat-text">
+                                        <span class="player-stat-label">Cartons</span>
+                                        <span class="player-stat-value"><span class="text-amber-600">${cards.yellows} 🟨</span> <span class="text-red-600">${cards.reds} 🟥</span></span>
+                                    </span>
+                                </div>
+                                <div class="player-stat-chip" title="${carpoolHint}">
+                                    <span class="player-stat-icon"><i class="fa-solid fa-car" aria-hidden="true"></i></span>
+                                    <span class="player-stat-text">
+                                        <span class="player-stat-label">Trajets</span>
+                                        <span class="player-stat-value ${carpoolStats.withPassengers ? 'text-sky-700' : 'text-slate-400'}">${carpoolStats.withPassengers ? carpoolStats.withPassengers + ' 🚗' : '—'}</span>
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="flex flex-wrap items-center gap-1 mt-2">
+                        <div class="flex flex-wrap items-center gap-1 mt-2.5">
                             ${niveauBadge}
-                            ${blessureBadge}
                             ${attendanceBadge}
                             ${autoBadge}
+                            ${playerRecordBadges(playerRecord, { compact: true })}
                         </div>
 
-                        <details class="player-details mt-2">
+                        <details class="player-details mt-2.5">
                             <summary><i class="fa-solid fa-chevron-right" aria-hidden="true"></i>Détails et postes</summary>
                             <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
-                                    <span class="text-slate-500">Postes :</span>
-                                    <span class="font-bold text-slate-800">${p1}${p2 !== '-' ? ' · ' + p2 : ''}${p3 !== '-' ? ' · ' + p3 : ''}</span>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Postes</span>
+                                    <span class="player-detail-value">${p1}${p2 !== '-' ? ' · ' + p2 : ''}${p3 !== '-' ? ' · ' + p3 : ''}</span>
                                 </div>
-                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
-                                    <span class="text-slate-500">Convocations :</span>
-                                    <span class="font-bold text-slate-800">${matchStats.total > 0 ? `${matchStats.played} retenu(s) · ${matchStats.choix} choix · ${matchStats.indispo} indispo` : '—'}</span>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Convocations</span>
+                                    <span class="player-detail-value">${matchStats.total > 0 ? `${matchStats.played} retenu(s) · ${matchStats.choix} choix · ${matchStats.indispo} indispo` : '—'}</span>
                                 </div>
-                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
-                                    <span class="text-slate-500">Entraînements :</span>
-                                    <span class="font-bold text-slate-800">${presencePct !== null ? `${presences}/${totalSessions} séances` : '—'}</span>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Résultats</span>
+                                    <span class="player-detail-value">${playerRecordBadges(playerRecord)}</span>
                                 </div>
-                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
-                                    <span class="text-slate-500">Covoiturage :</span>
-                                    <span class="font-bold text-slate-800">${carpoolStats.answered ? `${carpoolStats.withPassengers} avec passagers${carpoolStats.withoutSeats ? ` (dont ${carpoolStats.withoutSeats} sans place)` : ''} · ${carpoolStats.rides} passager · ${carpoolStats.directs} direct` : '—'}</span>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Blessures</span>
+                                    <span class="player-detail-value">${injuryHistoryText}</span>
                                 </div>
-                                <div class="bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-[11.5px]">
-                                    <span class="text-slate-500">Équipe :</span>
-                                    <span class="font-bold text-slate-800">${teamName}</span>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Entraînements</span>
+                                    <span class="player-detail-value">${presencePct !== null ? `${presences}/${totalSessions} séances` : '—'}</span>
+                                </div>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Covoiturage</span>
+                                    <span class="player-detail-value">${carpoolStats.answered ? `${carpoolStats.withPassengers} avec passagers${carpoolStats.withoutSeats ? ` (dont ${carpoolStats.withoutSeats} sans place)` : ''} · ${carpoolStats.rides} passager · ${carpoolStats.directs} direct` : '—'}</span>
+                                </div>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Équipe</span>
+                                    <span class="player-detail-value">${teamName}</span>
                                 </div>
                             </div>
                         </details>
@@ -2379,18 +2708,8 @@ Object.values(state.trainings).forEach(session => {
     );
 }
 
-    // Tri par date
-    matches.sort((a, b) => {
-        const dateA = a.date
-            ? new Date(a.date + 'T12:00:00')
-            : new Date('9999-12-31');
-
-        const dateB = b.date
-            ? new Date(b.date + 'T12:00:00')
-            : new Date('9999-12-31');
-
-        return dateA - dateB;
-    });
+    // Matchs à venir d'abord (chronologiques), déjà joués à la fin
+    matches = sortMatchesUpcomingFirst(matches);
 
     if (matches.length === 0) {
         selector.innerHTML =
@@ -2398,28 +2717,29 @@ Object.values(state.trainings).forEach(session => {
         return;
     }
 
+    const optionForMatch = (m) => {
+        const formattedDate = m.date
+            ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            })
+            : '--/--/--';
+
+        return `<option value="${m.id}">${m.opponent} (${formattedDate})</option>`;
+    };
+
+    const upcoming = matches.filter(m => !matchHasBeenPlayed(m));
+    const played = matches.filter(m => matchHasBeenPlayed(m));
+
     selector.innerHTML =
         '<option value="">-- Sélectionner un match --</option>' +
-        matches.map(m => {
-
-            const formattedDate = m.date
-                ? new Date(m.date + 'T12:00:00').toLocaleDateString(
-                    'fr-FR',
-                    {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    }
-                )
-                : '--/--/--';
-
-            return `
-                <option value="${m.id}">
-                    ${m.opponent} (${formattedDate})
-                </option>
-            `;
-
-        }).join('');
+        (upcoming.length
+            ? `<optgroup label="À venir (${upcoming.length})">${upcoming.map(optionForMatch).join('')}</optgroup>`
+            : '') +
+        (played.length
+            ? `<optgroup label="Déjà joués (${played.length})">${played.map(optionForMatch).join('')}</optgroup>`
+            : '');
 
     // Aucune sélection automatique
     selector.value = state.selectedMatchId || '';
@@ -2449,6 +2769,11 @@ Object.values(state.trainings).forEach(session => {
         function renderMatchDetail() {
             const role = window.currentUserRole || 'public';
 const userTeam = window.currentUserTeam || 'all';
+
+            // Bouton « page covoiturage » : visible dès qu'un match est sélectionné
+            updateTransportCarpoolLink(
+                state.selectedMatchId ? state.matches?.[state.selectedMatchId] : null
+            );
             const selector = document.getElementById('match-selector');
             const tbody = document.getElementById('match-convocation-tbody');
             const infoCard = document.getElementById('match-info-card');
@@ -2467,6 +2792,8 @@ const userTeam = window.currentUserTeam || 'all';
     carpoolBanner.style.display = 'none';
 }
     if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
+    const convHeroIdle = document.getElementById('convoc-match-hero');
+    if (convHeroIdle) convHeroIdle.classList.add('hidden');
 
     return;
 }
@@ -2483,20 +2810,25 @@ if (counterBanner) counterBanner.style.display = 'none';
 if (carpoolBanner) carpoolBanner.style.display = 'none';  
                 if(validationStatus) validationStatus.innerHTML = '';
                 if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
+                const convHeroEmpty = document.getElementById('convoc-match-hero');
+                if (convHeroEmpty) convHeroEmpty.classList.add('hidden');
                 return;
             }
 
             selector.value = state.selectedMatchId;
             if (infoCard) infoCard.style.display = 'flex';
-if (counterBanner) counterBanner.style.display = 'flex';
-if (carpoolBanner) carpoolBanner.style.display = 'flex';
+if (counterBanner) counterBanner.style.display = 'block';
+if (carpoolBanner) carpoolBanner.style.display = 'block';
             const m = state.matches[state.selectedMatchId];
             if (
     role === 'coach' &&
     m &&
     (m.team || '').toLowerCase() !== userTeam.toLowerCase()
 ) {
+    updateTransportCarpoolLink(null);
     if (inviteSearchBlock) inviteSearchBlock.classList.add('hidden');
+    const convHeroOther = document.getElementById('convoc-match-hero');
+    if (convHeroOther) convHeroOther.classList.add('hidden');
     return;
 }
 
@@ -2508,6 +2840,7 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             const playersForMatch = playerItems.map(item => item.p);
 
             const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
+            const teamHex = getTeamHex(m.team);
             const teamColors = getTeamColorClasses(m.team);
             const formattedDate = m.date ? new Date(m.date + 'T12:00:00').toLocaleDateString('fr-FR', {
                 day: '2-digit',
@@ -2523,7 +2856,6 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             // Bilan des convocations sur les matchs passés de cette équipe
             const convocHistory = buildConvocationHistory(m.team);
             const cardsIndex = getCardsByPlayerIndex();
-            const jerseysForMatch = computeMatchJerseys(m);
 
             if (inviteSearchBlock) {
                 inviteSearchBlock.classList.toggle('hidden', role !== 'coach' && role !== 'responsable');
@@ -2598,33 +2930,32 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
             }
 
             let convokedCount = 0;
+            let indispoCount = 0;
+            let nonConvokedCount = 0;
             const targetConvoked = parseInt(state.teams?.[m.team]?.targetConvocations) || 14;
             playerItems.forEach(({ p }) => {
-                if (m.convocations[p.id] === 'convoke') convokedCount++;
+                const status = m.convocations[p.id] || 'none';
+                if (status === 'convoke') convokedCount++;
+                else if (status === 'indisponible') indispoCount++;
+                else if (status === 'nonconvoke') nonConvokedCount++;
             });
 
-            const isOverTarget = convokedCount > targetConvoked;
-            counterBanner.className = `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${isOverTarget ? 'bg-red-50 border-red-200 text-red-900' : convokedCount < targetConvoked ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`;
-            counterBanner.innerHTML = `<div class="font-bold text-xs">Convocations : ${convokedCount} / ${targetConvoked}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${isOverTarget ? 'bg-red-200' : convokedCount < targetConvoked ? 'bg-amber-200' : 'bg-sky-200'}">${isOverTarget ? '⚠️ Trop de convoqués' : convokedCount < targetConvoked ? '⚠️ Incomplet' : '🔵 OK'}</span>`;
-
-            // Indisponibles banner
-            const indisponiblesList = playerItems
-                .filter(({ p }) => m.convocations[p.id] === 'indisponible')
-                .map(({ p }) => p.name);
-            const indisponiblesBanner = document.getElementById('indisponibles-banner');
-            if (indisponiblesBanner) {
-                if (indisponiblesList.length > 0) {
-                    indisponiblesBanner.classList.remove('hidden');
-                    indisponiblesBanner.innerHTML = `
-                        <div class="p-3 rounded-xl border bg-orange-50 border-orange-200 text-orange-900 flex items-center justify-between gap-2">
-                            <div class="font-bold text-xs">🟠 Indisponibles : ${indisponiblesList.length}</div>
-                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-orange-200">${indisponiblesList.join(', ')}</span>
-                        </div>`;
-                } else {
-                    indisponiblesBanner.classList.add('hidden');
-                    indisponiblesBanner.innerHTML = '';
-                }
+            const convHero = document.getElementById('convoc-match-hero');
+            if (convHero) {
+                convHero.classList.remove('hidden');
+                convHero.innerHTML = renderConvocationHero(m, {
+                    teamName,
+                    teamHex,
+                    formattedDate,
+                    convokedCount,
+                    targetConvoked,
+                    indispoCount,
+                    nonConvokedCount
+                });
             }
+
+            counterBanner.className = 'bg-white p-4 rounded-xl border border-slate-100 card-shadow';
+            counterBanner.innerHTML = renderConvocationOverviewCard(m, playerItems, convokedCount, targetConvoked);
 
     const summary = buildCarpoolSummary(m, playerItems.map(it => it.p));
 
@@ -2632,116 +2963,11 @@ if (carpoolBanner) carpoolBanner.style.display = 'flex';
 
 if (carpoolBanner) {
 
-    carpoolBanner.className =
-        `p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${summary.closed ? 'bg-sky-50 border-sky-200 text-sky-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`;
+    carpoolBanner.className = 'bg-white p-4 rounded-xl border border-slate-100 card-shadow';
 
-    carpoolBanner.innerHTML = `
-<div class="w-full text-xs space-y-1">
-
-<div class="flex flex-wrap items-center gap-2">
-    <div class="font-bold">🚗 Covoiturage</div>
-    ${summary.closed ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-200 text-sky-900">🔒 Confirmé par le coach</span>' : '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-200 text-emerald-900">En cours</span>'}
-</div>
-
-<div>
-✅ Réponses : ${summary.responses}/${summary.totalConvoked}
-</div>
-
-<div>
-⏳ En attente : ${summary.pending}
-</div>
-
-<div>
-🚗 Conducteurs : ${summary.drivers}
-</div>
-
-<div>
-👤 Passagers : ${summary.passengers}
-</div>
-
-<div>
-📍 Direct : ${summary.directs}
-</div>
-
-<div>
-❌ Absents : ${summary.absents}
-</div>
-
-<div class="font-bold">
-🚘 Places proposées : ${summary.seats}
-</div>
-
-<div class="font-bold ${summary.transportClass}">
-${summary.transportStatus}
-</div>
-
-${summary.driverList.length ? `
-<div class="mt-2">
-🚗 <strong>Conducteurs</strong><br>
-${summary.driverList.join('<br>')}
-</div>
-` : ''}
-
-${summary.driverNoSeatList.length ? `
-<div class="mt-2">
-🚙 <strong>Conducteurs sans place</strong><br>
-${summary.driverNoSeatList.join('<br>')}
-</div>
-` : ''}
-
-${summary.driverAssignments.length ? `
-<div class="mt-2">
-🚗→👤 <strong>Attribution</strong><br>
-${summary.driverAssignments.map(a => `${a.name} : ${a.passengerNames.length ? a.passengerNames.join(', ') : '—'}`).join('<br>')}
-</div>
-` : ''}
-
-${summary.toPlaceList.length ? `
-<div class="mt-2">
-🚫 <strong>À placer</strong><br>
-${summary.toPlaceList.join('<br>')}
-</div>
-` : ''}
-
-${summary.passengerList.length ? `
-<div class="mt-2">
-👤 <strong>Passagers</strong><br>
-${summary.passengerList.join('<br>')}
-</div>
-` : ''}
-
-${summary.directList.length ? `
-<div class="mt-2">
-📍 <strong>Direct</strong><br>
-${summary.directList.join('<br>')}
-</div>
-` : ''}
-
-${summary.absentList.length ? `
-<div class="mt-2">
-❌ <strong>Absents</strong><br>
-${summary.absentList.join('<br>')}
-</div>
-` : ''}
-
-${summary.pendingList.length ? `
-<div class="mt-2">
-⏳ <strong>En attente</strong><br>
-${summary.pendingList.join('<br>')}
-</div>
-` : ''}
-
-${m.carpoolId ? `
-<div class="mt-3 flex flex-wrap gap-2">
-    <button onclick="openCarpoolQR('${m.id}')" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold rounded-lg">🏷️ QR & lien</button>
-    ${(role === 'coach' || role === 'admin' || role === 'responsable') ? (summary.closed ? `<button onclick="setCarpoolClosed('${m.id}', false)" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold rounded-lg">🔓 Rouvrir</button>` : `<button onclick="setCarpoolClosed('${m.id}', true)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg"><i class="fa-solid fa-lock mr-1"></i>Clôturer le covoiturage</button>`) : ''}
-    <button onclick="copyCarpoolRecap('${m.id}')" class="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-[11px] font-bold rounded-lg">📤 Récap WhatsApp</button>
-</div>
-` : ''}
-
-</div>
-`;
+    carpoolBanner.innerHTML = renderCarpoolOverviewCard(summary, m, role);
 }
+
 renderTransportTab(summary);
 
 renderMatchSummary(m);
@@ -2773,22 +2999,41 @@ renderMatchSummary(m);
                 return '';
             };
 
+            // Liste triée par ordre alphabétique des prénoms
+            // (cartes mobile et tableau PC de l'onglet Convocations)
+            const firstNameSortKey = (p) => {
+                const { prenom, nom } = getPlayerNameParts(p);
+                return String(prenom || nom || p.name || '');
+            };
+
+            playerItems.sort((a, b) =>
+                firstNameSortKey(a.p).localeCompare(firstNameSortKey(b.p), 'fr', { sensitivity: 'base' })
+                || String(a.p.name || '').localeCompare(String(b.p.name || ''), 'fr', { sensitivity: 'base' })
+            );
+
             playerItems.forEach(({ p, invite }) => {
                 const currentStatus = m.convocations[p.id] || 'none';
                 const selectedPosition = m.positions[p.id] || p.poste1 || '-';
-                const jerseyNumber = jerseysForMatch[p.id]?.number ?? '';
                 const disciplineChip = renderDisciplineChip(computePlayerDiscipline(p.id, cardsIndex));
                 const postes = getPlayerPostesList(p);
                 const hasLicence = p.licence && p.licence.trim() !== '' && p.licence.trim() !== '-';
+
+                // Initiales pour l'avatar de la liste (tableau et cartes mobiles)
+                const { prenom: pPrenom, nom: pNom } = getPlayerNameParts(p);
+                const playerInitials = ((pPrenom || '').charAt(0) + (pNom || '').charAt(0)).toUpperCase()
+                    || String(p.name || '?').charAt(0).toUpperCase();
 
                 // --- HTML POUR MOBILE (Cartes) ---
                 htmlMobileCards += `
                     <div class="bg-white border ${currentStatus === 'convoke' ? 'border-sky-300 bg-sky-50/20' : 'border-slate-200'} rounded-xl p-3.5 shadow-sm space-y-2.5 mb-2.5">
                         <div class="flex items-start justify-between gap-2">
-                            <div class="min-w-0">
+                            <div class="flex items-start gap-2.5 min-w-0">
+                                <span class="conv-avatar" style="--team:${teamHex}" aria-hidden="true">${playerInitials}</span>
+                                <div class="min-w-0">
                                 <div class="font-bold text-slate-800 text-[13px]">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}${carpoolChip(p.id)}</div>
                                 <div class="text-[10px] text-slate-400">Poste favori : <span class="font-semibold text-slate-600">${p.poste1 || '-'}</span></div>
                                 ${convocationBadgeHtml(convocHistory.history[p.id])}
+                                </div>
                             </div>
                             ${invite ? `<button onclick="retirerInviteJoueur('${m.id}', '${p.id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg shrink-0" title="Retirer l'invité"><i class="fa-solid fa-xmark text-xs"></i></button>` : ''}
                         </div>
@@ -2815,21 +3060,22 @@ renderMatchSummary(m);
                                     <option value="Remplaçant" ${selectedPosition === 'Remplaçant' ? 'selected' : ''}>Remplaçant</option>
                                 </select>
                             </div>
-                            <div class="flex items-center justify-between gap-2">
-                                <span class="text-[10px] text-slate-500 uppercase font-bold">Maillot</span>
-                                <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-16 p-1 border rounded text-center font-bold text-xs bg-white">
-                            </div>
                         </div>
                     </div>
                 `;
 
                 // --- HTML POUR PC (Lignes de tableau classiques) ---
                 htmlTableRows += `
-                    <tr class="${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
+                    <tr class="conv-row ${currentStatus === 'convoke' ? 'bg-sky-50/30' : ''} border-b border-slate-100 hover:bg-slate-50/50">
                         <td class="p-3 pl-4">
+                            <div class="flex items-start gap-2.5">
+                                <span class="conv-avatar conv-avatar-sm" style="--team:${teamHex}" aria-hidden="true">${playerInitials}</span>
+                                <div class="min-w-0">
                             <div class="font-bold text-slate-800">${p.name}${invite ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase">Invité</span>' : ''}${disciplineChip}${carpoolChip(p.id)}</div>
                             <div class="text-[10px] text-slate-400">Poste favori : ${p.poste1 || '-'}</div>
                             ${convocationBadgeHtml(convocHistory.history[p.id])}
+                                </div>
+                            </div>
                         </td>
                         <td class="p-3">
                             <div class="flex items-center space-x-1.5">
@@ -2845,10 +3091,6 @@ renderMatchSummary(m);
                             </select>
                         </td>
                         <td class="p-3 text-center">
-                            <input type="number" min="1" max="99" value="${jerseyNumber}" placeholder="N°" onchange="setMatchJersey('${m.id}', '${p.id}', this.value)" class="w-14 p-1 border rounded text-center font-bold text-xs bg-white">
-                        </td>
-                        
-<td class="p-3 text-center">
                              <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
                                  <button onclick="setMatchStatus('${m.id}', '${p.id}', 'convoke')" class="status-btn status-convoke ${currentStatus === 'convoke' ? 'active-convoke' : ''}">Conv.</button>
                                  <button onclick="setMatchStatus('${m.id}', '${p.id}', 'nonconvoke')" class="status-btn status-nonconvoke ${currentStatus === 'nonconvoke' ? 'active-nonconvoke' : ''}">Non</button>
@@ -3208,6 +3450,11 @@ const nbTotal = playersForTraining.length;
             document.getElementById('detail-session-meta').textContent = `${dayName.charAt(0).toUpperCase() + dayName.slice(1)} · ${s.heure || '18:00'} – 20:00`;
             document.getElementById('detail-session-theme').textContent = s.theme || '—';
 
+            const matchLabel = document.getElementById('training-match-link-label');
+            if (matchLabel) {
+                matchLabel.textContent = formatTrainingMatchLabel(findTrainingWeekMatch(s));
+            }
+
             // PDF
             if (s.pdfData) {
                 document.getElementById('detail-pdf-zone').classList.remove('hidden');
@@ -3231,6 +3478,94 @@ const nbTotal = playersForTraining.length;
             document.getElementById('training-detail-view').classList.add('hidden');
             renderEntrainements();
         }
+
+        // --- Lien séance d'entraînement <-> composition du match de la semaine ---
+
+        // Cherche le match de la semaine pour une séance : d'abord le prochain
+        // match de la même équipe dans les 7 jours, sinon un match joué dans
+        // les 2 jours précédents.
+        function findTrainingWeekMatch(training) {
+            if (!training || !training.date) return null;
+
+            const ref = new Date(training.date + 'T12:00:00').getTime();
+            if (isNaN(ref)) return null;
+
+            const team = String(training.team || '').toLowerCase();
+
+            const candidates = Object.values(state.matches || {})
+                .filter(m => m && m.date)
+                .filter(m => !team || String(m.team || '').toLowerCase() === team)
+                .map(m => ({
+                    match: m,
+                    diff: (new Date(m.date + 'T12:00:00').getTime() - ref) / 86400000
+                }))
+                .filter(c => !isNaN(c.diff));
+
+            const after = candidates
+                .filter(c => c.diff >= 0 && c.diff <= 7)
+                .sort((a, b) => a.diff - b.diff);
+
+            if (after.length) return after[0].match;
+
+            const before = candidates
+                .filter(c => c.diff < 0 && c.diff >= -2)
+                .sort((a, b) => b.diff - a.diff);
+
+            return before.length ? before[0].match : null;
+        }
+
+        function formatTrainingMatchLabel(match) {
+            if (!match) return 'Aucun match programmé autour de cette séance';
+
+            const date = match.date
+                ? new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                    weekday: 'short', day: 'numeric', month: 'short'
+                })
+                : '';
+
+            return `${match.opponent || 'Match'}${date ? ' · ' + date : ''}`;
+        }
+
+        function openMatchCompositionFromTraining() {
+            const training = state.trainings?.[currentTrainingId];
+            if (!training) return;
+
+            const match = findTrainingWeekMatch(training);
+
+            if (!match) {
+                alert(
+                    "Aucun match n'est programmé cette semaine pour " +
+                    (state.teams?.[training.team]?.name || training.team || 'cette équipe') +
+                    ".\nCrée d'abord le match dans l'onglet Matchs."
+                );
+                return;
+            }
+
+            switchTab('matchs');
+            state.selectedMatchId = match.id;
+
+            const selector = document.getElementById('match-selector');
+            if (selector) selector.value = match.id;
+
+            switchMatchSubTab('composition');
+
+            window.compositionReturnTrainingId = training.id;
+            renderMatchComposition();
+        }
+
+        function backToTrainingFromComposition() {
+            const trainingId = window.compositionReturnTrainingId;
+            window.compositionReturnTrainingId = null;
+
+            switchTab('entrainements');
+
+            if (trainingId && state.trainings?.[trainingId]) {
+                openTrainingDetail(trainingId);
+            }
+        }
+
+        window.openMatchCompositionFromTraining = openMatchCompositionFromTraining;
+        window.backToTrainingFromComposition = backToTrainingFromComposition;
 
         function renderSessionPresenceStats(s) {
             const presence = s.presence || {};
@@ -3506,6 +3841,7 @@ const nbTotal = playersForTraining.length;
 
     playersToMark.forEach(player => {
         state.trainings[currentTrainingId].presence[player.id] = 'present';
+        clearPlayerInjuryFlag(player, state.trainings[currentTrainingId].date);
     });
 
     saveStateToFirebase();
@@ -3537,6 +3873,7 @@ function setAllTrainingAbsent() {
 
     playersToMark.forEach(player => {
         state.trainings[currentTrainingId].presence[player.id] = 'absent';
+        clearPlayerInjuryFlag(player, state.trainings[currentTrainingId].date);
     });
 
     // Tous absents : le groupe de travail se vide aussi
@@ -3858,12 +4195,8 @@ function duplicateTraining() {
     );
 }
 
-    // Trier les matchs par date (prochain d'abord)
-    matches.sort((a, b) => {
-        const dateA = a.date ? new Date(a.date + 'T12:00:00') : new Date('9999-12-31');
-        const dateB = b.date ? new Date(b.date + 'T12:00:00') : new Date('9999-12-31');
-        return dateA - dateB;
-    });
+    // Matchs à venir d'abord (chronologiques), déjà joués à la fin
+    matches = sortMatchesUpcomingFirst(matches);
 
     if (matches.length === 0) {
         container.innerHTML = `
@@ -3873,7 +4206,17 @@ function duplicateTraining() {
         return;
     }
 
-    container.innerHTML = matches.map(m => {
+    const upcomingMatches = matches.filter(m => !matchHasBeenPlayed(m));
+    const playedMatches = matches.filter(m => matchHasBeenPlayed(m));
+
+    const sectionTitle = (label, icon, count) => `
+        <div class="flex items-center gap-2 pt-1">
+            <span class="text-[10px] font-extrabold uppercase tracking-[.12em] text-slate-500"><i class="fa-solid ${icon} mr-1"></i>${label}</span>
+            <span class="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-extrabold">${count}</span>
+            <span class="flex-1 h-px bg-slate-200"></span>
+        </div>`;
+
+    const renderMatchCard = (m) => {
                 const teamName = state.teams?.[m.team]?.name || m.team || 'Équipe';
                 const teamColors = getTeamColorClasses(m.team);
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
@@ -3888,12 +4231,8 @@ function duplicateTraining() {
                     }
                 }
 
-                // Vérifier si le match est passé
-                const matchDateTime = m.date && m.heure 
-                    ? new Date(m.date + 'T' + (m.heure || '14:30'))
-                    : new Date('9999-12-31');
-                const now = new Date();
-                const isMatchPassed = matchDateTime < now;
+                // Match passé ou score déjà saisi
+                const isMatchPassed = matchHasBeenPlayed(m);
 
                 // Déterminer si l'équipe joue à domicile ou à l'extérieur
                 const isHome = m.location?.toLowerCase().includes('domicile') || m.location?.toLowerCase().includes('home');
@@ -3947,7 +4286,11 @@ else if (m.type === 'Amical') {
                             ${bilanButtonHTML}
                         </div>
                     </div>`;
-            }).join('');
+            };
+
+    container.innerHTML =
+        (upcomingMatches.length ? sectionTitle('À venir', 'fa-clock', upcomingMatches.length) + upcomingMatches.map(renderMatchCard).join('') : '') +
+        (playedMatches.length ? sectionTitle('Déjà joués', 'fa-flag-checkered', playedMatches.length) + playedMatches.map(renderMatchCard).join('') : '');
         }
 
         function deleteMatch(matchId) {
@@ -4002,6 +4345,8 @@ else if (m.type === 'Amical') {
             const newId = 'M_' + Date.now();
             state.matches[newId] = {
                 id: newId,
+                // Chaque match doit avoir son propre lien de covoiturage
+                carpoolId: 'CP_' + newId,
                 opponent: source.opponent,
                 adresse: source.adresse,
                 date: source.date,
@@ -4078,6 +4423,185 @@ else if (m.type === 'Amical') {
         function copyLicence(licence) {
             navigator.clipboard.writeText(licence).then(() => showToast(`Licence ${licence} copiée !`));
         }
+/* ---------- Blessures : durée calculée depuis les appels ---------- */
+
+function toDateKey(value) {
+    if (!value || typeof value !== 'string') return null;
+    const key = value.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
+}
+
+function dateKeyToDate(key) {
+    if (!key) return null;
+    const parts = key.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function todayDateKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function injuryDays(startKey, endKey) {
+    const start = dateKeyToDate(startKey);
+    const end = dateKeyToDate(endKey);
+    if (!start || !end) return null;
+    return Math.max(0, Math.round((end - start) / 86400000));
+}
+
+function formatInjuryDuration(days, short) {
+    if (days === null || days === undefined || Number.isNaN(days)) return '';
+    if (days <= 0) return short ? '< 1 j' : 'moins d’un jour';
+    if (days < 14) return `${days}${short ? ' j' : (days > 1 ? ' jours' : ' jour')}`;
+    if (days < 60) {
+        const weeks = Math.round(days / 7);
+        return `${weeks}${short ? ' sem.' : ' semaines'}`;
+    }
+    return `${Math.round(days / 30.4375)} mois`;
+}
+
+function formatInjuryDay(key) {
+    const date = dateKeyToDate(key);
+    return date ? date.toLocaleDateString('fr-FR') : '';
+}
+
+// Un joueur redevient disponible : on efface le drapeau « blessé » de sa fiche.
+function clearPlayerInjuryFlag(player, returnDate) {
+    if (!player || player.blessure !== true) return;
+    const sessionDate = toDateKey(returnDate);
+    if (sessionDate && sessionDate > todayDateKey()) return;
+    player.blessure = false;
+    player.blessureDateDebut = null;
+    player.blessureRetour = toDateKey(returnDate) || todayDateKey();
+}
+
+// Reconstitue les épisodes de blessure à partir des appels d'entraînement :
+// un épisode s'ouvre sur un statut « blessé » et se referme au premier autre statut.
+function getPlayerInjuryInfo(player) {
+    const result = { isInjured: false, current: null, past: [], hasAny: false, lastPast: null };
+    if (!player) return result;
+
+    const today = todayDateKey();
+    const teamKey = (player.team || player.cat || '').toLowerCase();
+    const entries = [];
+
+    Object.values(state.trainings || {}).forEach(session => {
+        if (!session || !session.date) return;
+        if ((session.team || '').toLowerCase() !== teamKey) return;
+        const status = session.presence && session.presence[player.id];
+        const date = toDateKey(session.date);
+        if (!status || !date) return;
+        // Une séance future pré-remplie ne doit pas clore une blessure en cours.
+        if (date > today) return;
+        entries.push({ date, status });
+    });
+
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+
+    let spells = [];
+    let openSpell = null;
+
+    entries.forEach(entry => {
+        if (entry.status === 'blesse') {
+            if (!openSpell) openSpell = { start: entry.date, end: null };
+            return;
+        }
+        if (openSpell) {
+            openSpell.end = entry.date;
+            spells.push(openSpell);
+            openSpell = null;
+        }
+    });
+
+    if (openSpell) spells.push(openSpell);
+
+    // Drapeau « blessé » de la fiche : on ne le retient que s'il apporte une info plus récente
+    // que le dernier appel (sinon c'est un ancien statut resté bloqué, ex. appel groupé).
+    const startFlag = toDateKey(player.blessureDateDebut);
+    if (player.blessure === true && startFlag) {
+        const lastEntryDate = entries.length ? entries[entries.length - 1].date : null;
+        const alreadyOpen = spells.some(spell => !spell.end);
+        if (!alreadyOpen && (!lastEntryDate || startFlag > lastEntryDate)) {
+            spells.push({ start: startFlag, end: null });
+        }
+    }
+
+    // Une date de retour enregistrée referme une blessure encore ouverte (une date
+    // future annonce juste le retour, elle ne doit pas déclarer le joueur guéri).
+    const returnDate = toDateKey(player.blessureRetour);
+    if (returnDate && returnDate <= today) {
+        spells = spells.map(spell =>
+            (!spell.end && (!spell.start || spell.start <= returnDate))
+                ? { ...spell, end: returnDate }
+                : spell
+        );
+    }
+
+    const decorated = spells
+        .filter(spell => spell.start)
+        .sort((a, b) => a.start.localeCompare(b.start))
+        .map(spell => ({
+            start: spell.start,
+            end: spell.end || null,
+            ongoing: !spell.end,
+            days: injuryDays(spell.start, spell.end || today)
+        }));
+
+    const current = decorated.find(spell => spell.ongoing) || null;
+    const past = decorated.filter(spell => !spell.ongoing);
+    const flagOnly = player.blessure === true && decorated.length === 0;
+
+    return {
+        isInjured: !!current || flagOnly,
+        current: current || (flagOnly ? { start: null, end: null, ongoing: true, days: null } : null),
+        past,
+        hasAny: decorated.length > 0 || flagOnly,
+        lastPast: past.length ? past[past.length - 1] : null
+    };
+}
+
+function renderInjuryBadge(info) {
+    if (!info) return '';
+
+    if (info.current) {
+        const duration = formatInjuryDuration(info.current.days, true);
+        const since = info.current.start ? ` depuis le ${formatInjuryDay(info.current.start)}` : '';
+        const title = `Blessé${since}${duration ? ` · ${formatInjuryDuration(info.current.days, false)}` : ''}`;
+        return `<span class="injury-badge is-active" title="${title}">🤕 ${duration ? 'Blessé · ' + duration : 'Blessé'}</span>`;
+    }
+
+    const last = info.lastPast;
+    if (last) {
+        const duration = formatInjuryDuration(last.days, true);
+        if (!duration) return '';
+        const title = `Blessé du ${formatInjuryDay(last.start)} au ${formatInjuryDay(last.end)} · ${formatInjuryDuration(last.days, false)}`;
+        return `<span class="injury-badge is-past" title="${title}">🤕 Guéri · ${duration}</span>`;
+    }
+
+    return '';
+}
+
+function formatPlayerInjuryHistory(info) {
+    if (!info || !info.hasAny) return '—';
+
+    const all = [];
+    if (info.current) all.push(info.current);
+    all.push(...(info.past || []));
+    all.sort((a, b) => (b.start || '').localeCompare(a.start || ''));
+
+    const parts = all.slice(0, 3).map(spell => {
+        const duration = formatInjuryDuration(spell.days, false);
+        if (!spell.start) return `en cours${duration ? ' · ' + duration : ''}`;
+        if (spell.ongoing) return `depuis le ${formatInjuryDay(spell.start)} · ${duration}`;
+        return `${formatInjuryDay(spell.start)} → ${formatInjuryDay(spell.end)} · ${duration}`;
+    });
+
+    if (all.length > 3) parts.push(`+${all.length - 3} autre(s)`);
+
+    return parts.join('<br>');
+}
+
 function formatDateFr(dateString) {
 
     if (!dateString) return '';
@@ -5076,8 +5600,25 @@ Un passager non déclaré = un enfant sans siège prévu.
             );
 
             const history = {};
+            const records = {};
+
             pastMatches.forEach(m => {
+                const home = parseInt(m.scoreHome, 10);
+                const away = parseInt(m.scoreAway, 10);
+                const hasScore =
+                    m.scoreHome !== undefined && m.scoreHome !== null && String(m.scoreHome).trim() !== '' &&
+                    m.scoreAway !== undefined && m.scoreAway !== null && String(m.scoreAway).trim() !== '' &&
+                    !isNaN(home) && !isNaN(away);
+                const resultKey = !hasScore ? null : home > away ? 'wins' : home === away ? 'draws' : 'losses';
+
                 Object.entries(m.convocations || {}).forEach(([pId, status]) => {
+                    // Bilan victoires / nuls / défaites des matchs où le joueur était convoqué
+                    if (resultKey && status === 'convoke') {
+                        if (!records[pId]) records[pId] = { wins: 0, draws: 0, losses: 0, matches: 0 };
+                        records[pId][resultKey]++;
+                        records[pId].matches++;
+                    }
+
                     let bucket = null;
                     if (status === 'convoke') bucket = 'played';
                     else if (status === 'nonconvoke') bucket = 'choix';
@@ -5089,7 +5630,7 @@ Un passager non déclaré = un enfant sans siège prévu.
                 });
             });
 
-            return { matches: pastMatches, history };
+            return { matches: pastMatches, history, records };
         }
 
         function convocationBadgeHtml(stats) {
@@ -5104,6 +5645,21 @@ Un passager non déclaré = un enfant sans siège prévu.
                         <span class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-600 font-bold">⚪ ${s.choix}</span>
                         <span class="text-[10px] font-extrabold text-slate-400">${pct}%</span>
                     </div>`;
+        }
+
+        // Pastilles Victoires / Nuls / Défaites pour un joueur
+        function playerRecordBadges(record, options) {
+            const r = record || { wins: 0, draws: 0, losses: 0, matches: 0 };
+            const compact = !!(options && options.compact);
+            if (!r.matches) {
+                return compact ? '' : `<span class="text-[10px] text-slate-400 italic">Aucun résultat</span>`;
+            }
+            const title = `${r.matches} match(s) joué(s) : ${r.wins} victoire(s), ${r.draws} nul(s), ${r.losses} défaite(s)`;
+            return `<span class="inline-flex flex-wrap items-center gap-1" title="${title}">
+                        <span class="px-1.5 py-0.5 rounded border border-emerald-100 bg-emerald-50 text-emerald-700 text-[10px] font-bold">${r.wins}V</span>
+                        <span class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-600 text-[10px] font-bold">${r.draws}N</span>
+                        <span class="px-1.5 py-0.5 rounded border border-red-100 bg-red-50 text-red-600 text-[10px] font-bold">${r.losses}D</span>
+                    </span>`;
         }
 
         function renderConvocationHistory(m, playerItems, convocHistory) {
@@ -5122,7 +5678,12 @@ Un passager non déclaré = un enfant sans siège prévu.
                     const s = data.history[p.id];
                     return ownTeam || (s && s.total > 0);
                 })
-                .map(({ p, invite }) => ({ p, invite, s: data.history[p.id] || emptyConvocationStats() }))
+                .map(({ p, invite }) => ({
+                    p,
+                    invite,
+                    s: data.history[p.id] || emptyConvocationStats(),
+                    r: (data.records || {})[p.id] || null
+                }))
                 .sort((a, b) =>
                     (b.s.played - a.s.played) ||
                     (a.s.choix - b.s.choix) ||
@@ -5132,13 +5693,13 @@ Un passager non déclaré = un enfant sans siège prévu.
             if (!data.matches.length) {
                 container.innerHTML = `
                 <div class="card card-pad">
-                    <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations</h3>
+                    <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations et résultats</h3>
                     <p class="card-sub">Aucun match passé pour ${teamName} : le bilan apparaîtra dès le premier match joué.</p>
                 </div>`;
                 return;
             }
 
-            const rowsHtml = rows.map(({ p, invite, s }) => {
+            const rowsHtml = rows.map(({ p, invite, s, r }) => {
                 const pct = s.total ? Math.round((s.played / s.total) * 100) : 0;
                 const originTeam = invite
                     ? (state.teams?.[p.team]?.name || String(p.team || p.cat || '').toUpperCase())
@@ -5153,6 +5714,7 @@ Un passager non déclaré = un enfant sans siège prévu.
                             <span class="px-1.5 py-0.5 rounded border border-sky-100 bg-sky-50 text-sky-700 text-[10px] font-bold" title="Convoqué">✅ ${s.played}</span>
                             <span class="px-1.5 py-0.5 rounded border border-orange-100 bg-orange-50 text-orange-700 text-[10px] font-bold" title="Indisponible">🟠 ${s.indispo}</span>
                             <span class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-600 text-[10px] font-bold" title="Non retenu (choix)">⚪ ${s.choix}</span>
+                            ${playerRecordBadges(r, { compact: true })}
                             <div class="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden hidden sm:block" title="${pct}% de convocations">
                                 <div class="h-full bg-sky-500" style="width:${pct}%"></div>
                             </div>
@@ -5166,8 +5728,8 @@ Un passager non déclaré = un enfant sans siège prévu.
                 <details class="group">
                     <summary class="list-none cursor-pointer p-4 flex items-start justify-between gap-2 hover:bg-slate-50 transition-colors">
                         <div>
-                            <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations</h3>
-                            <p class="card-sub">${teamName} · ${data.matches.length} match(s) passé(s) · ✅ convoqué · 🟠 indispo · ⚪ choix</p>
+                            <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>Bilan des convocations et résultats</h3>
+                            <p class="card-sub">${teamName} · ${data.matches.length} match(s) passé(s) · ✅ convoqué · 🟠 indispo · ⚪ choix · V/N/D résultats</p>
                         </div>
                         <span class="flex items-center gap-2 shrink-0">
                             <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">${rows.length} joueurs</span>
@@ -6060,18 +6622,18 @@ if (role === 'responsable') {
             let table = '';
             let mobile = '';
 
-            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">🎽 Encadrement & Dirigeants</td></tr>';
+            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="4" class="p-2 pl-4 uppercase tracking-wider">🎽 Encadrement & Dirigeants</td></tr>';
             mobile += '<div class="bg-slate-100 text-slate-700 font-bold text-xs p-2.5 rounded-lg my-3 uppercase tracking-wider">🎽 Encadrement & Dirigeants</div>';
 
             if (staff.length === 0) {
                 const hint = 'Ajoutez d\'abord coaches et dirigeants dans Effectif → Staff & Dirigeants.';
-                table += '<tr><td colspan="6" class="p-2 pl-4 text-[10px] text-slate-400 italic">' + hint + '</td></tr>';
+                table += '<tr><td colspan="4" class="p-2 pl-4 text-[10px] text-slate-400 italic">' + hint + '</td></tr>';
                 mobile += '<div class="text-[10px] text-slate-400 italic mb-2">' + hint + '</div>';
             } else {
                 const coachRow = (label, field, current) => `
                     <tr class="border-b border-slate-100 bg-slate-50/40">
                         <td class="p-2 pl-4 font-bold text-slate-700 text-xs">${label}</td>
-                        <td colspan="5" class="p-2">
+                        <td colspan="3" class="p-2">
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <select id="entourage-coach-select-${m.id}-${field}-table" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg">
                                     ${staffSelectOptions(sortedStaff, current ? staffId(current) : '', true)}
@@ -6108,12 +6670,12 @@ if (role === 'responsable') {
                 mobile += mobileCoach('Coach adjoint', 'adjoint', adjoint);
             }
 
-            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="6" class="p-2 pl-4 uppercase tracking-wider">👥 Dirigeants convoqués</td></tr>';
+            table += '<tr class="bg-slate-100 text-slate-700 font-bold text-xs"><td colspan="4" class="p-2 pl-4 uppercase tracking-wider">👥 Dirigeants convoqués</td></tr>';
 
             table += `
                 <tr class="border-b border-slate-100">
                     <td class="p-2 pl-4 font-bold text-slate-700 text-xs">Ajouter</td>
-                    <td colspan="5" class="p-2">
+                    <td colspan="3" class="p-2">
                         <div class="flex flex-wrap items-center gap-1.5">
                             <select id="entourage-dirigeant-select-${m.id}-table" class="bg-white border border-slate-300 font-bold text-xs text-slate-700 py-1 px-2 rounded-lg">
                                 ${staffSelectOptions(sortedStaff, '', false)}
@@ -6153,13 +6715,13 @@ if (role === 'responsable') {
                             </select>
                         </td>
                         <td class="p-2 text-center">
-                            <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
-                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','convoque')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Oui</button>
-                                <button onclick="setMatchDirigeantStatus('${m.id}','${id}','non')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'text-slate-600' : 'active-nonconvoke bg-slate-600 text-white'}">Non</button>
+                            <div class="inline-flex items-center gap-1">
+                                <div class="inline-flex rounded-lg border p-0.5 bg-slate-50">
+                                    <button onclick="setMatchDirigeantStatus('${m.id}','${id}','convoque')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'active-convoke bg-sky-600 text-white' : 'text-slate-600'}">Oui</button>
+                                    <button onclick="setMatchDirigeantStatus('${m.id}','${id}','non')" class="status-btn px-2.5 py-1 text-[11px] font-bold rounded-md ${d.convoked ? 'text-slate-600' : 'active-nonconvoke bg-slate-600 text-white'}">Non</button>
+                                </div>
+                                <button onclick="retirerMatchDirigeant('${m.id}','${id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>
                             </div>
-                        </td>
-                        <td class="p-2 text-center">
-                            <button onclick="retirerMatchDirigeant('${m.id}','${id}')" class="text-red-500 hover:bg-red-50 border border-red-200 p-1.5 rounded-lg" title="Retirer"><i class="fa-solid fa-xmark text-xs"></i></button>
                         </td>
                     </tr>`;
 
@@ -7048,6 +7610,36 @@ firebase.database().ref('teams').on('value', (snapshot) => {
 //
 // options.includeAll : true pour un admin/responsable (tout l'effectif
 // est listé, afin de pouvoir convoquer n'importe quel joueur).
+// Un match est considéré comme joué dès qu'un score est saisi
+// ou que son coup d'envoi est déjà passé.
+function matchHasBeenPlayed(m) {
+    if (!m) return false;
+
+    const hasScore = m.scoreHome !== undefined && m.scoreHome !== null && String(m.scoreHome).trim() !== ''
+        && m.scoreAway !== undefined && m.scoreAway !== null && String(m.scoreAway).trim() !== '';
+    if (hasScore) return true;
+
+    if (!m.date) return false;
+    const start = new Date(m.date + 'T' + (m.heure || '14:30'));
+    return !isNaN(start.getTime()) && start < new Date();
+}
+
+function matchStartTimestamp(m) {
+    if (!m || !m.date) return Number.MAX_SAFE_INTEGER;
+    const t = new Date(m.date + 'T' + (m.heure || '14:30')).getTime();
+    return isNaN(t) ? Number.MAX_SAFE_INTEGER : t;
+}
+
+// Non joués d'abord (ordre chronologique), puis déjà joués (ordre chronologique).
+function sortMatchesUpcomingFirst(list) {
+    return (list || []).slice().sort((a, b) => {
+        const playedA = matchHasBeenPlayed(a) ? 1 : 0;
+        const playedB = matchHasBeenPlayed(b) ? 1 : 0;
+        if (playedA !== playedB) return playedA - playedB;
+        return matchStartTimestamp(a) - matchStartTimestamp(b);
+    });
+}
+
 function getMatchPlayers(m, options) {
     const opts = options || {};
     const includeAll = !!opts.includeAll;
@@ -7308,6 +7900,229 @@ function buildCarpoolSummary(m, playersForMatch) {
         transportClass,
         closed
     };
+}
+
+// --- Cartes visuelles de l'onglet Infos Match ---
+function infoChipTone(tone) {
+    const tones = {
+        sky: 'bg-sky-50 border-sky-200 text-sky-700',
+        emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+        amber: 'bg-amber-50 border-amber-200 text-amber-800',
+        orange: 'bg-orange-50 border-orange-200 text-orange-800',
+        red: 'bg-red-50 border-red-200 text-red-700',
+        slate: 'bg-slate-50 border-slate-200 text-slate-600'
+    };
+    return tones[tone] || tones.slate;
+}
+
+function infoNameChip(name, tone) {
+    return `<span class="inline-flex items-center px-2 py-1 rounded-lg border text-[11px] font-bold ${infoChipTone(tone)}">${name}</span>`;
+}
+
+// Trie des joueurs par prénom (accents et casse ignorés) et renvoie leurs noms affichés.
+// On s'appuie sur les parties du nom pour rester juste quel que soit l'ordre d'affichage
+// choisi pour l'équipe (« NOM Prénom » ou « Prénom NOM »).
+function infoSortByFirstName(players) {
+    const firstNameKey = (p) => {
+        const { prenom, nom } = getPlayerNameParts(p);
+        return String(prenom || nom || p.name || '');
+    };
+
+    return players
+        .slice()
+        .sort((a, b) =>
+            firstNameKey(a).localeCompare(firstNameKey(b), 'fr', { sensitivity: 'base' })
+            || String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' })
+        )
+        .map(p => p.name);
+}
+
+function infoNameGroup(title, icon, names, tone) {
+    if (!names || !names.length) return '';
+    return `
+        <div>
+            <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">${icon} ${title} (${names.length})</p>
+            <div class="flex flex-wrap gap-1">${names.map(n => infoNameChip(n, tone)).join('')}</div>
+        </div>`;
+}
+
+function infoStatTile(value, label, tone) {
+    const tones = {
+        sky: 'bg-sky-50 border-sky-100 text-sky-900',
+        emerald: 'bg-emerald-50 border-emerald-100 text-emerald-900',
+        amber: 'bg-amber-50 border-amber-100 text-amber-900',
+        red: 'bg-red-50 border-red-100 text-red-900',
+        slate: 'bg-slate-50 border-slate-200 text-slate-700'
+    };
+    return `<div class="rounded-lg border px-1.5 py-2 text-center ${tones[tone] || tones.slate}">
+        <div class="text-base font-extrabold leading-none">${value}</div>
+        <div class="mt-1 text-[9px] font-bold uppercase tracking-wide opacity-70 leading-tight">${label}</div>
+    </div>`;
+}
+
+function renderConvocationOverviewCard(m, playerItems, convokedCount, targetConvoked) {
+    const convoked = [];
+    const indisponibles = [];
+    const nonConvoked = [];
+
+    playerItems.forEach(({ p }) => {
+        const status = m.convocations[p.id] || 'none';
+        if (status === 'convoke') convoked.push(p);
+        else if (status === 'indisponible') indisponibles.push(p);
+        else if (status === 'nonconvoke') nonConvoked.push(p);
+    });
+
+    const target = targetConvoked > 0 ? targetConvoked : 0;
+    const pct = target ? Math.min(100, Math.round((convokedCount / target) * 100)) : 0;
+    const isOver = convokedCount > target;
+    const isUnder = convokedCount < target;
+    const barColor = isOver ? 'bg-red-500' : isUnder ? 'bg-amber-500' : 'bg-sky-500';
+    const pillClass = isOver ? 'bg-red-100 text-red-700' : isUnder ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-700';
+    const pillLabel = isOver ? '⚠️ Trop de convoqués' : isUnder ? '⏳ Incomplet' : '✅ Complet';
+
+    return `
+        <div class="flex items-start justify-between gap-2">
+            <div>
+                <h3 class="text-sm font-extrabold text-slate-800">📋 Convocations</h3>
+                <p class="text-[11px] text-slate-500">Répartition de l'effectif pour ce match</p>
+            </div>
+            <span class="text-[10px] font-extrabold px-2 py-1 rounded-lg whitespace-nowrap ${pillClass}">${pillLabel}</span>
+        </div>
+
+        <div class="mt-3 flex items-end justify-between">
+            <p class="text-2xl font-extrabold text-slate-800 leading-none">${convokedCount}<span class="text-xs font-bold text-slate-400"> / ${target}</span></p>
+            <p class="text-[11px] font-bold text-slate-400">${pct}% de l'objectif</p>
+        </div>
+        <div class="mt-1.5 h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div class="h-full rounded-full ${barColor} transition-all" style="width:${pct}%"></div>
+        </div>
+
+        <div class="mt-3 space-y-2">
+            ${convoked.length ? infoNameGroup('Convoqués', '✅', infoSortByFirstName(convoked), 'sky') : '<p class="text-[11px] italic text-slate-400">Aucun joueur convoqué pour l\'instant.</p>'}
+            ${infoNameGroup('Indisponibles', '🟠', infoSortByFirstName(indisponibles), 'orange')}
+            ${infoNameGroup('Non convoqués', '⚪', infoSortByFirstName(nonConvoked), 'slate')}
+        </div>`;
+}
+
+function renderConvocationHero(m, info) {
+    const target = info.targetConvoked || 0;
+    const pct = target ? Math.min(100, Math.round((info.convokedCount / target) * 100)) : 0;
+    const missing = Math.max(0, target - info.convokedCount);
+    const statusPill = m.isValidated ? '🔒 Verrouillée' : '✏️ Brouillon';
+    const heure = m.heure || '14:30';
+    const lieu = m.location || 'Domicile';
+
+    return `
+        <div class="conv-hero" style="--team:${info.teamHex}">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="conv-hero-tag">${info.teamName} · Convocations</p>
+                    <p class="conv-hero-title">${m.opponent || 'Adversaire à définir'}</p>
+                    <p class="conv-hero-sub">${info.formattedDate} · ${heure} · ${lieu}</p>
+                </div>
+                <span class="conv-hero-pill">${statusPill}</span>
+            </div>
+
+            <div class="conv-hero-stats">
+                <div class="conv-hero-stat">
+                    <span class="conv-hero-stat-value">${info.convokedCount}<span class="conv-hero-stat-target">/${target}</span></span>
+                    <span class="conv-hero-stat-label">Convoqués</span>
+                </div>
+                <div class="conv-hero-stat">
+                    <span class="conv-hero-stat-value">${missing}</span>
+                    <span class="conv-hero-stat-label">À compléter</span>
+                </div>
+                <div class="conv-hero-stat">
+                    <span class="conv-hero-stat-value">${info.indispoCount}</span>
+                    <span class="conv-hero-stat-label">Indispo</span>
+                </div>
+                <div class="conv-hero-stat">
+                    <span class="conv-hero-stat-value">${info.nonConvokedCount}</span>
+                    <span class="conv-hero-stat-label">Non convoqués</span>
+                </div>
+            </div>
+
+            <div class="conv-hero-bar"><span style="width:${pct}%"></span></div>
+        </div>`;
+}
+
+function renderCarpoolOverviewCard(summary, m, role) {
+    const answered = summary.responses;
+    const pct = summary.totalConvoked ? Math.round((answered / summary.totalConvoked) * 100) : 0;
+    const barColor = pct === 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-sky-500' : 'bg-amber-500';
+
+    return `
+        <div class="flex items-start justify-between gap-2">
+            <div>
+                <h3 class="text-sm font-extrabold text-slate-800">🚗 Réponses covoiturage</h3>
+                <p class="text-[11px] text-slate-500">Réponses des joueurs convoqués</p>
+            </div>
+            <span class="text-[10px] font-extrabold px-2 py-1 rounded-lg whitespace-nowrap ${summary.closed ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'}">${summary.closed ? '🔒 Confirmé' : '⏳ En cours'}</span>
+        </div>
+
+        <div class="mt-3 flex items-end justify-between">
+            <p class="text-2xl font-extrabold text-slate-800 leading-none">${answered}<span class="text-xs font-bold text-slate-400"> / ${summary.totalConvoked} réponses</span></p>
+            <p class="text-[11px] font-bold text-slate-400">${pct}%</p>
+        </div>
+        <div class="mt-1.5 h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div class="h-full rounded-full ${barColor} transition-all" style="width:${pct}%"></div>
+        </div>
+        <p class="mt-2 text-[11px] font-bold ${summary.transportClass}">${summary.transportStatus}</p>
+
+        <div class="mt-3 grid grid-cols-3 gap-2">
+            ${infoStatTile(summary.drivers, 'Conducteurs', 'sky')}
+            ${infoStatTile(summary.passengers, 'Passagers', 'emerald')}
+            ${infoStatTile(summary.directs, 'Direct', 'amber')}
+            ${infoStatTile(summary.absents, 'Absents', 'red')}
+            ${infoStatTile(summary.seats, 'Places', 'sky')}
+            ${infoStatTile(summary.pending, 'En attente', 'slate')}
+        </div>
+
+        <details class="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <summary class="cursor-pointer select-none text-[11px] font-bold text-slate-600">Détail des réponses par joueur</summary>
+            <div class="mt-2 space-y-2">
+                ${infoNameGroup('Conducteurs', '🚗', summary.driverList, 'sky')}
+                ${infoNameGroup('Conducteurs sans place', '🚙', summary.driverNoSeatList, 'slate')}
+                ${infoNameGroup('Attribution', '🚗→👤', summary.driverAssignments.map(a => `${a.name} → ${a.passengerNames.length ? a.passengerNames.join(', ') : '—'}`), 'emerald')}
+                ${infoNameGroup('À placer', '🚫', summary.toPlaceList, 'red')}
+                ${infoNameGroup('Passagers', '👤', summary.passengerList, 'emerald')}
+                ${infoNameGroup('Direct', '📍', summary.directList, 'amber')}
+                ${infoNameGroup('Absents', '❌', summary.absentList, 'red')}
+                ${infoNameGroup('En attente', '⏳', summary.pendingList, 'slate')}
+            </div>
+        </details>
+
+        ${m.carpoolId ? `
+        <div class="mt-3 flex flex-wrap gap-2">
+            <button onclick="openCarpoolQR('${m.id}')" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold rounded-lg">🏷️ QR & lien</button>
+            ${(role === 'coach' || role === 'admin' || role === 'responsable') ? (summary.closed ? `<button onclick="setCarpoolClosed('${m.id}', false)" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold rounded-lg">🔓 Rouvrir</button>` : `<button onclick="setCarpoolClosed('${m.id}', true)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg"><i class="fa-solid fa-lock mr-1"></i>Clôturer le covoiturage</button>`) : ''}
+            <button onclick="copyCarpoolRecap('${m.id}')" class="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-[11px] font-bold rounded-lg">📤 Récap WhatsApp</button>
+        </div>` : ''}
+    `;
+}
+
+// Affiche (ou masque) le bouton d'ouverture de la page covoiturage publique
+// depuis l'en-tête de l'onglet Transport.
+function updateTransportCarpoolLink(m) {
+    const link = document.getElementById('transport-covoiturage-link');
+    if (!link) return;
+
+    if (!m) {
+        link.style.display = 'none';
+        link.removeAttribute('href');
+        return;
+    }
+
+    // Certains matchs (anciens ou dupliqués) n'ont pas encore d'identifiant de
+    // covoiturage : on en crée un stable et on le sauvegarde pour que la page
+    // publique puisse retrouver le match.
+    if (!m.carpoolId) {
+        m.carpoolId = 'CP_' + String(m.id || Date.now()).replace(/[^A-Za-z0-9_-]/g, '_');
+        try { saveStateToFirebase(); } catch (err) { console.error('carpoolId', err); }
+    }
+
+    link.href = `covoiturage.html?id=${encodeURIComponent(m.carpoolId)}`;
+    link.style.display = 'inline-flex';
 }
 
 function renderTransportTab(data) {
@@ -10310,6 +11125,1035 @@ function maybeAutoSyncFFF() {
 }
 
 
+// ============================================================
+//  MODULE : DISTRICT HAUTE-GARONNE
+//  Classements, calendrier et résultats officiels, calculés à
+//  partir des matchs de la compétition renvoyés par l'API FFF
+//  (même source que la synchronisation FFF).
+// ============================================================
+
+const DISTRICT_CACHE_TTL = 15 * 60 * 1000;
+const DISTRICT_CACHE_PREFIX = "district_cache_v1_";
+
+let districtState = {
+    competitions: [],
+    category: "",
+    cpNo: "",
+    matches: [],
+    loading: false,
+    error: "",
+    source: "",
+    phaseNo: "",
+    pouleNo: "",
+    standings: null,
+    lastSync: 0,
+    lastAttempt: 0
+};
+
+const DISTRICT_MANUAL_KEY = "district_manual_cps_v1";
+
+function districtManualCpList() {
+    try {
+        const raw = sessionStorage.getItem(DISTRICT_MANUAL_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list.map(String) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function districtAddManualCp(ref) {
+    const key = [String(ref.cpNo), ref.phaseNo || "", ref.pouleNo || ""].join(":");
+    const list = new Set(districtManualCpList());
+    list.add(key);
+    try {
+        sessionStorage.setItem(DISTRICT_MANUAL_KEY, JSON.stringify([...list]));
+    } catch (e) {
+        // Stockage indisponible : la compétition reste en mémoire pour la session.
+    }
+}
+
+function districtParseCompetitionRef(value) {
+    const text = String(value || "").trim();
+    const cpMatch = text.match(/engagement\/(\d+)/i) || text.match(/\b(\d{4,7})\b/);
+    const phaseMatch = text.match(/\/phase\/(\d+)(?:\/(\d+))?/i);
+
+    return {
+        cpNo: cpMatch ? cpMatch[1] : "",
+        phaseNo: phaseMatch ? phaseMatch[1] : "",
+        pouleNo: phaseMatch && phaseMatch[2] ? phaseMatch[2] : ""
+    };
+}
+
+// --- Extraction tolérante des réponses FFF (champs variables selon les endpoints) ---
+
+function fffCollectObjects(root, predicate, limit) {
+    const found = [];
+    const seen = new Set();
+
+    const walk = (node, depth) => {
+        if (!node || depth > 10 || found.length >= limit) return;
+        if (Array.isArray(node)) {
+            node.forEach(item => walk(item, depth + 1));
+            return;
+        }
+        if (typeof node !== "object") return;
+        if (seen.has(node)) return;
+        seen.add(node);
+        if (predicate(node)) {
+            found.push(node);
+            return;
+        }
+        Object.keys(node).forEach(key => walk(node[key], depth + 1));
+    };
+
+    walk(root, 0);
+    return found;
+}
+
+function fffObjName(obj) {
+    if (!obj) return "";
+    if (typeof obj === "string") return obj.trim();
+
+    const candidates = [
+        obj.nom, obj.name, obj.label, obj.libelle,
+        obj.short_name, obj.shortName,
+        obj.equipe && (obj.equipe.nom || obj.equipe.name || obj.equipe.short_name),
+        obj.club && (obj.club.nom || obj.club.name || obj.club.short_name)
+    ];
+
+    for (const value of candidates) {
+        if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return "";
+}
+
+function fffNum(obj, keys, fallback) {
+    if (!obj) return fallback === undefined ? 0 : fallback;
+    for (const key of keys) {
+        const value = obj[key];
+        if (value === null || value === undefined || value === "") continue;
+        const num = Number(value);
+        if (isFinite(num)) return num;
+    }
+    return fallback === undefined ? 0 : fallback;
+}
+
+function fffSide(obj, keys) {
+    if (!obj) return null;
+    for (const key of keys) {
+        const value = obj[key];
+        if (value && typeof value === "object" && !Array.isArray(value)) return value;
+    }
+    return null;
+}
+
+function fffIsClubSide(side) {
+    if (!side) return false;
+    const club = side.club || (side.equipe && side.equipe.club);
+    return !!(club && Number(club.cl_no) === Number(state.fffClubNo || 18707));
+}
+
+function fffExtractStandings(data) {
+    const clubNo = Number(state.fffClubNo || 18707);
+
+    const rows = fffCollectObjects(data, obj => {
+        const points = fffNum(obj, ["points", "pts", "nb_points", "point"], null);
+        const played = fffNum(obj, ["joue", "j", "matchs_joues", "nb_matchs", "journees"], null);
+        const team = fffObjName(obj.equipe) || fffObjName(obj.club) || fffObjName(obj);
+        return !!team && (points !== null || played !== null);
+    }, 60);
+
+    return rows.map(row => {
+        const teamObj = row.equipe || row.club || row;
+        const club = row.club || (teamObj && teamObj.club) || null;
+        const goalsFor = fffNum(row, ["buts_pour", "bp", "buts_marques", "buts_equipe"], 0);
+        const goalsAgainst = fffNum(row, ["buts_contre", "bc", "buts_encaisses"], 0);
+
+        return {
+            name: fffObjName(teamObj) || fffObjName(row) || "—",
+            isClub: !!(club && Number(club.cl_no) === clubNo),
+            points: fffNum(row, ["points", "pts", "nb_points", "point"], 0),
+            played: fffNum(row, ["joue", "j", "matchs_joues", "nb_matchs", "journees"], 0),
+            wins: fffNum(row, ["gagne", "g", "victoires", "nb_gagnes"], 0),
+            draws: fffNum(row, ["nul", "n", "nuls", "nb_nuls"], 0),
+            losses: fffNum(row, ["perdu", "p", "defaites", "nb_perdus"], 0),
+            goalsFor: goalsFor,
+            goalsAgainst: goalsAgainst,
+            diff: goalsFor - goalsAgainst
+        };
+    }).sort((a, b) =>
+        b.points - a.points
+        || b.diff - a.diff
+        || b.goalsFor - a.goalsFor
+        || a.name.localeCompare(b.name, "fr")
+    );
+}
+
+function fffExtractMatches(data) {
+    const raw = fffCollectObjects(data, obj => {
+        const home = fffSide(obj, ["home", "equipe1", "equipe_recevante", "recevant", "equipe_domicile"]);
+        const away = fffSide(obj, ["away", "equipe2", "equipe_visiteuse", "visiteur", "equipe_exterieur"]);
+        return !!(home && away);
+    }, 150);
+
+    const seen = new Set();
+    const matches = [];
+
+    raw.forEach(obj => {
+        const home = fffSide(obj, ["home", "equipe1", "equipe_recevante", "recevant", "equipe_domicile"]);
+        const away = fffSide(obj, ["away", "equipe2", "equipe_visiteuse", "visiteur", "equipe_exterieur"]);
+        if (!home || !away) return;
+
+        const date = obj.date || obj.ma_dat || obj.date_match || obj.date_rencontre || "";
+        const key = String(obj.ma_no || obj.id || (date + "|" + fffObjName(home) + "|" + fffObjName(away)));
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        matches.push({
+            ma_no: obj.ma_no || obj.id || key,
+            date: date,
+            time: obj.time || obj.heure || obj.ma_heure || "",
+            home: home,
+            away: away,
+            home_score: fffNum(obj, ["home_score", "score1", "buts1", "score_home", "buts_equipe1"], null),
+            away_score: fffNum(obj, ["away_score", "score2", "buts2", "score_away", "buts_equipe2"], null),
+            poule: obj.poule || null,
+            poule_journee: obj.poule_journee || obj.journee || null,
+            phase: obj.phase || null,
+            competition: obj.competition || null
+        });
+    });
+
+    return matches;
+}
+
+function fffExtractEngagements(data) {
+    const items = fffCollectObjects(data, obj => {
+        return !!(obj.cp_no || (obj.competition && obj.competition.cp_no));
+    }, 150);
+
+    const map = new Map();
+
+    items.forEach(obj => {
+        const comp = obj.competition || obj;
+        const cpNo = comp.cp_no || comp.cpNo;
+        if (!cpNo) return;
+
+        const key = String(cpNo);
+        if (map.has(key)) return;
+
+        const category = obj.categorie || obj.category || obj.category_label
+            || (obj.equipe && (obj.equipe.categorie || obj.equipe.category))
+            || "";
+
+        map.set(key, {
+            cp_no: key,
+            name: fffObjName(comp) || ("Compétition " + key),
+            categories: category ? [String(category)] : [],
+            poule: "",
+            matches: 0,
+            phaseNo: String(obj.phase_no || (obj.phase && (obj.phase.numero || obj.phase.no)) || ""),
+            pouleNo: String(obj.poule_no || (obj.poule && (obj.poule.numero || obj.poule.no)) || ""),
+            local: true
+        });
+    });
+
+    return [...map.values()];
+}
+
+async function fetchDistrictOfficial(ref) {
+    const cpNo = ref.cpNo;
+    const phaseNo = ref.phaseNo || "1";
+    const poules = ref.pouleNo ? [String(ref.pouleNo)] : ["1", "2", "3"];
+
+    let standings = null;
+    let matches = [];
+    let usedPoule = ref.pouleNo || "";
+
+    const safeJson = async (path) => {
+        try {
+            return await fffFetchJson(path);
+        } catch (err) {
+            console.warn("FFF " + path + " :", err.message);
+            return null;
+        }
+    };
+
+    for (const pouleNo of poules) {
+        if (!standings) {
+            const data = await safeJson("/api/compets/" + cpNo + "/phases/" + phaseNo + "/poules/" + pouleNo + "/classement_journees");
+            if (data) {
+                const rows = fffExtractStandings(data);
+                if (rows.length) {
+                    standings = { name: "Poule " + pouleNo, rows: rows };
+                    usedPoule = pouleNo;
+                }
+            }
+        }
+
+        if (!matches.length) {
+            const result = await safeJson("/api/compets/" + cpNo + "/phases/" + phaseNo + "/poules/" + pouleNo + "/resultat");
+            const agenda = await safeJson("/api/compets/" + cpNo + "/phases/" + phaseNo + "/poules/" + pouleNo + "/calendrier");
+            matches = fffExtractMatches(result).concat(fffExtractMatches(agenda));
+            if (matches.length && !usedPoule) usedPoule = pouleNo;
+        }
+
+        if (standings && matches.length) break;
+    }
+
+    return { standings: standings, matches: matches, phaseNo: phaseNo, pouleNo: usedPoule };
+}
+
+async function fetchFFFClubEngagements() {
+    const clubNo = state.fffClubNo || 18707;
+    const data = await fffFetchJson("/api/clubs/" + clubNo + "/equipes.json?filter=");
+    return fffExtractEngagements(data);
+}
+
+function districtLocalCompetitions() {
+    const list = [];
+    const seen = new Set();
+
+    const push = (cpNo, name, manual, phaseNo, pouleNo) => {
+        const key = String(cpNo || "");
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        list.push({
+            cp_no: key,
+            name: name || ("Compétition " + key),
+            categories: [],
+            poule: "",
+            matches: 0,
+            local: true,
+            manual: !!manual,
+            phaseNo: String(phaseNo || ""),
+            pouleNo: String(pouleNo || "")
+        });
+    };
+
+    Object.entries(state.fffLinks || {}).forEach(([cpNo, link]) => {
+        push(cpNo, link && link.competitionName, false);
+    });
+
+    Object.keys(state.fffCompJson || {}).forEach(cpNo => {
+        if (cpNo && String(state.fffCompJson[cpNo] || "").trim()) push(cpNo, "", false);
+    });
+
+    districtManualCpList().forEach(item => {
+        const parts = String(item).split(":");
+        push(parts[0], "", true, parts[1], parts[2]);
+    });
+
+    return list;
+}
+
+function districtMergeCompetitions(primary, secondary, previous) {
+    const merged = [];
+    const seen = new Set();
+
+    [...(primary || []), ...(previous || []), ...(secondary || [])].forEach(comp => {
+        if (!comp) return;
+        const key = String(comp.cp_no || "");
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        merged.push({ ...comp, cp_no: key });
+    });
+
+    return merged.sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""), "fr", { numeric: true })
+    );
+}
+
+function addDistrictCompetitionFromInput() {
+    const input = document.getElementById("district-cp-input");
+    const ref = districtParseCompetitionRef(input ? input.value : "");
+
+    if (!ref.cpNo) {
+        showToast("⚠️ Colle l'URL de la compétition (epreuves.fff.fr/…/engagement/454584-…/phase/1/7) ou son numéro", "error");
+        return;
+    }
+
+    districtAddManualCp(ref);
+
+    districtState.competitions = districtMergeCompetitions([], [{
+        cp_no: ref.cpNo,
+        name: "Compétition " + ref.cpNo,
+        categories: [],
+        poule: "",
+        matches: 0,
+        local: true,
+        manual: true,
+        phaseNo: ref.phaseNo,
+        pouleNo: ref.pouleNo
+    }], districtState.competitions || []);
+
+    if (input) input.value = "";
+
+    districtState.cpNo = ref.cpNo;
+    districtState.phaseNo = ref.phaseNo;
+    districtState.pouleNo = ref.pouleNo;
+    districtState.matches = [];
+    districtState.standings = null;
+    districtState.error = "";
+    renderDistrict();
+    loadDistrictMatches(false);
+}
+
+function districtEsc(value) {
+    return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function districtCacheRead(cpNo) {
+    try {
+        const raw = sessionStorage.getItem(DISTRICT_CACHE_PREFIX + cpNo);
+        if (!raw) return null;
+        const cached = JSON.parse(raw);
+        if (!cached || !Array.isArray(cached.matches)) return null;
+        if (Date.now() - (cached.at || 0) > DISTRICT_CACHE_TTL) return null;
+        return cached;
+    } catch (e) {
+        return null;
+    }
+}
+
+function districtCacheWrite(cpNo, matches, extra) {
+    try {
+        sessionStorage.setItem(DISTRICT_CACHE_PREFIX + cpNo, JSON.stringify(
+            Object.assign({ at: Date.now(), matches: matches }, extra || {})
+        ));
+    } catch (e) {
+        // Quota ou navigation privée : le cache reste optionnel.
+    }
+}
+
+function districtCategories() {
+    const set = new Set();
+    (districtState.competitions || []).forEach(comp => {
+        (comp.categories || []).forEach(cat => {
+            if (cat) set.add(String(cat));
+        });
+    });
+    return [...set].sort((a, b) => a.localeCompare(b, "fr", { numeric: true }));
+}
+
+function districtCompetitionsForCategory() {
+    const all = districtState.competitions || [];
+    const category = districtState.category;
+    if (!category) return all;
+    return all.filter(comp => {
+        if (comp && comp.manual) return true;
+        const haystack = ((comp.categories || []).join(" ") + " " + String(comp.name || "")).toUpperCase();
+        return haystack.indexOf(category.toUpperCase()) !== -1;
+    });
+}
+
+function districtSideName(side) {
+    if (!side) return "—";
+    return side.short_name
+        || side.short_name_federation
+        || side.short_name_ligue
+        || side.name
+        || side.nom
+        || (side.equipe && (side.equipe.short_name || side.equipe.nom || side.equipe.name))
+        || "—";
+}
+
+function districtSideKey(side) {
+    if (!side) return "";
+    const club = side.club || (side.equipe && side.equipe.club) || null;
+    const clubNo = club && club.cl_no ? club.cl_no : "";
+    const teamNo = side.equipe && side.equipe.eq_no ? side.equipe.eq_no : "";
+    return String(clubNo) + "|" + String(teamNo || side.short_name || side.name || side.nom || districtSideName(side));
+}
+
+function districtIsClubSide(side) {
+    return fffIsClubSide(side);
+}
+
+function districtScore(evt) {
+    if (!evt) return null;
+    const rawHome = evt.home_score;
+    const rawAway = evt.away_score;
+    if (rawHome === null || rawHome === undefined || rawHome === "") return null;
+    if (rawAway === null || rawAway === undefined || rawAway === "") return null;
+    const home = Number(rawHome);
+    const away = Number(rawAway);
+    if (!isFinite(home) || !isFinite(away)) return null;
+    return [home, away];
+}
+
+function districtMatchDate(evt) {
+    return evt && evt.date ? String(evt.date).slice(0, 10) : "";
+}
+
+function districtFormatDate(evt) {
+    const raw = districtMatchDate(evt);
+    if (!raw) return "Date à confirmer";
+    const date = new Date(raw + "T12:00:00");
+    if (isNaN(date.getTime())) return raw;
+    return date.toLocaleDateString("fr-FR", {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+    });
+}
+
+function districtMatchLabel(evt) {
+    return districtSideName(evt && evt.home) + " — " + districtSideName(evt && evt.away);
+}
+
+function computeDistrictStandings(matches) {
+    const poules = new Map();
+
+    (matches || []).forEach(evt => {
+        const score = districtScore(evt);
+        if (!score) return;
+
+        const phaseName = evt.phase && evt.phase.name ? String(evt.phase.name) : "";
+        const pouleName = (evt.poule && evt.poule.name) || "Poule unique";
+        const groupName = phaseName ? phaseName + " · " + pouleName : pouleName;
+        if (!poules.has(groupName)) poules.set(groupName, new Map());
+        const table = poules.get(groupName);
+
+        const addTeam = (side, goalsFor, goalsAgainst) => {
+            const key = districtSideKey(side);
+            if (!key) return;
+
+            let row = table.get(key);
+            if (!row) {
+                row = {
+                    key: key,
+                    name: districtSideName(side),
+                    isClub: districtIsClubSide(side),
+                    played: 0,
+                    wins: 0,
+                    draws: 0,
+                    losses: 0,
+                    goalsFor: 0,
+                    goalsAgainst: 0
+                };
+                table.set(key, row);
+            }
+
+            row.played++;
+            row.goalsFor += goalsFor;
+            row.goalsAgainst += goalsAgainst;
+
+            if (goalsFor > goalsAgainst) row.wins++;
+            else if (goalsFor === goalsAgainst) row.draws++;
+            else row.losses++;
+
+            if (districtIsClubSide(side)) row.isClub = true;
+        };
+
+        addTeam(evt.home, score[0], score[1]);
+        addTeam(evt.away, score[1], score[0]);
+    });
+
+    return [...poules.entries()].map(([name, table]) => {
+        const rows = [...table.values()].map(row => ({
+            ...row,
+            diff: row.goalsFor - row.goalsAgainst,
+            // Barème FFF amateur : victoire 4, nul 2, défaite 1.
+            points: row.wins * 4 + row.draws * 2 + row.losses
+        }));
+
+        rows.sort((a, b) =>
+            b.points - a.points
+            || b.diff - a.diff
+            || b.goalsFor - a.goalsFor
+            || a.name.localeCompare(b.name, "fr")
+        );
+
+        return { name: name, rows: rows };
+    }).sort((a, b) => a.name.localeCompare(b.name, "fr"));
+}
+
+function districtStatusText() {
+    if (districtState.error) return "❌ " + districtState.error;
+    if (districtState.loading) return "⏳ Chargement des données du district…";
+    if (!(districtState.competitions || []).length) {
+        return "Aucune compétition détectée pour le moment. Cliquez sur « Actualiser ».";
+    }
+    if (!districtState.cpNo) return "";
+    const when = districtState.lastSync
+        ? " · Mis à jour le " + new Date(districtState.lastSync).toLocaleString("fr-FR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+        })
+        : "";
+    const source = districtState.source === "official"
+        ? " · classement officiel" + (districtState.pouleNo ? " (poule " + districtState.pouleNo + ")" : "")
+        : districtState.source === "manual"
+            ? " · JSON FFF collé"
+            : districtState.source === "live"
+                ? " · résultats FFF"
+                : "";
+    return "Source officielle FFF · " + (districtState.matches || []).length + " match(s)" + source + when;
+}
+
+function updateDistrictStatus(text) {
+    const el = document.getElementById("district-status");
+    if (el) el.textContent = text || "";
+}
+
+function renderDistrict() {
+    const categorySelect = document.getElementById("district-category-filter");
+    const competitionSelect = document.getElementById("district-competition-filter");
+    if (!categorySelect || !competitionSelect) return;
+
+    districtState.competitions = districtMergeCompetitions([], districtLocalCompetitions(), districtState.competitions || []);
+
+    const categories = districtCategories();
+    if (!districtState.category && categories.length) {
+        const u14 = categories.find(cat => cat.toUpperCase().indexOf("U14") !== -1);
+        districtState.category = u14 || categories[0];
+    }
+
+    categorySelect.innerHTML = categories.length
+        ? categories.map(cat => `<option value="${districtEsc(cat)}" ${cat === districtState.category ? "selected" : ""}>${districtEsc(cat)}</option>`).join("")
+        : `<option value="">Toutes les catégories</option>`;
+
+    const competitions = districtCompetitionsForCategory();
+    if (!districtState.cpNo && competitions.length) {
+        const linked = competitions.find(comp => state.fffLinks && state.fffLinks[comp.cp_no]);
+        districtState.cpNo = String((linked || competitions[0]).cp_no);
+    }
+
+    competitionSelect.innerHTML = competitions.length
+        ? competitions.map(comp => {
+            const label = comp.name + (comp.poule ? " · " + comp.poule : "");
+            return `<option value="${comp.cp_no}" ${String(comp.cp_no) === String(districtState.cpNo) ? "selected" : ""}>${districtEsc(label)}</option>`;
+        }).join("")
+        : `<option value="">— Aucune compétition —</option>`;
+
+    const subtitle = document.getElementById("district-subtitle");
+    if (subtitle) {
+        const comp = competitions.find(c => String(c.cp_no) === String(districtState.cpNo));
+        subtitle.textContent = comp
+            ? comp.name + (comp.poule ? " · " + comp.poule : "")
+            : "Classements, calendrier et résultats officiels";
+    }
+
+    const urlEl = document.getElementById("district-json-url");
+    if (urlEl) {
+        if (districtState.cpNo) {
+            const now = new Date();
+            const seasonYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+            urlEl.textContent = "https://api-dofa.fff.fr/api/match_entities?competition.cp_no="
+                + districtState.cpNo
+                + "&ma_dat[after]=" + seasonYear + "-06-01";
+        } else {
+            urlEl.textContent = "Choisis d'abord une compétition";
+        }
+    }
+
+    updateDistrictStatus(districtStatusText());
+    renderDistrictStandings();
+    renderDistrictCalendar();
+    renderDistrictResults();
+}
+
+function renderDistrictStandings() {
+    const container = document.getElementById("district-standings");
+    if (!container) return;
+
+    const official = districtState.standings;
+    const tables = official && Array.isArray(official.rows) && official.rows.length
+        ? [{ name: official.name || "Classement officiel", rows: official.rows, official: true }]
+        : computeDistrictStandings(districtState.matches);
+
+    if (!tables.length) {
+        container.innerHTML = `
+            <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 text-center">
+                <p class="text-sm font-bold text-slate-700">Classement indisponible</p>
+                <p class="text-xs text-slate-500 mt-1">Les résultats officiels de cette compétition ne sont pas encore publiés.</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = tables.map(table => {
+        const rows = table.rows.map((row, index) => `
+            <tr class="${row.isClub ? "bg-sky-50" : ""}">
+                <td class="px-2 py-2 text-center font-bold text-slate-500">${index + 1}</td>
+                <td class="px-2 py-2 font-semibold ${row.isClub ? "text-sky-800" : "text-slate-700"}">
+                    ${districtEsc(row.name)}${row.isClub ? ' <span class="text-[9px] font-extrabold uppercase text-sky-600">nous</span>' : ""}
+                </td>
+                <td class="px-2 py-2 text-center font-extrabold text-slate-800">${row.points}</td>
+                <td class="px-2 py-2 text-center text-slate-600">${row.played}</td>
+                <td class="px-2 py-2 text-center text-slate-600">${row.wins}</td>
+                <td class="px-2 py-2 text-center text-slate-600">${row.draws}</td>
+                <td class="px-2 py-2 text-center text-slate-600">${row.losses}</td>
+                <td class="px-2 py-2 text-center text-slate-600">${row.goalsFor}</td>
+                <td class="px-2 py-2 text-center text-slate-600">${row.goalsAgainst}</td>
+                <td class="px-2 py-2 text-center font-semibold ${row.diff > 0 ? "text-emerald-600" : row.diff < 0 ? "text-red-500" : "text-slate-500"}">${row.diff > 0 ? "+" : ""}${row.diff}</td>
+            </tr>
+        `).join("");
+
+        return `
+            <div class="bg-white rounded-xl card-shadow border border-slate-100 overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+                    <h3 class="text-sm font-bold text-slate-800">🏅 ${districtEsc(table.name)}</h3>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">${table.official ? "Classement officiel" : "Barème 4-2-1"}</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wider">
+                            <tr>
+                                <th class="px-2 py-2 text-center">#</th>
+                                <th class="px-2 py-2 text-left">Équipe</th>
+                                <th class="px-2 py-2 text-center">Pts</th>
+                                <th class="px-2 py-2 text-center">J</th>
+                                <th class="px-2 py-2 text-center">G</th>
+                                <th class="px-2 py-2 text-center">N</th>
+                                <th class="px-2 py-2 text-center">P</th>
+                                <th class="px-2 py-2 text-center">BP</th>
+                                <th class="px-2 py-2 text-center">BC</th>
+                                <th class="px-2 py-2 text-center">Diff</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">${rows}</tbody>
+                    </table>
+                </div>
+            </div>`;
+    }).join("");
+}
+
+function districtMatchCard(evt, withScore) {
+    const score = districtScore(evt);
+    const isHome = districtIsClubSide(evt && evt.home);
+    const isAway = districtIsClubSide(evt && evt.away);
+    const highlight = isHome || isAway;
+    const journee = evt && evt.poule_journee && evt.poule_journee.number
+        ? "Journée " + evt.poule_journee.number
+        : "";
+    const time = evt && evt.time ? (parseFFFTime(evt.time) || evt.time) : "";
+
+    return `
+        <div class="p-3 rounded-xl border ${highlight ? "border-sky-200 bg-sky-50" : "border-slate-100 bg-slate-50"}">
+            <div class="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span>${districtEsc(districtFormatDate(evt))}${journee ? " · " + districtEsc(journee) : ""}</span>
+                <span>${highlight ? (isHome ? "Domicile" : "Extérieur") : ""}</span>
+            </div>
+            <div class="mt-1 flex items-center justify-between gap-2">
+                <p class="text-xs font-bold text-slate-800 min-w-0">${districtEsc(districtMatchLabel(evt))}</p>
+                ${withScore && score
+                    ? `<span class="shrink-0 text-sm font-extrabold text-slate-900 tabular-nums">${score[0]} - ${score[1]}</span>`
+                    : (time ? `<span class="shrink-0 text-xs font-bold text-slate-600">${districtEsc(time)}</span>` : "")}
+            </div>
+        </div>`;
+}
+
+function renderDistrictCalendar() {
+    const container = document.getElementById("district-calendar");
+    if (!container) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const upcoming = (districtState.matches || [])
+        .filter(evt => {
+            if (districtScore(evt)) return false;
+            const raw = districtMatchDate(evt);
+            if (!raw) return false;
+            const date = new Date(raw + "T12:00:00");
+            return !isNaN(date.getTime()) && date >= today;
+        })
+        .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))
+        .slice(0, 8);
+
+    container.innerHTML = upcoming.length
+        ? upcoming.map(evt => districtMatchCard(evt, false)).join("")
+        : `<p class="text-xs text-slate-500">Aucun match à venir pour cette compétition.</p>`;
+}
+
+function renderDistrictResults() {
+    const container = document.getElementById("district-results");
+    if (!container) return;
+
+    const played = (districtState.matches || [])
+        .filter(evt => !!districtScore(evt))
+        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+        .slice(0, 10);
+
+    container.innerHTML = played.length
+        ? played.map(evt => districtMatchCard(evt, true)).join("")
+        : `<p class="text-xs text-slate-500">Aucun résultat publié pour cette compétition.</p>`;
+}
+
+function districtManualMatches(cpNo) {
+    const raw = (state.fffCompJson || {})[String(cpNo)];
+    if (!raw || !String(raw).trim()) return [];
+    try {
+        const obj = JSON.parse(raw);
+        const list = Array.isArray(obj) ? obj : (obj && obj["hydra:member"]);
+        return Array.isArray(list) ? list : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+async function loadDistrictMatches(force) {
+    const cpNo = districtState.cpNo;
+    if (!cpNo) {
+        districtState.matches = [];
+        districtState.standings = null;
+        districtState.error = "";
+        renderDistrict();
+        return;
+    }
+
+    if (!force) {
+        const cached = districtCacheRead(cpNo);
+        if (cached) {
+            districtState.matches = cached.matches || [];
+            districtState.standings = cached.standings || null;
+            districtState.lastSync = cached.at || Date.now();
+            districtState.source = cached.source || "";
+            districtState.phaseNo = cached.phaseNo || districtState.phaseNo;
+            districtState.pouleNo = cached.pouleNo || districtState.pouleNo;
+            districtState.error = "";
+            renderDistrict();
+            return;
+        }
+    }
+
+    districtState.loading = true;
+    districtState.error = "";
+    renderDistrict();
+
+    try {
+        let matches = [];
+        let standings = null;
+        let source = "";
+        let usedPhase = districtState.phaseNo || "";
+        let usedPoule = districtState.pouleNo || "";
+
+        const selected = (districtState.competitions || []).find(c => String(c.cp_no) === String(cpNo));
+        if (!usedPhase && selected && selected.phaseNo) usedPhase = String(selected.phaseNo);
+        if (!usedPoule && selected && selected.pouleNo) usedPoule = String(selected.pouleNo);
+
+        // 1) Nouveaux endpoints officiels par phase/poule (données à jour).
+        if (usedPhase || usedPoule) {
+            const official = await fetchDistrictOfficial({
+                cpNo: cpNo,
+                phaseNo: usedPhase,
+                pouleNo: usedPoule
+            });
+
+            matches = official.matches || [];
+            standings = official.standings || null;
+            usedPhase = official.phaseNo || usedPhase;
+            usedPoule = official.pouleNo || usedPoule;
+            if (matches.length || standings) source = "official";
+        }
+
+        // 2) Ancien endpoint global de la compétition, puis JSON collé.
+        if (!matches.length) {
+            let liveError = null;
+            let fromManual = false;
+
+            try {
+                matches = await fetchFFFCompetitionMatches(Number(cpNo));
+            } catch (liveErr) {
+                liveError = liveErr;
+            }
+
+            if (!matches.length) {
+                matches = districtManualMatches(cpNo);
+                fromManual = matches.length > 0;
+            }
+
+            if (!matches.length && liveError) throw liveError;
+            source = fromManual ? "manual" : "live";
+        }
+
+        districtState.matches = Array.isArray(matches) ? matches : [];
+        districtState.standings = standings;
+        districtState.source = source;
+        districtState.phaseNo = usedPhase;
+        districtState.pouleNo = usedPoule;
+        districtState.lastSync = Date.now();
+        districtCacheWrite(cpNo, districtState.matches, {
+            standings: standings,
+            source: source,
+            phaseNo: usedPhase,
+            pouleNo: usedPoule
+        });
+    } catch (err) {
+        console.error("District : récupération des matchs impossible", err);
+        districtState.matches = [];
+        districtState.standings = null;
+        districtState.error = "Données de la compétition inaccessibles (" + err.message + "). Colle son JSON ci-dessous.";
+    } finally {
+        districtState.loading = false;
+        renderDistrict();
+    }
+}
+
+async function refreshDistrict(force) {
+    if (districtState.loading) return;
+
+    // Évite de relancer une tentative réseau à chaque synchronisation Firebase
+    // quand l'API est bloquée et qu'aucune compétition n'est connue.
+    if (!force && !(districtState.competitions || []).length) {
+        if (districtState.lastAttempt && Date.now() - districtState.lastAttempt < 60000) return;
+    }
+    districtState.lastAttempt = Date.now();
+
+    districtState.loading = true;
+    districtState.error = "";
+    updateDistrictStatus("⏳ Connexion au district…");
+
+    let remoteCompetitions = [];
+    let calendarError = null;
+
+    try {
+        if (force || !(districtState.competitions || []).length) {
+            try {
+                const calendar = await fetchFFFCalendar();
+                remoteCompetitions = remoteCompetitions.concat(fffGroupCompetitions(calendar));
+            } catch (calendarErr) {
+                calendarError = calendarErr;
+            }
+
+            try {
+                remoteCompetitions = remoteCompetitions.concat(await fetchFFFClubEngagements());
+            } catch (engErr) {
+                calendarError = calendarError || engErr;
+            }
+        }
+    } catch (err) {
+        calendarError = err;
+        console.warn("District : calendrier/engagements inaccessibles, utilisation des données locales", err);
+    }
+
+    districtState.competitions = districtMergeCompetitions(
+        remoteCompetitions,
+        districtLocalCompetitions(),
+        districtState.competitions || []
+    );
+
+    if (!districtState.competitions.length) {
+        districtState.error = "API FFF inaccessible depuis ce poste. Renseigne le n° de compétition ci-dessous, ou lance « node proxy-local.js ».";
+        if (calendarError) console.warn("District : " + calendarError.message);
+        districtState.loading = false;
+        renderDistrict();
+        return;
+    }
+
+    districtState.loading = false;
+
+    const categories = districtCategories();
+    if (!districtState.category && categories.length) {
+        const u14 = categories.find(cat => cat.toUpperCase().indexOf("U14") !== -1);
+        districtState.category = u14 || categories[0];
+    }
+
+    const previousCp = districtState.cpNo;
+    const competitions = districtCompetitionsForCategory();
+    if (!districtState.cpNo || !competitions.some(comp => String(comp.cp_no) === String(districtState.cpNo))) {
+        const linked = competitions.find(comp => state.fffLinks && state.fffLinks[comp.cp_no]);
+        districtState.cpNo = competitions.length ? String((linked || competitions[0]).cp_no) : "";
+    }
+
+    if (String(previousCp) !== String(districtState.cpNo)) {
+        districtState.phaseNo = "";
+        districtState.pouleNo = "";
+    }
+
+    const selectedComp = competitions.find(comp => String(comp.cp_no) === String(districtState.cpNo));
+    if (selectedComp && selectedComp.phaseNo) districtState.phaseNo = String(selectedComp.phaseNo);
+    if (selectedComp && selectedComp.pouleNo) districtState.pouleNo = String(selectedComp.pouleNo);
+
+    await loadDistrictMatches(!!force);
+}
+
+function saveDistrictJson() {
+    const textarea = document.getElementById("district-json-input");
+    const value = (textarea && textarea.value || "").trim();
+
+    if (!districtState.cpNo) {
+        showToast("⚠️ Choisis d'abord une compétition", "error");
+        return;
+    }
+
+    if (!value) {
+        showToast("⚠️ Colle le JSON de la compétition", "error");
+        return;
+    }
+
+    let matches = [];
+
+    try {
+        const obj = JSON.parse(value);
+        const list = Array.isArray(obj) ? obj : (obj && obj["hydra:member"]);
+        if (!Array.isArray(list) || list.length === 0) throw new Error("Aucun match dans ce JSON");
+        matches = list;
+    } catch (err) {
+        showToast("❌ JSON invalide : " + err.message, "error");
+        return;
+    }
+
+    state.fffCompJson = state.fffCompJson || {};
+    state.fffCompJson[districtState.cpNo] = value;
+    saveStateToFirebase();
+
+    if (textarea) textarea.value = "";
+
+    // Affichage immédiat : pas besoin d'attendre l'API (qui peut être bloquée).
+    districtState.matches = matches;
+    districtState.standings = null;
+    districtState.source = "manual";
+    districtState.lastSync = Date.now();
+    districtState.error = "";
+    districtCacheWrite(districtState.cpNo, matches);
+    renderDistrict();
+
+    showToast("✅ JSON enregistré : classement et résultats mis à jour");
+}
+
+function onDistrictCategoryChange(value) {
+    districtState.category = value || "";
+    districtState.cpNo = "";
+    districtState.phaseNo = "";
+    districtState.pouleNo = "";
+    districtState.matches = [];
+    districtState.standings = null;
+    districtState.error = "";
+
+    const competitions = districtCompetitionsForCategory();
+    if (competitions.length) {
+        const linked = competitions.find(comp => state.fffLinks && state.fffLinks[comp.cp_no]);
+        districtState.cpNo = String((linked || competitions[0]).cp_no);
+    }
+
+    renderDistrict();
+    if (districtState.cpNo) loadDistrictMatches(false);
+}
+
+function onDistrictCompetitionChange(value) {
+    const comp = (districtState.competitions || []).find(c => String(c.cp_no) === String(value));
+
+    districtState.cpNo = value || "";
+    districtState.phaseNo = comp && comp.phaseNo ? String(comp.phaseNo) : "";
+    districtState.pouleNo = comp && comp.pouleNo ? String(comp.pouleNo) : "";
+    districtState.matches = [];
+    districtState.standings = null;
+    districtState.error = "";
+    renderDistrict();
+    if (districtState.cpNo) loadDistrictMatches(false);
+}
+
 function openModalTeam(teamId = null) {
 
     const titleEl = document.getElementById('modal-team-title');
@@ -11380,6 +13224,20 @@ function getFirstName(player) {
         { key: '4222', label: '4-2-2-2' }
     ];
 
+    // Mini-terrain du sélecteur de formation : attaque vers la droite
+    function formationMiniPitch(system) {
+        const dots = getFormationSlots(system).map(pos =>
+            `<circle cx="${(100 - pos.y).toFixed(1)}" cy="${pos.x.toFixed(1)}" r="4.6"/>`
+        ).join('');
+
+        return `<svg class="comp-form-pitch" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><g fill="#fff">${dots}</g></svg>`;
+    }
+
+    // Abréviation d'un poste : DC1 -> DC, MDF2 -> MDF
+    function slotAbbreviation(slot) {
+        return String(slot || '').replace(/\d+$/, '');
+    }
+
     const JERSEY_PATH = 'M25 6 Q32 12 39 6 L52 13 L58 29 L46 35 L46 58 Q46 62 42 62 L22 62 Q18 62 18 58 L18 35 L6 29 L12 13 Z';
 
     // Un numéro doit rester lisible : on choisit blanc ou encre selon la clarté du maillot
@@ -11465,6 +13323,42 @@ function getFirstName(player) {
         const maxSubs = Math.min(3, Math.max(0, targetConvoked - 11));
         const placedCount = slots.filter(s => match.slotAssignments[s.slot]).length;
 
+        const popSlot = window.__compPopSlot || null;
+        window.__compPopSlot = null;
+        const animateFormation = !!window.__compAnimateFormation;
+        window.__compAnimateFormation = false;
+        document.body.classList.remove('comp-fullscreen-open');
+
+        const teamLabel = state.teams?.[match.team]?.name || match.team || 'Équipe';
+        const opponentLabel = match.opponent ? `vs ${match.opponent}` : '';
+        const matchDateLabel = match.date
+            ? new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+            : '';
+        const metaLine = [opponentLabel, matchDateLabel].filter(Boolean).join(' · ');
+        const formationLabel = FORMATIONS.find(f => f.key === formation)?.label || formation;
+        const placedPct = Math.round((placedCount / 11) * 100);
+        const subsOnSheet = Math.min(bench.length, maxSubs);
+
+        const returnTraining = window.compositionReturnTrainingId
+            ? state.trainings?.[window.compositionReturnTrainingId]
+            : null;
+
+        const returnBanner = returnTraining ? `
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border border-sky-200 bg-sky-50">
+                <div class="flex items-center gap-2 min-w-0">
+                    <i class="fa-solid fa-person-running text-sky-600" aria-hidden="true"></i>
+                    <p class="text-[11.5px] text-slate-700 truncate">
+                        Composition ouverte depuis la séance
+                        <strong>${returnTraining.title || 'sans titre'}</strong>
+                    </p>
+                </div>
+                <button type="button" onclick="backToTrainingFromComposition()"
+                        class="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-sky-200 text-sky-700 text-[11px] font-bold hover:bg-sky-100 flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                    Retour à la séance
+                </button>
+            </div>` : '';
+
         const duplicates = Object.entries(jerseys)
             .filter(([, j]) => j.duplicate)
             .map(([id]) => squadById.get(id))
@@ -11476,71 +13370,111 @@ function getFirstName(player) {
             const player = playerId ? squadById.get(playerId) : null;
             const jersey = player ? jerseys[player.id] : null;
             const label = getSlotLabel(pos.slot);
+            const abbr = slotAbbreviation(pos.slot);
             const style = `--px:${pos.x}%;--py:${pos.y}%;--lx:${(100 - pos.y).toFixed(2)}%;--ly:${pos.x}%;`;
 
             if (!player) {
                 return `
                 <button type="button" class="pitch-slot" style="${style}"
                         onclick="openPlayerPicker('${pos.slot}')"
+                        title="${label}"
                         aria-label="Placer un joueur : ${label}">
-                    <span class="slot-empty"><i class="fa-solid fa-plus" aria-hidden="true"></i></span>
-                    <span class="pitch-name">${label}</span>
+                    <span class="slot-empty">${abbr}</span>
                 </button>`;
             }
 
             return `
-                <button type="button" class="pitch-slot" style="${style}"
+                <button type="button" class="pitch-slot${popSlot === pos.slot ? ' is-pop' : ''}" style="${style}"
                         onclick="openPlayerPicker('${pos.slot}')"
-                        title="${formatPlayerName(player)}"
+                        title="${formatPlayerName(player)} · ${label}"
                         aria-label="Changer ${formatPlayerName(player)} : ${label}">
                     ${jerseyMarkup(teamHex, jersey ? jersey.number : null, jersey && jersey.duplicate)}
                     <span class="pitch-name">${getPitchDisplayName(player)}</span>
                 </button>`;
         };
 
-        const benchHTML = bench.length
-            ? bench.map((p, i) => {
-                const off = i >= maxSubs;
-                const jersey = jerseys[p.id] || {};
-                const number = jersey.number;
-                const divider = (i === maxSubs && bench.length > maxSubs)
-                    ? `<div class="flex items-center gap-2 pt-2">
-                           <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Hors feuille</span>
-                           <span class="flex-1 h-px bg-slate-200"></span>
-                       </div>`
-                    : '';
+        const benchRowHTML = (p, i) => {
+            const off = i >= maxSubs;
+            const jersey = jerseys[p.id] || {};
+            const number = jersey.number;
+            const parts = getPlayerNameParts(p);
+            const initials = (`${(parts.prenom || '').charAt(0)}${(parts.nom || '').charAt(0)}`.toUpperCase())
+                || String(getPitchDisplayName(p) || '?').charAt(0).toUpperCase();
 
-                return `${divider}
-                <div class="flex items-center gap-2 ${off ? 'opacity-60' : ''}">
-                    <span class="bench-num ${number ? '' : 'is-off'}" ${number ? 'style="background:' + teamHex + '"' : ''}>${number || '—'}</span>
+            return `
+                <div class="bench-row ${off ? 'is-off opacity-70' : ''}">
+                    <span class="bench-avatar" style="background:${teamHex}">${initials}</span>
                     <div class="min-w-0 flex-1">
-                        <p class="font-bold text-[12.5px] text-slate-800 truncate">${formatPlayerName(p)}${jersey.duplicate ? ' <span class="text-red-600">!</span>' : ''}</p>
-                        <p class="text-[10.5px] text-slate-500 truncate">${getPosteLabel(p.poste1)}</p>
+                        <p class="flex items-center gap-1 font-bold text-[12px] text-slate-800">
+                            <span class="truncate">${formatPlayerName(p)}</span>
+                            ${jersey.duplicate ? '<span class="text-red-600" title="Numéro en double">!</span>' : ''}
+                        </p>
+                        <p class="text-[10px] text-slate-500 truncate">${getPosteLabel(p.poste1)}${number ? ' · n°' + number : ''}</p>
                     </div>
                     <div class="flex flex-col gap-0.5">
-                        <button onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'up')" ${i === 0 ? 'disabled' : ''}
-                                class="w-7 h-7 rounded-md border border-slate-200 text-slate-600 flex items-center justify-center text-[10px] ${i === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
-                                aria-label="Monter ${formatPlayerName(p)}">▲</button>
-                        <button onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'down')" ${i === bench.length - 1 ? 'disabled' : ''}
-                                class="w-7 h-7 rounded-md border border-slate-200 text-slate-600 flex items-center justify-center text-[10px] ${i === bench.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 active:bg-slate-200'}"
-                                aria-label="Descendre ${formatPlayerName(p)}">▼</button>
+                        <button type="button" onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'up')" ${i === 0 ? 'disabled' : ''}
+                                class="bench-move" aria-label="Monter ${formatPlayerName(p)}">▲</button>
+                        <button type="button" onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'down')" ${i === bench.length - 1 ? 'disabled' : ''}
+                                class="bench-move" aria-label="Descendre ${formatPlayerName(p)}">▼</button>
                     </div>
                 </div>`;
-            }).join('')
+        };
+
+        const onSheet = bench.slice(0, maxSubs);
+        const offSheet = bench.slice(maxSubs);
+
+        const benchHTML = bench.length
+            ? `
+                ${onSheet.length ? `
+                    <div class="bench-section"><span>Sur la feuille</span><span class="flex-1 h-px bg-slate-200"></span><span>${onSheet.length}</span></div>
+                    <div class="bench-list">${onSheet.map(p => benchRowHTML(p, bench.indexOf(p))).join('')}</div>` : ''}
+                ${offSheet.length ? `
+                    <div class="bench-section"><span>Hors feuille</span><span class="flex-1 h-px bg-slate-200"></span><span>${offSheet.length}</span></div>
+                    <div class="bench-list">${offSheet.map(p => benchRowHTML(p, bench.indexOf(p))).join('')}</div>` : ''}
+            `
             : '<p class="text-xs text-slate-400 italic">Aucun remplaçant : tous les convoqués sont sur le terrain.</p>';
 
         container.innerHTML = `
         <div class="space-y-3">
 
-            <div class="flex flex-wrap items-center gap-1.5">
+            ${returnBanner}
+
+            <div class="comp-hero" style="--team:${teamHex}">
+                <div class="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="comp-hero-tag">Composition</p>
+                        <h2 class="text-xl font-extrabold leading-tight truncate">${teamLabel}</h2>
+                        <p class="text-[11.5px] font-semibold opacity-90 truncate">
+                            ${metaLine || 'Date et adversaire non renseignés'}
+                        </p>
+                        <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                            <span class="comp-hero-pill"><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>${formationLabel}</span>
+                            <span class="comp-hero-pill"><i class="fa-solid fa-users" aria-hidden="true"></i>${convoked.length} convoqué(s)</span>
+                        </div>
+                    </div>
+                    <div class="shrink-0 sm:text-right sm:min-w-[7.5rem]">
+                        <p class="text-2xl font-extrabold tabular-nums leading-none">${placedCount}<span class="text-sm opacity-70">/11</span></p>
+                        <p class="text-[9.5px] font-extrabold uppercase tracking-[.12em] opacity-85 mt-1">titulaires</p>
+                        <div class="h-1.5 rounded-full bg-white/25 mt-1.5 overflow-hidden sm:ml-auto sm:w-28">
+                            <div class="h-full rounded-full bg-white transition-all" style="width:${placedPct}%"></div>
+                        </div>
+                        <p class="text-[10px] font-bold opacity-85 mt-1">${subsOnSheet}/${maxSubs} remplaçant(s)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comp-form-bar">
                 ${FORMATIONS.map(f => `
-                    <button onclick="applyFormation('${f.key}')"
-                            class="formation-btn ${formation === f.key ? 'is-active' : ''}">${f.label}</button>
+                    <button type="button" onclick="applyFormation('${f.key}')"
+                            class="comp-form ${formation === f.key ? 'is-active' : ''}"
+                            aria-pressed="${formation === f.key}"
+                            title="Système ${f.label}">
+                        ${formationMiniPitch(f.key)}
+                        <span>${f.label}</span>
+                    </button>
                 `).join('')}
-                <button onclick="resetComposition()"
-                        class="formation-btn ml-auto"
-                        style="border-color:#fecaca;color:#b91c1c">
-                    <i class="fa-solid fa-rotate-left mr-1" aria-hidden="true"></i>Tout au banc
+                <button type="button" onclick="resetComposition()" class="comp-reset">
+                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>Tout au banc
                 </button>
             </div>
 
@@ -11553,31 +13487,66 @@ function getFirstName(player) {
             <div class="grid lg:grid-cols-4 gap-3">
 
                 <div class="lg:col-span-3">
-                    <div class="pitch-wrap" id="composition-terrain">
+                    <div class="pitch-wrap${animateFormation ? ' is-switching' : ''}" id="composition-terrain">
                         ${buildPitchSVG('portrait')}
                         ${buildPitchSVG('landscape')}
                         ${slots.map(slotHTML).join('')}
+                        <button type="button" class="pitch-fs-btn is-open" onclick="togglePitchFullscreen(true)"
+                                aria-label="Agrandir le terrain" title="Plein écran">
+                            <i class="fa-solid fa-expand" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="pitch-fs-btn is-close" onclick="togglePitchFullscreen(false)"
+                                aria-label="Quitter le plein écran" title="Réduire">
+                            <i class="fa-solid fa-compress" aria-hidden="true"></i>
+                        </button>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-slate-500">
-                        <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>
-                        <span>Touche une position pour y placer un joueur.</span>
-                        <span class="ml-auto font-bold text-slate-600">${placedCount}/11 titulaires</span>
+                    <div class="flex flex-wrap items-center gap-1.5 mt-2.5">
+                        <span class="comp-chip ${placedCount === 11 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}">
+                            <i class="fa-solid fa-users" aria-hidden="true"></i>${placedCount}/11 titulaires
+                        </span>
+                        <span class="comp-chip bg-slate-50 text-slate-600 border-slate-200">
+                            <i class="fa-solid fa-arrows-up-down" aria-hidden="true"></i>${bench.length} remplaçant(s)
+                        </span>
+                        <span class="comp-chip ${duplicates.length ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}">
+                            <i class="fa-solid ${duplicates.length ? 'fa-triangle-exclamation' : 'fa-circle-check'}" aria-hidden="true"></i>${duplicates.length ? 'Numéros en double' : 'Numéros OK'}
+                        </span>
+                        <span class="ml-auto text-[10.5px] text-slate-400 flex items-center gap-1">
+                            <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>Touche une position
+                        </span>
                     </div>
                 </div>
 
-                <aside class="card card-pad space-y-3">
+                <aside class="card card-pad space-y-3 lg:sticky lg:top-20 lg:self-start">
                     <div>
                         <h3 class="card-title"><i class="fa-solid fa-arrows-up-down"></i>Banc</h3>
                         <p class="card-sub" ${convoked.length > targetConvoked ? 'style="color:#dc2626;font-weight:700"' : ''}>
                             ${convoked.length} convoqué(s) / ${targetConvoked} · ${maxSubs} remplaçant(s)
                         </p>
                     </div>
-                    <div class="space-y-1.5">${benchHTML}</div>
+                    <div class="space-y-1.5 lg:max-h-[calc(100dvh-11rem)] lg:overflow-y-auto lg:pr-1">${benchHTML}</div>
                 </aside>
 
             </div>
         </div>`;
     }
+
+    function togglePitchFullscreen(force) {
+        const pitch = document.getElementById('composition-terrain');
+        if (!pitch) return;
+
+        const on = typeof force === 'boolean' ? force : !pitch.classList.contains('is-fullscreen');
+
+        pitch.classList.toggle('is-fullscreen', on);
+        document.body.classList.toggle('comp-fullscreen-open', on);
+    }
+
+    window.togglePitchFullscreen = togglePitchFullscreen;
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const pitch = document.getElementById('composition-terrain');
+        if (pitch && pitch.classList.contains('is-fullscreen')) togglePitchFullscreen(false);
+    });
 
     /* ---- Choix du joueur pour une position ---- */
 
@@ -11673,6 +13642,8 @@ function getFirstName(player) {
 
         if (!match.slotAssignments) match.slotAssignments = {};
         match.slotAssignments[pickingSlot] = playerId;
+
+        window.__compPopSlot = pickingSlot;
 
         saveStateToFirebase();
         toggleModal('modal-pick-player', false);
@@ -11784,6 +13755,8 @@ function applyFormation(system) {
     // Les joueurs dont la place n'existe plus dans le nouveau système
     // repartent automatiquement sur le banc.
     pruneSlotAssignments(match);
+
+    window.__compAnimateFormation = true;
 
     saveStateToFirebase();
 
