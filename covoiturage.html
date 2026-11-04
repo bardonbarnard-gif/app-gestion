@@ -120,7 +120,19 @@ function playerShort(id) {
         players.find(x => x.id === id);
 
     return p ? shortName(p.name) : id;
+}
 
+// Clé de tri alphabétique sur le prénom, quel que soit l'ordre d'affichage
+// choisi pour l'équipe (« NOM Prénom » ou « Prénom NOM »).
+function firstNameKey(p) {
+
+    if (!p) return '';
+
+    const parts = (p.prenom || p.nom)
+        ? { prenom: p.prenom || '', nom: p.nom || '' }
+        : splitCovoitName(p.name);
+
+    return String(parts.prenom || parts.nom || p.name || '');
 }
 
 function showMessage(text, isError) {
@@ -516,6 +528,10 @@ function renderLive() {
 
     const pendingNames = convokedPlayers()
         .filter(p => !responses[p.id])
+        .sort((a, b) =>
+            firstNameKey(a).localeCompare(firstNameKey(b), 'fr', { sensitivity: 'base' })
+            || String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' })
+        )
         .map(p => shortName(p.name));
 
     let myCard = '';
