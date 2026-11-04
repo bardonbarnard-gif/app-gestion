@@ -275,6 +275,38 @@ function matchDirectTime(m) {
     return minutesToHHMM(start - (parseInt(m && m.arrivalMargin) || 60));
 }
 
+// Échappe les valeurs saisies avant de les injecter dans du HTML
+function escapeHtml(value) {
+
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+// Date du match au format « 8 novembre 2026 »
+function formatMatchDate(iso) {
+
+    const raw = String(iso || '').trim();
+
+    if (!raw) return '';
+
+    const d = new Date(
+        raw.includes('T')
+            ? raw
+            : raw + 'T12:00:00'
+    );
+
+    if (Number.isNaN(d.getTime())) return raw;
+
+    return d.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+}
+
 function renderMatchInfo() {
 
     const el = document.getElementById('match-info');
@@ -311,15 +343,23 @@ function renderMatchInfo() {
         </div>
 
         <div class="mt-2">
-            📅 ${match.date || ''}
+            📅 ${formatMatchDate(match.date)}
         </div>
 
         <div class="mt-3 space-y-2">
 
             ${mapsUrl ? `
             <a href="${mapsUrl}" target="_blank" rel="noopener"
-               class="flex items-center justify-center gap-1.5 px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl">
-                🗺️ Itinéraire sans péage
+               title="Ouvrir l'itinéraire dans Google Maps, sans péage"
+               class="group flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-700 hover:to-sky-600 text-white shadow-md shadow-sky-200 transition">
+                <span class="flex items-center justify-center w-10 h-10 rounded-full bg-white/20 text-xl shrink-0">🗺️</span>
+                <span class="min-w-0 flex-1">
+                    <span class="block text-sm font-extrabold leading-tight">Itinéraire vers le stade</span>
+                    <span class="block text-[11px] font-semibold text-sky-50 truncate">
+                        ${escapeHtml(origin || 'Ma position')} → ${escapeHtml(destination)} · sans péage
+                    </span>
+                </span>
+                <span class="shrink-0 text-xl opacity-80 group-hover:translate-x-0.5 transition-transform">→</span>
             </a>` : ''}
 
             <div class="flex items-start gap-3 bg-white border border-sky-300 rounded-xl p-3">
