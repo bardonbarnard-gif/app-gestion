@@ -957,6 +957,24 @@ body.comp-fullscreen-open { overflow: hidden; }
     cursor: not-allowed;
 }
 
+.comp-form:disabled,
+.comp-reset:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+.pitch-slot:disabled {
+    cursor: not-allowed;
+}
+
+.pitch-slot:disabled:hover {
+    transform: translate(-50%, -50%);
+}
+
+.pitch-slot:disabled:hover .jersey-svg {
+    filter: none;
+}
+
 .bench-section {
     display: flex;
     align-items: center;
