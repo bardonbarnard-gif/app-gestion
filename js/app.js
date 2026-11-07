@@ -5805,7 +5805,8 @@ Un passager non déclaré = un enfant sans siège prévu.
             const m = state.matches[mId];
             if (!m) return;
 
-            const ids = getCompositionBenchPlayers(m).map(p => p.id);
+            const phase = getActiveCompositionPhase(m);
+            const ids = getPhaseBenchPlayers(m, phase).map(p => p.id);
             const from = ids.indexOf(pId);
             if (from === -1) return;
 
@@ -5813,7 +5814,7 @@ Un passager non déclaré = un enfant sans siège prévu.
             if (to < 0 || to >= ids.length) return;
 
             ids.splice(to, 0, ids.splice(from, 1)[0]);
-            m.benchOrder = ids;
+            setCompositionPhaseBenchOrder(m, phase, ids);
 
             saveStateToFirebase();
             renderMatchComposition();
@@ -6068,6 +6069,18 @@ Un passager non déclaré = un enfant sans siège prévu.
             if (Array.isArray(m.benchOrder)) {
                 m.benchOrder = m.benchOrder.filter(id => id !== playerId);
             }
+
+            // Les compositions prévues référencent aussi des joueurs : on les nettoie.
+            COMPOSITION_PLAN_FIELDS.forEach(field => {
+                const plan = m[field];
+                if (!plan) return;
+                Object.keys(plan.slots || {}).forEach(slot => {
+                    if (plan.slots[slot] === playerId) delete plan.slots[slot];
+                });
+                if (Array.isArray(plan.benchOrder)) {
+                    plan.benchOrder = plan.benchOrder.filter(id => id !== playerId);
+                }
+            });
 
             saveStateToFirebase();
             renderMatchDetail();
@@ -7668,6 +7681,190 @@ function compositionLockMessage(lock) {
         ? 'Ce match a déjà été joué : la composition ne peut plus être modifiée.'
         : 'La feuille de match est verrouillée : déverrouille-la pour modifier la composition.';
 }
+
+// ---------------------------------------------------------------------------
+// Composition prévue (préparation de match)
+// En plus du onze de départ (slotAssignments / currentFormation), un match peut
+// porter un second onze « planifié » : celui envisagé en 2e mi-temps.
+// Le plan est un instantané séparé : il ne modifie jamais le onze de départ.
+// ---------------------------------------------------------------------------
+// Quatre phases : le onze de départ et trois compositions prévues.
+const COMPOSITION_PHASES = {
+    start: { label: 'Départ', longLabel: 'Onze de départ', field: null, icon: 'fa-flag-checkered' },
+    plan: { label: '2e MT', longLabel: '2e mi-temps', field: 'plannedComposition', icon: 'fa-wand-magic-sparkles' },
+    end: { label: 'Fin', longLabel: 'Fin de match', field: 'plannedCompositionEnd', icon: 'fa-wand-magic-sparkles' },
+    test: { label: 'Test', longLabel: 'Composition test', field: 'plannedCompositionTest', icon: 'fa-flask' }
+};
+
+// Clés des phases prévues (tout sauf le onze de départ), dans l'ordre d'affichage.
+const COMPOSITION_PLAN_KEYS = Object.keys(COMPOSITION_PHASES).filter(key => COMPOSITION_PHASES[key].field);
+const COMPOSITION_PLAN_FIELDS = COMPOSITION_PLAN_KEYS.map(key => COMPOSITION_PHASES[key].field);
+
+let compositionViewPhase = 'start';
+let compositionViewPhaseMatchId = null;
+
+function normalizeCompositionPhaseKey(key) {
+    return Object.prototype.hasOwnProperty.call(COMPOSITION_PHASES, key) ? key : 'start';
+}
+
+function getCompositionViewPhaseKey() {
+    return normalizeCompositionPhaseKey(compositionViewPhase);
+}
+
+// Champ du match qui stocke la phase (null pour le onze de départ).
+function compositionPhaseField(key) {
+    const meta = COMPOSITION_PHASES[normalizeCompositionPhaseKey(key)];
+    return meta ? meta.field : null;
+}
+
+// Données d'une phase, même forme que les champs historiques :
+// { key, formation, slots, benchOrder }. null si la phase n'existe pas.
+function getCompositionPhaseData(match, phaseKey) {
+    if (!match) return { key: 'start', formation: '433', slots: {}, benchOrder: [] };
+
+    const key = normalizeCompositionPhaseKey(phaseKey);
+    const field = compositionPhaseField(key);
+
+    if (field) {
+        const plan = match[field];
+        if (!plan) return null;
+        if (!plan.slots) plan.slots = {};
+        return {
+            key: key,
+            formation: plan.formation || match.currentFormation || '433',
+            slots: plan.slots,
+            benchOrder: Array.isArray(plan.benchOrder) ? plan.benchOrder : []
+        };
+    }
+
+    if (!match.slotAssignments) match.slotAssignments = {};
+    return {
+        key: 'start',
+        formation: match.currentFormation || '433',
+        slots: match.slotAssignments,
+        benchOrder: Array.isArray(match.benchOrder) ? match.benchOrder : []
+    };
+}
+
+// Phase réellement affichée : retombe sur le départ si le plan a été supprimé.
+function getActiveCompositionPhase(match) {
+    return getCompositionPhaseData(match, getCompositionViewPhaseKey())
+        || getCompositionPhaseData(match, 'start');
+}
+
+function setCompositionPhaseBenchOrder(match, phase, ids) {
+    if (!match || !phase) return;
+    const field = compositionPhaseField(phase.key);
+    if (field) {
+        if (match[field]) match[field].benchOrder = ids;
+        return;
+    }
+    match.benchOrder = ids;
+}
+
+function prunePhaseSlots(match, phaseKey) {
+    const data = getCompositionPhaseData(match, phaseKey);
+    if (!data) return;
+    const valid = new Set(getFormationSlots(data.formation).map(s => s.slot));
+    Object.keys(data.slots || {}).forEach(slot => {
+        if (!valid.has(slot)) delete data.slots[slot];
+    });
+}
+
+// Banc d'une phase : convoqués non placés, triés selon l'ordre de cette phase.
+function getPhaseBenchPlayers(match, phase) {
+    if (!match || !phase) return [];
+    const assigned = Object.values(phase.slots || {});
+    const players = getMatchPlayers(match)
+        .map(item => item.p)
+        .filter(p => (match.convocations || {})[p.id] === 'convoke' && !assigned.includes(p.id));
+
+    const rank = new Map((phase.benchOrder || []).map((id, i) => [id, i]));
+    return players.sort((a, b) => {
+        const ra = rank.has(a.id) ? rank.get(a.id) : Number.MAX_SAFE_INTEGER;
+        const rb = rank.has(b.id) ? rank.get(b.id) : Number.MAX_SAFE_INTEGER;
+        return ra - rb;
+    });
+}
+
+function setCompositionPhase(key) {
+    compositionViewPhase = normalizeCompositionPhaseKey(key);
+    renderMatchComposition();
+}
+window.setCompositionPhase = setCompositionPhase;
+
+// Chaque nouvelle phase part de la précédente : on n'ajuste ensuite que les
+// joueurs qui sortent et ceux qui entrent.
+function createCompositionPhase(key) {
+    const match = state.matches[state.selectedMatchId];
+    if (!match) return;
+
+    const lock = getCompositionLock(match);
+    if (lock) {
+        showToast(compositionLockMessage(lock), 'error');
+        return;
+    }
+
+    const phaseKey = normalizeCompositionPhaseKey(key);
+    const field = compositionPhaseField(phaseKey);
+    if (!field) return;
+
+    if (!match[field]) {
+        const order = Object.keys(COMPOSITION_PHASES);
+        let previousKey = order[Math.max(0, order.indexOf(phaseKey) - 1)] || 'start';
+        if (!getCompositionPhaseData(match, previousKey)) previousKey = 'start';
+        const base = getCompositionPhaseData(match, previousKey) || getCompositionPhaseData(match, 'start');
+
+        match[field] = {
+            formation: base.formation,
+            slots: Object.assign({}, base.slots),
+            benchOrder: (base.benchOrder || []).slice(),
+            createdAt: new Date().toISOString()
+        };
+        saveStateToFirebase();
+        showToast(`${COMPOSITION_PHASES[phaseKey].longLabel} : composition créée depuis ${COMPOSITION_PHASES[previousKey].longLabel.toLowerCase()}`);
+    }
+
+    compositionViewPhase = phaseKey;
+    compositionViewPhaseMatchId = match.id;
+    renderMatchComposition();
+}
+window.createCompositionPhase = createCompositionPhase;
+
+// Compatibilité avec les appels précédents (2e mi-temps).
+function createPlannedComposition() {
+    createCompositionPhase('plan');
+}
+window.createPlannedComposition = createPlannedComposition;
+
+function deleteCompositionPhase(key) {
+    const match = state.matches[state.selectedMatchId];
+    if (!match) return;
+
+    const phaseKey = normalizeCompositionPhaseKey(key);
+    const field = compositionPhaseField(phaseKey);
+    if (!field || !match[field]) return;
+
+    const lock = getCompositionLock(match);
+    if (lock) {
+        showToast(compositionLockMessage(lock), 'error');
+        return;
+    }
+
+    if (!confirm(`Supprimer la composition « ${COMPOSITION_PHASES[phaseKey].longLabel} » ? Le onze de départ ne change pas.`)) return;
+
+    delete match[field];
+    compositionViewPhase = 'start';
+    saveStateToFirebase();
+    renderMatchComposition();
+    showToast(`${COMPOSITION_PHASES[phaseKey].longLabel} : composition supprimée`);
+}
+window.deleteCompositionPhase = deleteCompositionPhase;
+
+function deletePlannedComposition() {
+    deleteCompositionPhase('plan');
+}
+window.deletePlannedComposition = deletePlannedComposition;
 
 function matchStartTimestamp(m) {
     if (!m || !m.date) return Number.MAX_SAFE_INTEGER;
@@ -13435,12 +13632,49 @@ function getFirstName(player) {
         lines.push(`🏉 ${teamLabel}${match.opponent ? ' vs ' + match.opponent : ''}`);
         const meta = [dateLabel, formationLabel].filter(Boolean).join(' · ');
         if (meta) lines.push(meta);
-        lines.push('', 'Titulaires');
+        const hasPlannedPhase = COMPOSITION_PLAN_KEYS.some(key => !!getCompositionPhaseData(match, key));
+        lines.push('', hasPlannedPhase ? 'Onze de départ' : 'Titulaires');
         lines.push(...(starterRows.length ? starterRows : ['—']));
         if (benchRows.length) {
             lines.push('', 'Remplaçants');
             lines.push(...benchRows);
         }
+
+        const startIds = new Set(Object.values((getCompositionPhaseData(match, 'start') || {}).slots || {}));
+
+        COMPOSITION_PLAN_KEYS.forEach(key => {
+            const planData = getCompositionPhaseData(match, key);
+            if (!planData) return;
+
+            const planIds = new Set(Object.values(planData.slots || {}));
+            const planFormationLabel = FORMATIONS.find(f => f.key === planData.formation)?.label || '';
+
+            const nameRows = ids => ids
+                .map(id => squadById.get(id))
+                .filter(Boolean)
+                .map(p => ({ p, n: jerseyNumber(p) }))
+                .sort(sortByNumber)
+                .map(row => `${row.n != null ? row.n + '.' : '•'} ${formatPlayerName(row.p)}`);
+
+            const entrants = nameRows([...planIds].filter(id => !startIds.has(id)));
+            const sortants = nameRows([...startIds].filter(id => !planIds.has(id)));
+
+            const planStarters = getFormationSlots(planData.formation)
+                .map(s => {
+                    const pid = (planData.slots || {})[s.slot];
+                    const p = pid ? squadById.get(pid) : null;
+                    return p ? { p, position: getSlotLabel(s.slot, planData.formation), n: jerseyNumber(p) } : null;
+                })
+                .filter(Boolean)
+                .sort(sortByNumber)
+                .map(row => `${row.n != null ? row.n + '.' : '•'} ${formatPlayerName(row.p)} — ${row.position}`);
+
+            lines.push('', `${COMPOSITION_PHASES[key].longLabel}${planFormationLabel ? ' · ' + planFormationLabel : ''}`);
+            if (entrants.length) lines.push(`Entrés : ${entrants.join(', ')}`);
+            if (sortants.length) lines.push(`Sortis : ${sortants.join(', ')}`);
+            if (!entrants.length && !sortants.length) lines.push('(même onze que le départ)');
+            lines.push(...(planStarters.length ? planStarters : ['—']));
+        });
 
         return lines.join('\n');
     }
@@ -13512,23 +13746,39 @@ function getFirstName(player) {
         }
 
         const match = state.matches[state.selectedMatchId];
+
+        // Changement de match : on revient toujours au onze de départ.
+        if (compositionViewPhaseMatchId !== match.id) {
+            compositionViewPhaseMatchId = match.id;
+            compositionViewPhase = 'start';
+        }
+        if (!getCompositionPhaseData(match, compositionViewPhase)) compositionViewPhase = 'start';
+
         if (!match.slotAssignments) match.slotAssignments = {};
         pruneSlotAssignments(match);
 
-        const formation = match.currentFormation || '433';
+        const phase = getActiveCompositionPhase(match);
+        const isPlanPhase = phase.key !== 'start';
+        prunePhaseSlots(match, phase.key);
+
+        const startPhaseSlots = (getCompositionPhaseData(match, 'start') || {}).slots || {};
+        const startPlayerIds = new Set(Object.values(startPhaseSlots));
+
+        const formation = phase.formation;
         const slots = getFormationSlots(formation);
+        const phaseSlots = phase.slots;
         const jerseys = computeMatchJerseys(match);
         const teamHex = getTeamHex(match.team);
 
         const squad = getMatchPlayers(match).map(item => item.p);
         const squadById = new Map(squad.map(p => [p.id, p]));
         const convoked = squad.filter(p => (match.convocations || {})[p.id] === 'convoke');
-        const bench = getCompositionBenchPlayers(match);
+        const bench = getPhaseBenchPlayers(match, phase);
         const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
         const maxSubs = Math.min(3, Math.max(0, targetConvoked - 11));
         const compositionLock = getCompositionLock(match);
         const compositionLocked = !!compositionLock;
-        const placedCount = slots.filter(s => match.slotAssignments[s.slot]).length;
+        const placedCount = slots.filter(s => phaseSlots[s.slot]).length;
 
         const popSlot = window.__compPopSlot || null;
         window.__compPopSlot = null;
@@ -13579,7 +13829,7 @@ function getFirstName(player) {
             .map(p => formatPlayerName(p));
 
         const slotHTML = (pos) => {
-            const playerId = match.slotAssignments[pos.slot];
+            const playerId = phaseSlots[pos.slot];
             const player = playerId ? squadById.get(playerId) : null;
             const jersey = player ? jerseys[player.id] : null;
             const label = getSlotLabel(pos.slot, formation);
@@ -13602,6 +13852,7 @@ function getFirstName(player) {
                         title="${formatPlayerName(player)} · ${label}"
                         aria-label="Changer ${formatPlayerName(player)} : ${label}">
                     ${jerseyMarkup(teamHex, jersey ? jersey.number : null, jersey && jersey.duplicate)}
+                    ${isPlanPhase && !startPlayerIds.has(player.id) ? '<span class="plan-badge plan-badge-in" title="Entre en jeu par rapport au onze de départ">↑</span>' : ''}
                     <span class="pitch-name">${getPitchDisplayName(player)}</span>
                 </button>`;
         };
@@ -13621,6 +13872,7 @@ function getFirstName(player) {
                         <p class="flex items-center gap-1 font-bold text-[12px] text-slate-800">
                             <span class="truncate">${formatPlayerName(p)}</span>
                             ${jersey.duplicate ? '<span class="text-red-600" title="Numéro en double">!</span>' : ''}
+                            ${isPlanPhase && startPlayerIds.has(p.id) ? '<span class="plan-tag plan-tag-out" title="Sort par rapport au onze de départ">↓ sort</span>' : ''}
                         </p>
                         <p class="text-[10px] text-slate-500 truncate">${getPosteLabel(p.poste1)}${number ? ' · n°' + number : ''}</p>
                     </div>
@@ -13647,15 +13899,63 @@ function getFirstName(player) {
             `
             : '<p class="text-xs text-slate-400 italic">Aucun remplaçant : tous les convoqués sont sur le terrain.</p>';
 
+        const phaseDiff = key => {
+            const data = getCompositionPhaseData(match, key);
+            if (!data) return null;
+            const ids = new Set(Object.values(data.slots || {}));
+            return {
+                entrants: [...ids].filter(id => !startPlayerIds.has(id)).length,
+                sortants: [...startPlayerIds].filter(id => !ids.has(id)).length
+            };
+        };
+
+        const phaseButtons = Object.keys(COMPOSITION_PHASES).map(key => {
+            const meta = COMPOSITION_PHASES[key];
+            const diff = phaseDiff(key);
+            const isActive = phase.key === key;
+
+            if (!diff) {
+                return `
+                <button type="button" onclick="createCompositionPhase('${key}')" ${compositionLocked ? 'disabled' : ''}
+                        class="comp-phase comp-phase-plan" title="Préparer : ${meta.longLabel}">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i>${meta.label}
+                </button>`;
+            }
+
+            return `
+                <button type="button" onclick="setCompositionPhase('${key}')"
+                        class="comp-phase ${key === 'start' ? '' : 'comp-phase-plan'} ${isActive ? 'is-active' : ''}"
+                        aria-pressed="${isActive}"
+                        title="${meta.longLabel} : ${diff.entrants} entrée(s) · ${diff.sortants} sortie(s) par rapport au départ">
+                    <i class="fa-solid ${meta.icon}" aria-hidden="true"></i>${meta.label}
+                </button>`;
+        }).join('');
+
+        const phaseBar = `<div class="comp-phase-bar">${phaseButtons}</div>`;
+
+        const activePhaseMeta = COMPOSITION_PHASES[phase.key] || COMPOSITION_PHASES.start;
+        const activeDiff = isPlanPhase ? phaseDiff(phase.key) : null;
+
+        const planBanner = isPlanPhase ? `
+            <div class="rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 text-[11.5px] text-teal-900 flex items-start gap-2">
+                <i class="fa-solid ${activePhaseMeta.icon} mt-0.5" aria-hidden="true"></i>
+                <span class="flex-1">
+                    <strong>${activePhaseMeta.longLabel} — ${phase.key === 'test' ? 'composition de travail' : 'composition prévue'}.</strong> Le onze de départ n'est pas modifié.
+                    ${activeDiff ? `<br><span class="font-semibold">${activeDiff.entrants} entrée(s) · ${activeDiff.sortants} sortie(s) par rapport au départ</span>` : ''}
+                </span>
+                <button type="button" onclick="deleteCompositionPhase('${phase.key}')" ${compositionLocked ? 'disabled' : ''}
+                        class="shrink-0 text-[10.5px] font-bold underline">Supprimer</button>
+            </div>` : '';
+
         container.innerHTML = `
         <div class="space-y-3">
 
-            ${compositionLockBanner}${returnBanner}
+            ${compositionLockBanner}${returnBanner}${phaseBar}${planBanner}
 
             <div class="comp-hero" style="--team:${teamHex}">
                 <div class="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div class="min-w-0">
-                        <p class="comp-hero-tag">Composition</p>
+                        <p class="comp-hero-tag">${isPlanPhase ? activePhaseMeta.longLabel : 'Composition'}</p>
                         <h2 class="text-xl font-extrabold leading-tight truncate">${teamLabel}</h2>
                         <p class="text-[11.5px] font-semibold opacity-90 truncate">
                             ${metaLine || 'Date et adversaire non renseignés'}
@@ -13781,7 +14081,7 @@ function getFirstName(player) {
         pickingSlot = slot;
 
         const sub = document.getElementById('pick-player-slot');
-        if (sub) sub.textContent = getSlotLabel(slot, match.currentFormation);
+        if (sub) sub.textContent = getSlotLabel(slot, getActiveCompositionPhase(match).formation);
 
         renderPlayerPicker();
         toggleModal('modal-pick-player', true);
@@ -13796,7 +14096,8 @@ function getFirstName(player) {
         const jerseys = computeMatchJerseys(match);
         const teamHex = getTeamHex(match.team);
 
-        const assigned = match.slotAssignments || {};
+        const phase = getActiveCompositionPhase(match);
+        const assigned = phase.slots || {};
         const currentId = assigned[pickingSlot];
         const takenIds = Object.values(assigned).filter(id => id !== currentId);
 
@@ -13869,8 +14170,8 @@ function getFirstName(player) {
         const match = state.matches[state.selectedMatchId];
         if (!match || !pickingSlot) return;
 
-        if (!match.slotAssignments) match.slotAssignments = {};
-        match.slotAssignments[pickingSlot] = playerId;
+        const phase = getActiveCompositionPhase(match);
+        phase.slots[pickingSlot] = playerId;
 
         window.__compPopSlot = pickingSlot;
 
@@ -13888,7 +14189,7 @@ function getFirstName(player) {
         const match = state.matches[state.selectedMatchId];
         if (!match || !pickingSlot) return;
 
-        delete match.slotAssignments[pickingSlot];
+        delete getActiveCompositionPhase(match).slots[pickingSlot];
 
         saveStateToFirebase();
         toggleModal('modal-pick-player', false);
@@ -13989,17 +14290,26 @@ function applyFormation(system) {
     const match =
         state.matches[state.selectedMatchId];
 
-    // Une ancienne couche « composition libre » a existé : on la retire pour
-    // qu'il ne reste qu'un seul système de placement.
-    if (match.composition) {
-        delete match.composition;
+    const phase = getActiveCompositionPhase(match);
+
+    if (phase.key !== 'start') {
+        // Chaque phase prévue a son propre système : celui du départ n'est pas touché.
+        const field = compositionPhaseField(phase.key);
+        if (field && match[field]) match[field].formation = system;
+        prunePhaseSlots(match, phase.key);
+    } else {
+        // Une ancienne couche « composition libre » a existé : on la retire pour
+        // qu'il ne reste qu'un seul système de placement.
+        if (match.composition) {
+            delete match.composition;
+        }
+
+        match.currentFormation = system;
+
+        // Les joueurs dont la place n'existe plus dans le nouveau système
+        // repartent automatiquement sur le banc.
+        pruneSlotAssignments(match);
     }
-
-    match.currentFormation = system;
-
-    // Les joueurs dont la place n'existe plus dans le nouveau système
-    // repartent automatiquement sur le banc.
-    pruneSlotAssignments(match);
 
     window.__compAnimateFormation = true;
 
@@ -14007,7 +14317,7 @@ function applyFormation(system) {
 
     renderMatchComposition();
 
-    showToast(`Système ${FORMATIONS.find(f => f.key === system)?.label || system} appliqué`);
+    showToast(`Système ${FORMATIONS.find(f => f.key === system)?.label || system} appliqué${phase.key === 'start' ? '' : ' (' + COMPOSITION_PHASES[phase.key].longLabel + ')'}`);
 }
 
 function getFormationSlots(system = "433") {
@@ -14266,7 +14576,9 @@ function resetComposition() {
 
     if (
         !confirm(
-            "Remettre tous les joueurs sur le banc ?"
+            getActiveCompositionPhase(state.matches[state.selectedMatchId]).key === 'start'
+                ? "Remettre tous les joueurs sur le banc ?"
+                : `Vider « ${COMPOSITION_PHASES[getActiveCompositionPhase(state.matches[state.selectedMatchId]).key].longLabel} » ?`
         )
     ) {
         return;
@@ -14277,16 +14589,20 @@ function resetComposition() {
             state.selectedMatchId
         ];
 
-    match.slotAssignments = {};
+    const phase = getActiveCompositionPhase(match);
+    Object.keys(phase.slots || {}).forEach(slot => { delete phase.slots[slot]; });
+    setCompositionPhaseBenchOrder(match, phase, []);
 
-    match.composition = {};
+    if (phase.key === 'start') match.composition = {};
 
     saveStateToFirebase();
 
     renderMatchComposition();
 
     showToast(
-        "Tous les joueurs ont été remis au banc"
+        phase.key === 'start'
+            ? "Tous les joueurs ont été remis au banc"
+            : `« ${COMPOSITION_PHASES[phase.key].longLabel} » vidée : tout le monde sur le banc`
     );
 }
 
