@@ -5797,6 +5797,11 @@ Un passager non déclaré = un enfant sans siège prévu.
         }
 
         function moveCompositionBenchPlayer(mId, pId, dir) {
+            const lock = getCompositionLock(state.matches[mId]);
+            if (lock) {
+                showToast(compositionLockMessage(lock), 'error');
+                return;
+            }
             const m = state.matches[mId];
             if (!m) return;
 
@@ -5915,10 +5920,10 @@ Un passager non déclaré = un enfant sans siège prévu.
             if (!match.jerseys) match.jerseys = {};
 
             const value = String(jersey == null ? '' : jersey).trim();
-            const auto = computeAutoJerseyMap(match)[pId];
 
-            // Vide ou identique au numéro automatique : aucune surcharge stockée
-            if (!value || (auto != null && parseInt(value, 10) === auto)) {
+
+            // Vide : retour à la numérotation automatique
+            if (!value) {
                 delete match.jerseys[pId];
                 saveStateToFirebase();
                 return;
@@ -5939,11 +5944,35 @@ Un passager non déclaré = un enfant sans siège prévu.
                 return;
             }
 
-            const clash = Object.entries(computeMatchJerseys(match))
+            const currentJerseys = computeMatchJerseys(match);
+            const clash = Object.entries(currentJerseys)
                 .find(([id, j]) => id !== pId && j.number === number);
 
             if (clash) {
-                showToast('Le numéro ' + number + ' est déjà pris', 'error');
+                const [otherId] = clash;
+                const myNumber = currentJerseys[pId]?.number;
+                const otherIsStarter = Object.values(match.slotAssignments || {}).includes(otherId);
+                const canSwap = myNumber != null && (otherIsStarter
+                    ? myNumber >= 1 && myNumber <= 11
+                    : myNumber >= 12 && myNumber <= 14);
+
+                // Échange : l'autre joueur récupère le numéro libéré s'il est
+                // compatible avec son rôle, sinon il repasse en automatique.
+                if (canSwap) {
+                    const otherAuto = computeAutoJerseyMap(match)[otherId];
+                    if (otherAuto != null && otherAuto === myNumber) {
+                        delete match.jerseys[otherId];
+                    } else {
+                        match.jerseys[otherId] = String(myNumber);
+                    }
+                    showToast('Numéros ' + myNumber + ' et ' + number + ' échangés');
+                } else {
+                    delete match.jerseys[otherId];
+                    showToast('Numéro ' + number + ' attribué, l\'autre joueur repasse en automatique');
+                }
+
+                match.jerseys[pId] = String(number);
+                saveStateToFirebase();
                 return;
             }
 
@@ -7622,6 +7651,22 @@ function matchHasBeenPlayed(m) {
     if (!m.date) return false;
     const start = new Date(m.date + 'T' + (m.heure || '14:30'));
     return !isNaN(start.getTime()) && start < new Date();
+}
+
+// Une composition est figée dès que le match a déjà été joué (score saisi
+// ou coup d'envoi passé) ou que la feuille de match a été verrouillée.
+function getCompositionLock(m) {
+    if (!m) return null;
+    if (matchHasBeenPlayed(m)) return { type: 'played' };
+    if (m.isValidated) return { type: 'validated' };
+    return null;
+}
+
+function compositionLockMessage(lock) {
+    if (!lock) return '';
+    return lock.type === 'played'
+        ? 'Ce match a déjà été joué : la composition ne peut plus être modifiée.'
+        : 'La feuille de match est verrouillée : déverrouille-la pour modifier la composition.';
 }
 
 function matchStartTimestamp(m) {
@@ -12991,7 +13036,32 @@ function getFirstName(player) {
         AD: 'Ailier droit'
     };
 
-    function getSlotLabel(slot) {
+    // Défense à 2 centraux : défenseur central gauche (DCG) / droit (DCD).
+    // Défense à 3 centraux : DCG / DC (au milieu) / DCD.
+    function centralDefenderLabels(formation) {
+        const count = getFormationSlots(formation || '433')
+            .filter(s => s.slot === 'DC1' || s.slot === 'DC2' || s.slot === 'DC3')
+            .length;
+
+        if (count >= 3) {
+            return {
+                DC1: 'Défenseur central gauche',
+                DC2: 'Défenseur central',
+                DC3: 'Défenseur central droit'
+            };
+        }
+
+        return {
+            DC1: 'Défenseur central gauche',
+            DC2: 'Défenseur central droit'
+        };
+    }
+
+    function getSlotLabel(slot, formation) {
+        if (slot === 'DC1' || slot === 'DC2' || slot === 'DC3') {
+            const labels = centralDefenderLabels(formation);
+            if (labels[slot]) return labels[slot];
+        }
         return SLOT_LABELS[slot] || slot;
     }
 
@@ -13114,7 +13184,8 @@ function getFirstName(player) {
     };
 
     // Numéros automatiques : titulaires selon leur poste, banc 12-14
-    function computeAutoJerseyMap(match) {
+    function computeAutoJerseyMap(match, options) {
+        const skip = options?.skip || new Set();
         const map = {};
         if (!match) return map;
 
@@ -13122,7 +13193,7 @@ function getFirstName(player) {
         const slots = getFormationSlots(formationKey);
         const table = FORMATION_JERSEYS[formationKey] || FORMATION_JERSEYS['433'];
         const assigned = match.slotAssignments || {};
-        const used = new Set();
+        const used = new Set(options?.reserved || []);
 
         const firstFree = () => {
             for (let n = 1; n <= 11; n++) if (!used.has(n)) return n;
@@ -13131,7 +13202,7 @@ function getFirstName(player) {
 
         slots.forEach(s => {
             const pid = assigned[s.slot];
-            if (!pid || map[pid] != null) return;
+            if (!pid || skip.has(pid) || map[pid] != null) return;
 
             let number = table[s.slot];
             if (!number || used.has(number)) number = SLOT_JERSEY[s.slot];
@@ -13147,8 +13218,21 @@ function getFirstName(player) {
         const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
         const maxSubs = Math.min(3, Math.max(0, targetConvoked - 11));
 
-        getCompositionBenchPlayers(match).forEach((p, i) => {
-            map[p.id] = i < maxSubs ? 12 + i : null;
+        let nextBench = 12;
+        const autoBench = getCompositionBenchPlayers(match).filter(p => !skip.has(p.id));
+        autoBench.forEach((p, i) => {
+            if (i >= maxSubs) {
+                map[p.id] = null;
+                return;
+            }
+            while (nextBench <= 14 && used.has(nextBench)) nextBench++;
+            if (nextBench > 14) {
+                map[p.id] = null;
+                return;
+            }
+            map[p.id] = nextBench;
+            used.add(nextBench);
+            nextBench++;
         });
 
         return map;
@@ -13156,7 +13240,28 @@ function getFirstName(player) {
 
     // Numéros affichés : titulaires 1-11, remplaçants 12-14, surcharge manuelle encadrée
     function computeMatchJerseys(match) {
-        const autoMap = computeAutoJerseyMap(match);
+        const assignedIds = Object.values(match?.slotAssignments || {});
+        const manualNumbers = {};
+        const reserved = new Set();
+
+        // Les surcharges manuelles valides sont réservées en premier : les
+        // numéros automatiques ne peuvent donc plus les prendre, ce qui permet
+        // d'échanger deux numéros sans jamais créer de doublon.
+        Object.entries(match?.jerseys || {}).forEach(([pid, value]) => {
+            const n = parseInt(value, 10);
+            if (!n) return;
+            const starter = assignedIds.includes(pid);
+            const min = starter ? 1 : 12;
+            const max = starter ? 11 : 14;
+            if (n < min || n > max || reserved.has(n)) return;
+            reserved.add(n);
+            manualNumbers[pid] = n;
+        });
+
+        const autoMap = computeAutoJerseyMap(match, {
+            reserved: reserved,
+            skip: new Set(Object.keys(manualNumbers))
+        });
         const out = {};
 
         Object.entries(autoMap).forEach(([pid, number]) => {
@@ -13233,8 +13338,11 @@ function getFirstName(player) {
         return `<svg class="comp-form-pitch" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><g fill="#fff">${dots}</g></svg>`;
     }
 
-    // Abréviation d'un poste : DC1 -> DC, MDF2 -> MDF
-    function slotAbbreviation(slot) {
+    // Abréviation d'un poste : DCG / DC / DCD pour les centraux, MDF2 -> MDF
+    function slotAbbreviation(slot, formation) {
+        if (slot === 'DC1') return 'DCG';
+        if (slot === 'DC2') return centralDefenderLabels(formation).DC3 ? 'DC' : 'DCD';
+        if (slot === 'DC3') return 'DCD';
         return String(slot || '').replace(/\d+$/, '');
     }
 
@@ -13289,6 +13397,103 @@ function getFirstName(player) {
         });
     }
 
+    // Liste « poste + numéro » de la composition, prête à envoyer (WhatsApp, SMS…)
+    function buildCompositionShareText(match) {
+        if (!match) return '';
+
+        const squadById = new Map(getMatchPlayers(match).map(item => [item.p.id, item.p]));
+        const jerseys = computeMatchJerseys(match);
+        const slots = getFormationSlots(match.currentFormation || '433');
+        const teamLabel = state.teams?.[match.team]?.name || match.team || 'Équipe';
+        const formationLabel = FORMATIONS.find(f => f.key === (match.currentFormation || '433'))?.label || '';
+        const dateLabel = match.date
+            ? new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+            : '';
+
+        const jerseyNumber = p => jerseys[p.id]?.number;
+        const sortByNumber = (a, b) => (a.n == null ? 99 : a.n) - (b.n == null ? 99 : b.n);
+
+        const starterRows = slots
+            .map(s => {
+                const pid = (match.slotAssignments || {})[s.slot];
+                const p = pid ? squadById.get(pid) : null;
+                return p ? { p, position: getSlotLabel(s.slot, match.currentFormation), n: jerseyNumber(p) } : null;
+            })
+            .filter(Boolean)
+            .sort(sortByNumber)
+            .map(row => `${row.n != null ? row.n + '.' : '•'} ${formatPlayerName(row.p)} — ${row.position}`);
+
+        const assignedIds = new Set(Object.values(match.slotAssignments || {}));
+        const benchRows = getMatchPlayers(match)
+            .map(item => item.p)
+            .filter(p => (match.convocations || {})[p.id] === 'convoke' && !assignedIds.has(p.id))
+            .map(p => ({ p, n: jerseyNumber(p) }))
+            .sort(sortByNumber)
+            .map(row => `${row.n != null ? row.n + '.' : '•'} ${formatPlayerName(row.p)}${row.p.poste1 ? ' — ' + getPosteLabel(row.p.poste1) : ''}`);
+
+        const lines = [];
+        lines.push(`🏉 ${teamLabel}${match.opponent ? ' vs ' + match.opponent : ''}`);
+        const meta = [dateLabel, formationLabel].filter(Boolean).join(' · ');
+        if (meta) lines.push(meta);
+        lines.push('', 'Titulaires');
+        lines.push(...(starterRows.length ? starterRows : ['—']));
+        if (benchRows.length) {
+            lines.push('', 'Remplaçants');
+            lines.push(...benchRows);
+        }
+
+        return lines.join('\n');
+    }
+
+    async function shareMatchComposition() {
+        const match = state.matches[state.selectedMatchId];
+        if (!match) return;
+
+        const text = buildCompositionShareText(match);
+        if (!text) return;
+
+        // Partage natif : WhatsApp, SMS, mail… selon les applis du téléphone.
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: ((state.teams?.[match.team]?.name || match.team || '') + ' — composition').trim(),
+                    text: text
+                });
+                return;
+            } catch (err) {
+                if (err && err.name === 'AbortError') return;
+            }
+        }
+
+        const copied = () => showToast('Composition copiée 📋 à coller dans WhatsApp');
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+                await navigator.clipboard.writeText(text);
+                copied();
+                return;
+            } catch (e) {
+                // on tente la copie historique ci-dessous
+            }
+        }
+
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            copied();
+        } catch (e) {
+            showToast('Impossible de copier la composition', 'error');
+        }
+        document.body.removeChild(ta);
+    }
+
+    window.shareMatchComposition = shareMatchComposition;
+
     function renderMatchComposition() {
 
         const container = document.getElementById('match-composition-container');
@@ -13321,6 +13526,8 @@ function getFirstName(player) {
         const bench = getCompositionBenchPlayers(match);
         const targetConvoked = parseInt(state.teams?.[match.team]?.targetConvocations) || 14;
         const maxSubs = Math.min(3, Math.max(0, targetConvoked - 11));
+        const compositionLock = getCompositionLock(match);
+        const compositionLocked = !!compositionLock;
         const placedCount = slots.filter(s => match.slotAssignments[s.slot]).length;
 
         const popSlot = window.__compPopSlot || null;
@@ -13342,6 +13549,12 @@ function getFirstName(player) {
         const returnTraining = window.compositionReturnTrainingId
             ? state.trainings?.[window.compositionReturnTrainingId]
             : null;
+
+        const compositionLockBanner = compositionLock ? `
+            <div class="rounded-xl border border-slate-300 bg-slate-100 px-3 py-2.5 text-[11.5px] text-slate-700 flex items-start gap-2">
+                <i class="fa-solid fa-lock mt-0.5" aria-hidden="true"></i>
+                <span><strong>Composition verrouillée.</strong> ${compositionLockMessage(compositionLock)}</span>
+            </div>` : '';
 
         const returnBanner = returnTraining ? `
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border border-sky-200 bg-sky-50">
@@ -13369,13 +13582,13 @@ function getFirstName(player) {
             const playerId = match.slotAssignments[pos.slot];
             const player = playerId ? squadById.get(playerId) : null;
             const jersey = player ? jerseys[player.id] : null;
-            const label = getSlotLabel(pos.slot);
-            const abbr = slotAbbreviation(pos.slot);
+            const label = getSlotLabel(pos.slot, formation);
+            const abbr = slotAbbreviation(pos.slot, formation);
             const style = `--px:${pos.x}%;--py:${pos.y}%;--lx:${(100 - pos.y).toFixed(2)}%;--ly:${pos.x}%;`;
 
             if (!player) {
                 return `
-                <button type="button" class="pitch-slot" style="${style}"
+                <button type="button" class="pitch-slot" style="${style}" ${compositionLocked ? 'disabled' : ''}
                         onclick="openPlayerPicker('${pos.slot}')"
                         title="${label}"
                         aria-label="Placer un joueur : ${label}">
@@ -13384,7 +13597,7 @@ function getFirstName(player) {
             }
 
             return `
-                <button type="button" class="pitch-slot${popSlot === pos.slot ? ' is-pop' : ''}" style="${style}"
+                <button type="button" class="pitch-slot${popSlot === pos.slot ? ' is-pop' : ''}" style="${style}" ${compositionLocked ? 'disabled' : ''}
                         onclick="openPlayerPicker('${pos.slot}')"
                         title="${formatPlayerName(player)} · ${label}"
                         aria-label="Changer ${formatPlayerName(player)} : ${label}">
@@ -13412,9 +13625,9 @@ function getFirstName(player) {
                         <p class="text-[10px] text-slate-500 truncate">${getPosteLabel(p.poste1)}${number ? ' · n°' + number : ''}</p>
                     </div>
                     <div class="flex flex-col gap-0.5">
-                        <button type="button" onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'up')" ${i === 0 ? 'disabled' : ''}
+                        <button type="button" onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'up')" ${i === 0 || compositionLocked ? 'disabled' : ''}
                                 class="bench-move" aria-label="Monter ${formatPlayerName(p)}">▲</button>
-                        <button type="button" onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'down')" ${i === bench.length - 1 ? 'disabled' : ''}
+                        <button type="button" onclick="moveCompositionBenchPlayer('${match.id}', '${p.id}', 'down')" ${i === bench.length - 1 || compositionLocked ? 'disabled' : ''}
                                 class="bench-move" aria-label="Descendre ${formatPlayerName(p)}">▼</button>
                     </div>
                 </div>`;
@@ -13437,7 +13650,7 @@ function getFirstName(player) {
         container.innerHTML = `
         <div class="space-y-3">
 
-            ${returnBanner}
+            ${compositionLockBanner}${returnBanner}
 
             <div class="comp-hero" style="--team:${teamHex}">
                 <div class="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -13459,13 +13672,18 @@ function getFirstName(player) {
                             <div class="h-full rounded-full bg-white transition-all" style="width:${placedPct}%"></div>
                         </div>
                         <p class="text-[10px] font-bold opacity-85 mt-1">${subsOnSheet}/${maxSubs} remplaçant(s)</p>
+                        <button type="button" onclick="shareMatchComposition()"
+                                class="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 border border-white/40 text-[11px] font-bold transition"
+                                title="Envoyer la liste des joueurs (poste et numéro) via WhatsApp ou une autre application">
+                            <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>Partager la liste
+                        </button>
                     </div>
                 </div>
             </div>
 
             <div class="comp-form-bar">
                 ${FORMATIONS.map(f => `
-                    <button type="button" onclick="applyFormation('${f.key}')"
+                    <button type="button" onclick="applyFormation('${f.key}')" ${compositionLocked ? 'disabled' : ''}
                             class="comp-form ${formation === f.key ? 'is-active' : ''}"
                             aria-pressed="${formation === f.key}"
                             title="Système ${f.label}">
@@ -13473,7 +13691,7 @@ function getFirstName(player) {
                         <span>${f.label}</span>
                     </button>
                 `).join('')}
-                <button type="button" onclick="resetComposition()" class="comp-reset">
+                <button type="button" onclick="resetComposition()" ${compositionLocked ? 'disabled' : ''} class="comp-reset">
                     <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>Tout au banc
                 </button>
             </div>
@@ -13555,10 +13773,15 @@ function getFirstName(player) {
     function openPlayerPicker(slot) {
         const match = state.matches[state.selectedMatchId];
         if (!match) return;
+        const lock = getCompositionLock(match);
+        if (lock) {
+            showToast(compositionLockMessage(lock), 'error');
+            return;
+        }
         pickingSlot = slot;
 
         const sub = document.getElementById('pick-player-slot');
-        if (sub) sub.textContent = getSlotLabel(slot);
+        if (sub) sub.textContent = getSlotLabel(slot, match.currentFormation);
 
         renderPlayerPicker();
         toggleModal('modal-pick-player', true);
@@ -13604,6 +13827,7 @@ function getFirstName(player) {
                         <label class="flex-1">
                             <span class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">Numéro de maillot</span>
                             <input type="number" min="1" max="99" value="${jerseys[currentPlayer.id]?.number || ''}"
+                                   title="Un numéro déjà pris est échangé avec l'autre joueur"
                                    onchange="setSlotJersey('${currentPlayer.id}', this.value)"
                                    class="w-full p-1.5 border border-slate-200 rounded-lg text-center font-bold text-sm bg-white">
                         </label>
@@ -13637,6 +13861,11 @@ function getFirstName(player) {
     }
 
     function choosePlayerForSlot(playerId) {
+        const lock = getCompositionLock(state.matches[state.selectedMatchId]);
+        if (lock) {
+            showToast(compositionLockMessage(lock), 'error');
+            return;
+        }
         const match = state.matches[state.selectedMatchId];
         if (!match || !pickingSlot) return;
 
@@ -13651,6 +13880,11 @@ function getFirstName(player) {
     }
 
     function clearPlayerFromSlot() {
+        const lock = getCompositionLock(state.matches[state.selectedMatchId]);
+        if (lock) {
+            showToast(compositionLockMessage(lock), 'error');
+            return;
+        }
         const match = state.matches[state.selectedMatchId];
         if (!match || !pickingSlot) return;
 
@@ -13662,6 +13896,11 @@ function getFirstName(player) {
     }
 
     function setSlotJersey(playerId, value) {
+        const lock = getCompositionLock(state.matches[state.selectedMatchId]);
+        if (lock) {
+            showToast(compositionLockMessage(lock), 'error');
+            return;
+        }
         setMatchJersey(state.selectedMatchId, playerId, value);
         renderMatchComposition();
         renderPlayerPicker();
@@ -13733,6 +13972,12 @@ function removePlayerFromComposition(playerId) {
 }
 
 function applyFormation(system) {
+
+    const lock = getCompositionLock(state.matches[state.selectedMatchId]);
+    if (lock) {
+        showToast(compositionLockMessage(lock), 'error');
+        return;
+    }
 
     if (
         !state.selectedMatchId ||
@@ -14012,6 +14257,12 @@ function assignPlayerToSlot(slot) {
 }
 
 function resetComposition() {
+
+    const lock = getCompositionLock(state.matches[state.selectedMatchId]);
+    if (lock) {
+        showToast(compositionLockMessage(lock), 'error');
+        return;
+    }
 
     if (
         !confirm(
