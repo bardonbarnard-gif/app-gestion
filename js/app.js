@@ -363,6 +363,7 @@ const defaultPlayers = [
 let selectedMatchId = null;
 let currentCatFilter = 'all';
 let currentEffectifTab = 'joueurs';
+let effectifSortMode = 'default';
 let activeSection = 'dashboard';
 
         // --- 3. SYNCHRONISATION FIREBASE ---
@@ -2417,8 +2418,106 @@ if (role === 'responsable') {
                 return convocHistoryCache[key];
             };
 
+            // Taux de présence aux séances et de matchs joués, calculés une seule
+            // fois par joueur : servent au tri et à l'affichage des fiches.
+            const ratioCache = new Map();
+            const getPlayerRatios = (p) => {
+                if (ratioCache.has(p.id)) return ratioCache.get(p.id);
+
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const playerTeam = String(p.team || p.cat || '').toLowerCase();
+                let presences = 0;
+                let totalSessions = 0;
+
+                Object.values(state.trainings || {}).forEach(session => {
+                    if (!session.date) return;
+
+                    const sessionDate = new Date(session.date + 'T12:00:00');
+                    sessionDate.setHours(0, 0, 0, 0);
+
+                    if (sessionDate >= today) return;
+
+                    // Ne compter que les séances de l'équipe du joueur
+                    if (String(session.team || '').toLowerCase() !== playerTeam) return;
+
+                    const presence = session.presence || {};
+
+                    // Ignorer les séances dont l'appel n'a pas été rempli
+                    if (Object.keys(presence).length === 0) return;
+
+                    totalSessions++;
+
+                    if (presence[p.id] === 'present' || presence[p.id] === 'retard') {
+                        presences++;
+                    }
+                });
+
+                const convocHistory = getConvocationHistoryForTeam(p.team || p.cat);
+                const matchStats = convocHistory.history[p.id] || emptyConvocationStats();
+
+                // Un joueur est « disponible » sur un match s'il n'était pas indisponible :
+                // les matchs où il s'est signalé absent ne relèvent pas du choix du coach.
+                const availableMatches = matchStats.total - matchStats.indispo;
+
+                const ratios = {
+                    presences,
+                    totalSessions,
+                    presencePct: totalSessions > 0 ? Math.round((presences / totalSessions) * 100) : null,
+                    convocHistory,
+                    matchStats,
+                    matchPct: matchStats.total > 0 ? Math.round((matchStats.played / matchStats.total) * 100) : null,
+                    availableMatches,
+                    availabilityPct: matchStats.total > 0 ? Math.round((availableMatches / matchStats.total) * 100) : null,
+                    indispoPct: matchStats.total > 0 ? Math.round((matchStats.indispo / matchStats.total) * 100) : null,
+                    // Taux de sélection : joué parmi les matchs où il était disponible
+                    selectionPct: availableMatches > 0 ? Math.round((matchStats.played / availableMatches) * 100) : null
+                };
+
+                ratioCache.set(p.id, ratios);
+                return ratios;
+            };
+
+            // Tri choisi dans le sélecteur de l'onglet Effectif
+            if (effectifSortMode !== 'default') {
+                const byName = (a, b) => formatPlayerName(a).localeCompare(formatPlayerName(b), 'fr', { sensitivity: 'base' });
+                const sortValue = (p) => {
+                    const r = getPlayerRatios(p);
+                    switch (effectifSortMode) {
+                        case 'gap':
+                            // Écart séances / sélection réelle : les matchs d'indisponibilité
+                            // ne comptent pas, sinon un joueur blessé paraît « peu utilisé ».
+                            return (r.presencePct !== null && r.selectionPct !== null && r.availableMatches >= 2)
+                                ? r.presencePct - r.selectionPct
+                                : null;
+                        case 'presence-desc':
+                        case 'presence-asc':
+                            return r.presencePct;
+                        case 'match-desc':
+                        case 'match-asc':
+                            return r.matchPct;
+                        default:
+                            return null;
+                    }
+                };
+                const ascending = effectifSortMode === 'presence-asc' || effectifSortMode === 'match-asc';
+
+                playersToDisplay = [...playersToDisplay].sort((a, b) => {
+                    const va = sortValue(a);
+                    const vb = sortValue(b);
+                    const aEmpty = va === null || va === undefined;
+                    const bEmpty = vb === null || vb === undefined;
+                    if (aEmpty && bEmpty) return byName(a, b);
+                    if (aEmpty) return 1;
+                    if (bEmpty) return -1;
+                    if (va !== vb) return ascending ? va - vb : vb - va;
+                    return byName(a, b);
+                });
+            }
+
             const container = document.getElementById('effectif-full-container');
-            container.innerHTML = playersToDisplay.map(p => {
+            container.innerHTML = playersToDisplay.map((p, index) => {
                 const p1 = p.poste1 || '-', p2 = p.poste2 || '-', p3 = p.poste3 || '-';
                 const niveau = p.niveau || 2;
 
@@ -2445,46 +2544,8 @@ const niveauBadge =
                 const injuryHistoryText = formatPlayerInjuryHistory(injuryInfo);
 
 
-                // Calcul présences entraînements (nouveau format)
-                const today = new Date();
-today.setHours(0,0,0,0);
-
-let presences = 0;
-let totalSessions = 0;
-
-Object.values(state.trainings).forEach(session => {
-    if (!session.date) return;
-
-    const sessionDate = new Date(session.date + 'T12:00:00');
-    sessionDate.setHours(0,0,0,0);
-
-    if (sessionDate >= today) return;
-
-    // Ne compter que les séances de l'équipe du joueur
-    if (
-        (session.team || '').toLowerCase() !==
-        (p.team || p.cat || '').toLowerCase()
-    ) {
-        return;
-    }
-
-    const presence = session.presence || {};
-
-    // Ignorer les séances dont l'appel n'a pas été rempli
-    if (Object.keys(presence).length === 0) {
-        return;
-    }
-
-    totalSessions++;
-
-    if (
-        presence[p.id] === 'present' ||
-        presence[p.id] === 'retard'
-    ) {
-        presences++;
-    }
-});
-                const presencePct = totalSessions > 0 ? Math.round((presences / totalSessions) * 100) : null;
+                // Présences et bilan de convocations (déjà calculés plus haut)
+                const { presences, totalSessions, presencePct, convocHistory, matchStats, matchPct, availableMatches, availabilityPct, indispoPct, selectionPct } = getPlayerRatios(p);
                 const attendanceBadge = presencePct !== null && presencePct < 50 ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-700">⚠️ Assiduité faible</span>' : '';
                 const presenceColor = presencePct === null ? 'text-slate-400' : presencePct >= 75 ? 'text-emerald-600' : presencePct >= 50 ? 'text-amber-600' : 'text-red-600';
 
@@ -2499,11 +2560,40 @@ Object.values(state.trainings).forEach(session => {
                     : 'Aucune réponse covoiturage enregistrée';
 
                 // Bilan convocations sur les matchs passés de son équipe
-                const convocHistory = getConvocationHistoryForTeam(p.team || p.cat);
-                const matchStats = convocHistory.history[p.id] || emptyConvocationStats();
                 const playerRecord = (convocHistory.records || {})[p.id] || null;
-                const matchPct = matchStats.total > 0 ? Math.round((matchStats.played / matchStats.total) * 100) : null;
                 const matchColor = matchPct === null ? 'text-slate-400' : matchPct >= 75 ? 'text-emerald-600' : matchPct >= 50 ? 'text-amber-600' : 'text-red-600';
+
+                // Joueur peu utilisé alors qu'il est assidu aux entraînements
+                // (on ignore les matchs où il s'était signalé indisponible)
+                const underplayGap = (presencePct !== null && selectionPct !== null && availableMatches >= 2)
+                    ? presencePct - selectionPct
+                    : null;
+                const underplayBadge = underplayGap !== null && underplayGap >= 25 && presencePct >= 60
+                    ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-700" title="${presencePct}% de présence aux séances mais ${selectionPct}% de sélection sur les ${availableMatches} match(s) où il était disponible">📉 Peu utilisé (+${underplayGap} pts)</span>`
+                    : '';
+
+                // Rang dans le classement courant : les taux sont déjà lisibles sur
+                // les jauges de la fiche, on n'ajoute que l'écart quand il existe.
+                const rankNumber = index + 1;
+                let rankDetail = '';
+                let rankLabel = '';
+
+                if (effectifSortMode === 'gap') {
+                    rankDetail = underplayGap !== null
+                        ? `écart séances − sélection ${underplayGap > 0 ? '+' : ''}${underplayGap} pts (${matchStats.played}/${availableMatches} joués quand disponible)`
+                        : 'données incomplètes (moins de 2 matchs disponibles)';
+                    rankLabel = underplayGap !== null ? `#${rankNumber} · ${underplayGap > 0 ? '+' : ''}${underplayGap} pts` : `#${rankNumber}`;
+                } else if (effectifSortMode.startsWith('presence')) {
+                    rankDetail = presencePct !== null ? `${presencePct} % de séances` : 'aucune séance pointée';
+                    rankLabel = `#${rankNumber}`;
+                } else if (effectifSortMode.startsWith('match')) {
+                    rankDetail = matchPct !== null ? `${matchPct} % de matchs` : 'aucun match passé';
+                    rankLabel = `#${rankNumber}`;
+                }
+
+                const rankBadge = rankLabel
+                    ? `<span class="effectif-rank px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Rang ${rankNumber} dans le classement — ${rankDetail}">${rankLabel}</span>`
+                    : '';
 
                                 const initials = (p.name || '?')
                     .split(/\s+/)
@@ -2513,11 +2603,11 @@ Object.values(state.trainings).forEach(session => {
                     .join('');
 
                 const matchHint = matchPct !== null
-                    ? `${matchStats.played} convoqué(s) sur ${matchStats.total} match(s)`
+                    ? `${matchStats.played} joué(s) sur ${matchStats.total} match(s) · ${matchStats.choix} non convoqué(s) · ${matchStats.indispo} indispo`
                     : (convocHistory.matches.length ? 'Aucun statut enregistré' : 'Aucun match passé');
 
                 return `
-                <article class="player-row" style="--team-color:${getTeamHex(p.team || p.cat)}">
+                <article class="player-row" style="--team-color:${getTeamHex(p.team || p.cat)}" data-player-search="${((p.name || '') + ' ' + (p.licence || '')).replace(/"/g, '&quot;')}" data-player-team="${String(p.team || p.cat || '').replace(/"/g, '&quot;')}">
                     <div class="player-avatar ${teamColors.badge}" aria-hidden="true">${initials}</div>
 
                     <div class="min-w-0 flex-1">
@@ -2547,6 +2637,12 @@ Object.values(state.trainings).forEach(session => {
                                     <span class="player-gauge-value ${matchColor}">${matchPct !== null ? matchPct + '%' : '—'}</span>
                                 </span>
                                 <span class="player-gauge-label"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i>Matchs</span>
+                            </div>
+                            <div class="player-gauge ${availabilityPct === null ? 'is-empty' : ''}" title="${availabilityPct !== null ? `${availableMatches} match(s) disponible(s) sur ${matchStats.total} · ${matchStats.indispo} indispo (${indispoPct} %)` : 'Aucun match passé'}">
+                                <span class="player-gauge-ring" style="--pct:${availabilityPct !== null ? availabilityPct : 0}">
+                                    <span class="player-gauge-value ${availabilityPct === null ? 'text-slate-400' : availabilityPct >= 75 ? 'text-emerald-600' : availabilityPct >= 50 ? 'text-amber-600' : 'text-orange-600'}">${availabilityPct !== null ? availabilityPct + '%' : '—'}</span>
+                                </span>
+                                <span class="player-gauge-label"><i class="fa-solid fa-kit-medical" aria-hidden="true"></i>Dispo</span>
                             </div>
                             <div class="player-gauge ${presencePct === null ? 'is-empty' : ''}" title="${presencePct !== null ? presences + ' présence(s) sur ' + totalSessions + ' séance(s)' : 'Aucune séance passée'}">
                                 <span class="player-gauge-ring" style="--pct:${presencePct !== null ? presencePct : 0}">
@@ -2581,8 +2677,10 @@ Object.values(state.trainings).forEach(session => {
                         </div>
 
                         <div class="flex flex-wrap items-center gap-1 mt-2.5">
+                            ${rankBadge}
                             ${niveauBadge}
                             ${attendanceBadge}
+                            ${underplayBadge}
                             ${autoBadge}
                             ${playerRecordBadges(playerRecord, { compact: true })}
                         </div>
@@ -2596,7 +2694,15 @@ Object.values(state.trainings).forEach(session => {
                                 </div>
                                 <div class="player-detail-item">
                                     <span class="player-detail-label">Convocations</span>
-                                    <span class="player-detail-value">${matchStats.total > 0 ? `${matchStats.played} retenu(s) · ${matchStats.choix} choix · ${matchStats.indispo} indispo` : '—'}</span>
+                                    <span class="player-detail-value">${matchStats.total > 0 ? `${matchStats.played} joué(s) · ${matchStats.choix} non convoqué(s) · ${matchStats.indispo} indispo sur ${matchStats.total} match(s)` : '—'}</span>
+                                </div>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Disponibilité</span>
+                                    <span class="player-detail-value">${availabilityPct !== null ? `${availableMatches}/${matchStats.total} match(s) (${availabilityPct} %) · ${matchStats.indispo} indispo` : '—'}</span>
+                                </div>
+                                <div class="player-detail-item">
+                                    <span class="player-detail-label">Sélection</span>
+                                    <span class="player-detail-value">${selectionPct !== null ? `${matchStats.played}/${availableMatches} joué(s) quand disponible (${selectionPct} %)` : '—'}</span>
                                 </div>
                                 <div class="player-detail-item">
                                     <span class="player-detail-label">Résultats</span>
@@ -2626,9 +2732,56 @@ Object.values(state.trainings).forEach(session => {
 
             renderStaffEffectif();
             renderCarpoolRanking();
+
+            const sortSelect = document.getElementById('effectif-sort');
+            if (sortSelect) sortSelect.value = effectifSortMode;
+
+            // Explication du classement courant + réapplication des filtres actifs
+            updateEffectifSortHint(playersToDisplay.length);
+            filterPlayers();
         }
 
         window.renderEffectif = renderEffectif;
+
+        // Texte d'aide qui explique le classement affiché (et non juste le tri)
+        function effectifSortHintText(mode, count) {
+            const joueurs = count > 1 ? `${count} joueurs classés` : `${count} joueur classé`;
+
+            switch (mode) {
+                case 'gap':
+                    return `Écart entre présence aux séances et sélection réelle : les matchs où le joueur s'était signalé indisponible ne comptent pas. Un joueur à 90 % de séances et 40 % de sélection (+50 pts) passe avant un joueur à 70 % / 50 % (+20 pts). ${joueurs}, joueurs ayant moins de 2 matchs disponibles en fin de liste.`;
+                case 'presence-desc':
+                    return `Classement par taux de présence aux séances, du plus assidu au moins assidu (séances passées de l'équipe). ${joueurs}.`;
+                case 'presence-asc':
+                    return `Classement par taux de présence aux séances, du moins assidu au plus assidu. ${joueurs}.`;
+                case 'match-desc':
+                    return `Classement par taux de matchs joués, du plus utilisé au moins utilisé (matchs passés de l'équipe). ${joueurs}.`;
+                case 'match-asc':
+                    return `Classement par taux de matchs joués, du moins utilisé au plus utilisé. ${joueurs}.`;
+                default:
+                    return '';
+            }
+        }
+
+        function updateEffectifSortHint(count = 0) {
+            const hint = document.getElementById('effectif-sort-hint');
+            if (!hint) return;
+
+            const texte = effectifSortHintText(effectifSortMode, count);
+            hint.classList.toggle('hidden', !texte);
+
+            if (texte) {
+                hint.innerHTML = `<i class="fa-solid fa-arrow-down-wide-short mr-1" aria-hidden="true"></i>${texte} <span class="font-bold">Le # devant chaque joueur indique son rang dans ce classement.</span>`;
+            }
+        }
+
+        // Change le tri des fiches joueurs (séances, matchs, écart entre les deux)
+        function setEffectifSort(mode) {
+            effectifSortMode = mode || 'default';
+            renderEffectif();
+        }
+
+        window.setEffectifSort = setEffectifSort;
 
         // Statistiques covoiturage d'un joueur, calculees sur les matchs existants
         // (une reponse orpheline, sans match, n'est pas comptee)
@@ -5639,11 +5792,16 @@ Un passager non déclaré = un enfant sans siège prévu.
                 return `<div class="mt-1 text-[10px] text-slate-400 italic" title="Aucun match passé avec cette équipe">— aucun match</div>`;
             }
             const pct = Math.round((s.played / s.total) * 100);
-            return `<div class="flex flex-wrap items-center gap-1 mt-1" title="${s.played} convoqué(s) · ${s.choix} choix du coach · ${s.indispo} indisponible(s) sur ${s.total} match(s) passé(s)">
+            const available = s.total - s.indispo;
+            const dispoPct = Math.round((available / s.total) * 100);
+            const selectionPct = available > 0 ? Math.round((s.played / available) * 100) : null;
+            return `<div class="flex flex-wrap items-center gap-1 mt-1" title="${s.played} joué(s) · ${s.choix} non convoqué(s) (choix) · ${s.indispo} indisponible(s) sur ${s.total} match(s) passé(s) — disponible sur ${available} match(s)">
                         <span class="px-1.5 py-0.5 rounded border border-sky-100 bg-sky-50 text-sky-700 font-bold">✅ ${s.played}</span>
                         <span class="px-1.5 py-0.5 rounded border border-orange-100 bg-orange-50 text-orange-700 font-bold">🟠 ${s.indispo}</span>
                         <span class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-600 font-bold">⚪ ${s.choix}</span>
-                        <span class="text-[10px] font-extrabold text-slate-400">${pct}%</span>
+                        <span class="text-[10px] font-extrabold text-slate-400" title="Part des matchs joués sur le total">${pct}% joués</span>
+                        <span class="text-[10px] font-bold text-orange-600" title="Part des matchs où il était disponible (hors indisponibilité)">${dispoPct}% dispo</span>
+                        ${selectionPct !== null ? `<span class="text-[10px] font-bold text-sky-600" title="Part des matchs joués parmi ceux où il était disponible">${selectionPct}% si dispo</span>` : ''}
                     </div>`;
         }
 
@@ -7031,59 +7189,29 @@ function updateDeadlinePreview() {
 }
 
 function filterPlayers(query = "") {
-
-    const q =
-        query.toLowerCase() ||
-        document.getElementById('search-player').value.toLowerCase();
-
-    const role = window.currentUserRole || 'public';
-    const userTeam = window.currentUserTeam || 'all';
-
-    let playersSource = state.players;
-
-if (role === 'responsable') {
-
-    const allowedTeams = userTeam
-        .split(',')
-        .map(t => t.trim().toLowerCase());
-
-    playersSource = state.players.filter(
-        p =>
-            allowedTeams.includes(
-                (p.team || p.cat || '').toLowerCase()
-            )
-    );
-
-} else if (role === 'coach') {
-
-    playersSource = state.players.filter(
-        p =>
-            (p.team || p.cat || '').toLowerCase() ===
-            userTeam.toLowerCase()
-    );
-}
+    const searchInput = document.getElementById('search-player');
+    const q = String(query || (searchInput ? searchInput.value : '') || '')
+        .toLowerCase()
+        .trim();
 
     const container = document.getElementById('effectif-full-container');
-    const cards = Array.from(container.children);
+    if (!container) return;
 
+    const catFilter = String(currentCatFilter || 'all').toLowerCase();
     let visibleCount = 0;
 
-    cards.forEach((card, i) => {
+    // On filtre directement les fiches affichées : l'ordre peut changer
+    // selon le tri choisi, les index de state.players ne correspondent plus.
+    Array.from(container.children).forEach(card => {
+        const haystack = String(card.dataset.playerSearch || '').toLowerCase();
+        const cardTeam = String(card.dataset.playerTeam || '').toLowerCase();
 
-        const player = playersSource[i];
-
-        if (!player) return;
-
-        const matchText =
-            player.name.toLowerCase().includes(q) ||
-            (player.licence && player.licence.toLowerCase().includes(q));
-
-        const matchCat =
-            currentCatFilter === 'all' ||
-            player.team === currentCatFilter;
-
+        const matchText = !q || haystack.includes(q);
+        const matchCat = catFilter === 'all' || cardTeam === catFilter;
         const visible = matchText && matchCat;
 
+        // Le rang affiché reste celui du classement complet, même si un
+        // filtre masque certains joueurs (pas de renumérotation trompeuse).
         if (visible) visibleCount++;
 
         // Une chaîne vide restaure le display défini par la feuille de styles
@@ -8352,6 +8480,12 @@ function updateTransportCarpoolLink(m) {
     if (!m) {
         link.style.display = 'none';
         link.removeAttribute('href');
+
+        const testLinkOff = document.getElementById('transport-covoiturage-test-link');
+        if (testLinkOff) {
+            testLinkOff.style.display = 'none';
+            testLinkOff.removeAttribute('href');
+        }
         return;
     }
 
@@ -8364,6 +8498,13 @@ function updateTransportCarpoolLink(m) {
     }
 
     link.href = `covoiturage.html?id=${encodeURIComponent(m.carpoolId)}`;
+
+    // Lien de test staff (?test=1) : même match, réponses dans une base d'essai
+    const testLink = document.getElementById('transport-covoiturage-test-link');
+    if (testLink) {
+        testLink.href = `covoiturage.html?id=${encodeURIComponent(m.carpoolId)}&test=1`;
+        testLink.style.display = 'inline-flex';
+    }
     link.style.display = 'inline-flex';
 }
 

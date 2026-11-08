@@ -30,6 +30,16 @@ const params =
 const carpoolId =
     params.get('id');
 
+// Mode test (staff, lien ?test=1) : les réponses vont dans un nœud
+// d'essai séparé, jamais dans carpoolResponses, donc elles n'entrent
+// dans aucune statistique ni dans le suivi du coach.
+const testMode =
+    params.get('test') === '1';
+
+const responsesPath = testMode
+    ? 'rangueil_data/carpoolTest/' + carpoolId
+    : 'rangueil_data/carpoolResponses/' + carpoolId;
+
 let match = null;
 let matchKey = null;
 let players = [];
@@ -38,6 +48,8 @@ let closed = false;
 let me = '';
 let chosenStatus = '';
 let chosenSeats = 0;
+let chosenPassengers = [];
+let chosenDriver = '';
 let teamsConfig = {};
 
 // Même règle que l'app principale : le nom s'arrête au premier mot non majuscules
@@ -187,10 +199,21 @@ function liveData() {
 
                 passengerIds.forEach(pid => placed.add(pid));
 
+                const requestedIds = Object.entries(responses)
+                    .filter(([pid, pr]) =>
+                        pid !== id &&
+                        pr &&
+                        pr.status === 'passenger' &&
+                        pr.driverId === id &&
+                        !passengerIds.includes(pid)
+                    )
+                    .map(([pid]) => playerShort(pid));
+
                 attr.push({
                     name: playerShort(id),
                     seats: r.seats || 0,
-                    passengers: passengerIds.map(playerShort)
+                    passengers: passengerIds.map(playerShort),
+                    requests: requestedIds
                 });
 
             }
@@ -219,7 +242,9 @@ function liveData() {
 
     const toPlace = Object.entries(responses)
         .filter(([id, r]) => r.status === 'passenger' && !placed.has(id))
-        .map(([id]) => playerShort(id));
+        .map(([id, r]) => r.driverId
+            ? playerShort(id) + ' → ' + playerShort(r.driverId)
+            : playerShort(id));
 
     return {
         drivers,
@@ -345,6 +370,14 @@ function renderMatchInfo() {
           + '&travelmode=driving&avoid=tolls'
         : '';
 
+    // Variante 100 % navigateur : aucune application à installer.
+    // Apple Plans s'ouvre dans le navigateur sur Android et dans l'app
+    // déjà présente sur iPhone (aucune installation dans les deux cas).
+    const webMapsUrl = destination
+        ? 'https://maps.apple.com/?daddr=' + encodeURIComponent(destination)
+          + '&dirflg=d'
+        : '';
+
     el.innerHTML = `
         <div class="font-bold text-sky-900 text-lg">
             🏆 ${match.type || ''}
@@ -361,7 +394,7 @@ function renderMatchInfo() {
         <div class="mt-3 space-y-2">
 
             ${mapsUrl ? `
-            <a href="${mapsUrl}" target="_blank" rel="noopener"
+            <a href="${mapsUrl}" rel="noopener"
                title="Ouvrir l'itinéraire dans Google Maps, sans péage"
                class="group flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-700 hover:to-sky-600 text-white shadow-md shadow-sky-200 transition">
                 <span class="flex items-center justify-center w-10 h-10 rounded-full bg-white shrink-0">
@@ -385,7 +418,22 @@ function renderMatchInfo() {
                     </span>
                 </span>
                 <span class="shrink-0 text-xl opacity-80 group-hover:translate-x-0.5 transition-transform">→</span>
-            </a>` : ''}
+            </a>
+
+            <div class="grid grid-cols-2 gap-2">
+                <a href="${webMapsUrl}" rel="noopener"
+                   title="Itinéraire dans le navigateur, sans installer d'application"
+                   class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-sky-300 text-sky-800 text-[12px] font-bold hover:bg-sky-50 transition">
+                    🌐 Sans application
+                </a>
+                <button type="button" id="copy-address"
+                        title="Copie l'adresse du stade pour la coller dans ton GPS"
+                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 text-[12px] font-bold hover:bg-slate-50 transition">
+                    📋 Copier l'adresse
+                </button>
+            </div>
+
+            <p id="copy-address-status" class="text-[11px] font-semibold text-emerald-700 text-center"></p>` : ''}
 
             <div class="flex items-start gap-3 bg-white border border-sky-300 rounded-xl p-3">
                 <div class="text-xl leading-none mt-0.5">🕐</div>
@@ -424,6 +472,53 @@ function renderMatchInfo() {
 
         </div>
     `;
+
+    // Copie de l'adresse : pour ceux qui ne veulent installer aucune application
+    const copyBtn = document.getElementById('copy-address');
+
+    if (copyBtn) {
+
+        copyBtn.addEventListener('click', () => {
+
+            const status =
+                document.getElementById('copy-address-status');
+
+            const done = msg => { if (status) status.textContent = msg; };
+
+            const fallback = () => {
+
+                const field = document.createElement('textarea');
+                field.value = destination;
+                field.style.position = 'fixed';
+                field.style.opacity = '0';
+                document.body.appendChild(field);
+                field.select();
+
+                let ok = false;
+                try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+                document.body.removeChild(field);
+
+                done(ok
+                    ? 'Adresse copiée ✓'
+                    : 'Copie impossible : sélectionne l\'adresse à la main.');
+
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+
+                navigator.clipboard.writeText(destination)
+                    .then(() => done('Adresse copiée ✓'))
+                    .catch(fallback);
+
+            } else {
+
+                fallback();
+
+            }
+
+        });
+
+    }
 
 }
 
@@ -520,6 +615,8 @@ function renderLive() {
 
     const myDriverId = me
         ? Object.keys(responses).find(id => responses[id] && responses[id].status === 'driver' && Array.isArray(responses[id].passengers) && responses[id].passengers.includes(me))
+          || (myR && myR.driverId)
+          || null
         : null;
 
     const directNames = convokedPlayers()
@@ -547,14 +644,30 @@ function renderLive() {
             const seats = myR.seats || 0;
             const filled = Array.isArray(myR.passengers) ? myR.passengers.length : 0;
 
+            const asks = Object.entries(responses)
+                .filter(([id, r]) =>
+                    id !== me &&
+                    r &&
+                    r.status === 'passenger' &&
+                    r.driverId === me &&
+                    !(Array.isArray(myR.passengers) && myR.passengers.includes(id))
+                )
+                .length;
+
             title = '🚗 Tu conduis';
-            detail = `${filled}/${seats} place(s) occupée(s) · Départ ${rdvTime} — ${meetingPlace}`;
+            detail = `${filled}/${seats} place(s) occupée(s)${asks ? ` · 🙋 ${asks} demande(s)` : ''} · Départ ${rdvTime} — ${meetingPlace}`;
             cls = 'bg-sky-50 border-sky-300 text-sky-900';
 
         } else if (myR.status === 'passenger') {
 
+            const placed = !!(myDriverId &&
+                responses[myDriverId] &&
+                Array.isArray(responses[myDriverId].passengers) &&
+                responses[myDriverId].passengers.includes(me));
+
             title = '👤 Tu es passager' + (myDriverId ? ' de ' + playerShort(myDriverId) : '');
-            detail = `Rendez-vous ${rdvTime} — ${meetingPlace}`;
+            detail = `Rendez-vous ${rdvTime} — ${meetingPlace}`
+                + (myDriverId && !placed ? ' · place à confirmer' : '');
             cls = 'bg-emerald-50 border-emerald-300 text-emerald-900';
 
         } else if (myR.status === 'direct') {
@@ -610,6 +723,10 @@ function renderLive() {
                         </div>
                         <div class="mt-1.5 flex items-center gap-1">${dots}</div>
                         <p class="mt-1 text-[11px] text-slate-600">${filled ? a.passengers.join(', ') : '<span class="text-slate-400">Personne pour le moment</span>'}</p>
+                        ${a.requests && a.requests.length ? `
+                        <p class="mt-1 text-[11px] font-semibold text-amber-700">
+                            🙋 ${a.requests.join(', ')} souhaite(nt) monter
+                        </p>` : ''}
                     </div>`;
                 }).join('') : '<p class="text-xs text-slate-400 italic">Aucune voiture proposée pour le moment.</p>'}
             </div>
@@ -653,8 +770,21 @@ function renderAll() {
 
     renderMatchInfo();
     renderLockBanner();
+    renderTestBanner();
     renderLive();
-    renderMyAssignment();
+    updateZones();
+
+}
+
+// Bandeau visible uniquement avec le lien de test (?test=1)
+function renderTestBanner() {
+
+    const el =
+        document.getElementById('test-banner');
+
+    if (!el) return;
+
+    el.classList.toggle('hidden', !testMode);
 
 }
 
@@ -677,6 +807,204 @@ function toggleDriverZone(show) {
 
 }
 
+// Affiche la zone conducteur ou la zone passager selon le choix,
+// puis repeint les deux sélecteurs.
+function updateZones() {
+
+    toggleDriverZone(chosenStatus === 'driver');
+
+    const passengerZone =
+        document.getElementById('passenger-zone');
+
+    if (passengerZone) {
+
+        passengerZone.classList.toggle(
+            'hidden',
+            chosenStatus !== 'passenger'
+        );
+
+    }
+
+    renderMyAssignment();
+    renderPassengerCars();
+
+}
+
+// Passagers que je peux encore prendre dans ma voiture
+function passengerCandidates() {
+
+    if (!me) return [];
+
+    const placedByOthers = new Set();
+
+    Object.entries(responses).forEach(([id, r]) => {
+
+        if (id === me || !r) return;
+
+        if (r.status === 'driver' && Array.isArray(r.passengers)) {
+
+            r.passengers.forEach(pid => placedByOthers.add(pid));
+
+        }
+
+    });
+
+    return convokedPlayers()
+        .filter(p => p.id !== me)
+        .filter(p => !placedByOthers.has(p.id))
+        .filter(p => {
+
+            const r = responses[p.id];
+
+            if (!r || r.status !== 'passenger') return false;
+
+            // Il a déjà choisi une autre voiture
+            if (r.driverId && r.driverId !== me) return false;
+
+            return true;
+
+        })
+        .map(p => ({
+            id: p.id,
+            name: p.name,
+            requested: !!(responses[p.id] && responses[p.id].driverId === me)
+        }))
+        .sort((a, b) =>
+            (b.requested ? 1 : 0) - (a.requested ? 1 : 0)
+            || String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' })
+        );
+
+}
+
+// Voitures proposées, avec leurs places libres
+function driverCars() {
+
+    const cars = [];
+
+    Object.entries(responses).forEach(([id, r]) => {
+
+        if (!r || r.status !== 'driver') return;
+
+        const seats = r.seats || 0;
+
+        if (seats <= 0) return;
+
+        const current = Array.isArray(r.passengers) ? r.passengers : [];
+
+        const requests = Object.entries(responses)
+            .filter(([pid, pr]) =>
+                pid !== id &&
+                pr &&
+                pr.status === 'passenger' &&
+                pr.driverId === id &&
+                !current.includes(pid)
+            )
+            .map(([pid]) => playerShort(pid));
+
+        cars.push({
+            id,
+            name: playerShort(id),
+            seats,
+            current,
+            free: Math.max(0, seats - current.length),
+            requests
+        });
+
+    });
+
+    return cars.sort((a, b) =>
+        b.free - a.free
+        || String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' })
+    );
+
+}
+
+function renderPassengerCars() {
+
+    const container =
+        document.getElementById('passenger-cars');
+
+    if (!container) return;
+
+    if (!me || chosenStatus !== 'passenger') {
+
+        container.innerHTML = '';
+        return;
+
+    }
+
+    const cars =
+        driverCars().filter(c => c.free > 0 || c.current.includes(me));
+
+    if (!cars.length) {
+
+        container.innerHTML = `
+            <p class="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                Aucune voiture avec de la place pour le moment.
+                Choisis « J'y vais directement » ou réessaie plus tard.
+            </p>
+        `;
+
+        return;
+
+    }
+
+    container.innerHTML = cars.map(c => {
+
+        const picked = chosenDriver === c.id;
+
+        return `
+            <button
+                type="button"
+                data-driver="${c.id}"
+                class="w-full text-left rounded-xl border-2 p-3 transition ${picked
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : 'border-slate-200 bg-white hover:border-emerald-300'}">
+
+                <div class="flex items-center justify-between gap-2">
+
+                    <span class="font-bold text-slate-800 text-sm">🚗 ${c.name}</span>
+
+                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${c.free > 0
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-slate-100 text-slate-500'}">
+                        ${c.free} place(s) libre(s)
+                    </span>
+
+                </div>
+
+                <p class="mt-1 text-[11px] text-slate-600">
+                    ${c.current.length
+                        ? c.current.map(playerShort).join(', ')
+                        : 'Personne pour le moment'}
+                </p>
+
+                ${c.requests.length ? `
+                <p class="mt-1 text-[11px] font-semibold text-amber-700">
+                    🙋 ${c.requests.join(', ')} souhaite(nt) monter
+                </p>` : ''}
+
+            </button>
+        `;
+
+    }).join('');
+
+    container.querySelectorAll('button[data-driver]').forEach(btn => {
+
+        btn.addEventListener('click', () => {
+
+            const id = btn.getAttribute('data-driver');
+
+            chosenDriver = chosenDriver === id ? '' : id;
+
+            renderPassengerCars();
+
+        });
+
+    });
+
+}
+
 function prefillForm() {
 
     const r = myResponse();
@@ -689,6 +1017,8 @@ function prefillForm() {
 
     chosenStatus = '';
     chosenSeats = 0;
+    chosenPassengers = [];
+    chosenDriver = '';
 
     const seatsSelect =
         document.getElementById('available-seats');
@@ -714,13 +1044,21 @@ function prefillForm() {
 
             if (seatsSelect) seatsSelect.value = String(chosenSeats);
 
+            chosenPassengers = Array.isArray(r.passengers)
+                ? r.passengers.slice(0, chosenSeats)
+                : [];
+
+        }
+
+        if (r.status === 'passenger') {
+
+            chosenDriver = r.driverId || '';
+
         }
 
     }
 
-    toggleDriverZone(chosenStatus === 'driver');
-
-    renderMyAssignment();
+    updateZones();
 
 }
 
@@ -771,9 +1109,7 @@ function enableForm() {
 
                 chosenStatus = radio.value;
 
-                toggleDriverZone(chosenStatus === 'driver');
-
-                renderMyAssignment();
+                updateZones();
 
             }
 
@@ -790,7 +1126,10 @@ function enableForm() {
 
             chosenSeats = parseInt(seatsSelect.value) || 0;
 
-            renderMyAssignment();
+            chosenPassengers =
+                chosenPassengers.slice(0, chosenSeats);
+
+            updateZones();
 
         });
 
@@ -805,36 +1144,24 @@ function enableForm() {
 
     }
 
-}
+    // Mode test : remise à zéro du bac à sable (le nœud réel n'est jamais touché)
+    const resetBtn =
+        document.getElementById('test-reset');
 
-function guestPassengerIds() {
+    if (resetBtn && testMode) {
 
-    const placed = new Set();
+        resetBtn.addEventListener('click', () => {
 
-    Object.values(responses).forEach(r => {
+            if (!window.confirm('Vider toutes les réponses de test ? Les vraies réponses sont conservées.')) return;
 
-        if (
-            r.status === 'driver' &&
-            Array.isArray(r.passengers)
-        ) {
+            db.ref(responsesPath)
+                .remove()
+                .then(() => showMessage('🧪 Réponses de test vidées.', false))
+                .catch(error => showMessage('Erreur : ' + error.message, true));
 
-            r.passengers.forEach(pid => placed.add(pid));
+        });
 
-        }
-
-    });
-
-    return Object.entries(responses)
-        .filter(([id, r]) =>
-            r.status === 'passenger' &&
-            id !== me &&
-            !placed.has(id)
-        )
-        .map(([id]) => id)
-        .map(id => players.find(p => p.id === id))
-        .filter(Boolean)
-        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-        .map(p => ({ id: p.id, name: p.name }));
+    }
 
 }
 
@@ -845,90 +1172,91 @@ function renderMyAssignment() {
 
     if (!container) return;
 
-    const r = myResponse();
-
-    if (
-        !me ||
-        !r ||
-        r.status !== 'driver' ||
-        (r.seats || 0) <= 0 ||
-        closed
-    ) {
+    if (!me || chosenStatus !== 'driver') {
 
         container.innerHTML = '';
         return;
 
     }
 
-    const seats = r.seats || 0;
+    const seats = parseInt(chosenSeats) || 0;
 
-    const available =
-        guestPassengerIds();
+    const remain = Math.max(0, seats - chosenPassengers.length);
 
-    const current =
-        Array.isArray(r.passengers) ? r.passengers : [];
-
-    const remain =
-        seats - current.length;
+    const candidates = passengerCandidates();
 
     let html = `
-        <div class="p-4 mb-5 rounded-xl bg-sky-50 border border-sky-200">
+        <div class="p-3 rounded-xl bg-sky-50 border border-sky-200">
 
             <div class="flex items-center justify-between gap-2 mb-2">
 
-                <label class="font-bold text-slate-700 text-sm">
-                    🚗 Mes passagers
-                </label>
+                <p class="font-bold text-slate-700 text-sm">
+                    👥 Mes passagers
+                </p>
 
                 <span class="text-xs font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full">
-                    ${current.length} / ${seats} places
+                    ${chosenPassengers.length} / ${seats} places
                 </span>
 
             </div>
     `;
 
-    if (available.length === 0 && current.length === 0) {
+    if (seats <= 0) {
 
         html += `
-            <p class="text-xs text-slate-400">
+            <p class="text-xs text-slate-500">
+                Choisis d'abord le nombre de places de ta voiture.
+            </p>
+        `;
+
+    } else if (candidates.length === 0) {
+
+        html += `
+            <p class="text-xs text-slate-500">
                 Aucun passager à placer pour le moment.
             </p>
         `;
 
     } else {
 
-        available.forEach(p => {
+        html += '<div class="space-y-1.5">';
 
-            const checked = current.includes(p.id);
+        candidates.forEach(c => {
 
-            const disabled = !checked && remain <= 0;
+            const picked = chosenPassengers.includes(c.id);
+
+            const disabled = !picked && remain <= 0;
 
             html += `
-                <label class="flex items-center gap-2 py-1 text-sm ${disabled ? 'opacity-50' : ''}">
+                <label class="flex items-center gap-3 px-3 py-2 rounded-xl border bg-white ${picked
+                    ? 'border-sky-400 ring-1 ring-sky-200'
+                    : 'border-slate-200'} ${disabled ? 'opacity-40' : 'cursor-pointer'}">
+
                     <input
                         type="checkbox"
-                        data-pid="${p.id}"
-                        ${checked ? 'checked' : ''}
+                        class="w-4 h-4 accent-sky-600"
+                        data-candidate="${c.id}"
+                        ${picked ? 'checked' : ''}
                         ${disabled ? 'disabled' : ''}>
-                    ${p.name}
+
+                    <span class="text-sm font-semibold text-slate-700">${c.name}</span>
+
+                    ${c.requested
+                        ? '<span class="ml-auto text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">🙋 demande</span>'
+                        : ''}
+
                 </label>
             `;
 
         });
 
-        html += `
-            <button
-                onclick="saveAssignment()"
-                class="mt-3 w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-2.5 rounded-xl text-sm">
-                Enregistrer mes passagers
-            </button>
-        `;
+        html += '</div>';
 
         if (remain > 0) {
 
             html += `
                 <p class="mt-2 text-[11px] text-slate-500">
-                    ${remain} place(s) encore disponible(s).
+                    ${remain} place(s) encore libre(s).
                 </p>
             `;
 
@@ -939,6 +1267,40 @@ function renderMyAssignment() {
     html += '</div>';
 
     container.innerHTML = html;
+
+    container.querySelectorAll('input[data-candidate]').forEach(cb => {
+
+        cb.addEventListener('change', () => {
+
+            const id = cb.getAttribute('data-candidate');
+
+            if (cb.checked) {
+
+                if (chosenPassengers.length >= seats) {
+
+                    cb.checked = false;
+                    return;
+
+                }
+
+                if (!chosenPassengers.includes(id)) {
+
+                    chosenPassengers.push(id);
+
+                }
+
+            } else {
+
+                chosenPassengers =
+                    chosenPassengers.filter(pid => pid !== id);
+
+            }
+
+            renderMyAssignment();
+
+        });
+
+    });
 
 }
 
@@ -959,13 +1321,16 @@ function saveResponse() {
         return;
     }
 
+    const seats =
+        Math.max(0, parseInt(chosenSeats) || 0);
+
     const payload = {
 
         status: chosenStatus,
 
         seats:
             chosenStatus === 'driver'
-                ? parseInt(chosenSeats) || 0
+                ? seats
                 : 0,
 
         updatedAt: Date.now()
@@ -974,76 +1339,47 @@ function saveResponse() {
 
     if (chosenStatus === 'driver') {
 
-        const prev = responses[me];
-
         payload.passengers =
-            prev &&
-            prev.status === 'driver' &&
-            Array.isArray(prev.passengers)
-                ? prev.passengers.slice()
-                : [];
+            chosenPassengers.slice(0, seats);
 
-        if (payload.passengers.length > payload.seats) {
+    }
 
-            payload.passengers =
-                payload.passengers.slice(0, payload.seats);
+    if (chosenStatus === 'passenger') {
 
-        }
+        payload.driverId = chosenDriver || '';
 
     }
 
     db.ref(
-        'rangueil_data/carpoolResponses/'
-        + carpoolId + '/'
+        responsesPath + '/'
         + me
     )
     .set(payload)
     .then(() => {
 
-        showMessage('✅ Réponse enregistrée. Merci !', false);
+        let text = '✅ Réponse enregistrée. Merci !';
+
+        if (chosenStatus === 'driver') {
+
+            text = `✅ Sélection validée : ${payload.passengers.length}/${seats} place(s) occupée(s).`;
+
+        } else if (chosenStatus === 'passenger' && chosenDriver) {
+
+            text = `✅ Sélection validée : tu montes avec ${playerShort(chosenDriver)}.`;
+
+        }
+
+        // En mode test, on rappelle que rien n'est parti dans le suivi réel
+        if (testMode) text = '🧪 Test (non enregistré dans les stats) — ' + text;
+
+        showMessage(text, false);
 
         const anotherBtn =
             document.getElementById('respond-another');
 
         if (anotherBtn) anotherBtn.classList.remove('hidden');
 
-        renderMyAssignment();
-
-    })
-    .catch(error => {
-
-        showMessage('Erreur : ' + error.message, true);
-
-    });
-
-}
-
-function saveAssignment() {
-
-    const r = myResponse();
-
-    if (!r) return;
-
-    const checks = document.querySelectorAll(
-        '#my-assignment input[type="checkbox"][data-pid]:checked'
-    );
-
-    const ids = Array.from(checks)
-        .map(x => x.getAttribute('data-pid'))
-        .slice(0, r.seats || 0);
-
-    db.ref(
-        'rangueil_data/carpoolResponses/'
-        + carpoolId + '/'
-        + me
-    )
-    .update({
-        passengers: ids,
-        updatedAt: Date.now()
-    })
-    .then(() => {
-
-        showMessage('✅ Passagers enregistrés. Merci !', false);
+        updateZones();
 
     })
     .catch(error => {
@@ -1059,6 +1395,8 @@ function respondForAnother() {
     me = '';
     chosenStatus = '';
     chosenSeats = 0;
+    chosenPassengers = [];
+    chosenDriver = '';
 
     const select =
         document.getElementById('player-select');
@@ -1083,7 +1421,7 @@ function respondForAnother() {
 
     if (anotherBtn) anotherBtn.classList.add('hidden');
 
-    renderMyAssignment();
+    updateZones();
 
 }
 
@@ -1097,14 +1435,14 @@ function afterInit() {
 
             match = snapshot.val() || match;
 
-            closed = !!(match && match.carpoolClosed);
+            closed = testMode ? false : !!(match && match.carpoolClosed);
 
             renderAll();
 
         });
 
     db.ref(
-        'rangueil_data/carpoolResponses/' + carpoolId
+        responsesPath
     )
     .on('value', snapshot => {
 
@@ -1189,6 +1527,22 @@ db.ref('rangueil_data/matches')
     </div>
 
     <div
+        id="test-banner"
+        class="hidden mb-5 p-4 rounded-xl bg-violet-100 border border-violet-300 text-violet-900 text-sm">
+        <p class="font-extrabold">🧪 Mode test</p>
+        <p class="text-[12px] font-semibold mt-0.5">
+            Les réponses vont dans une base d'essai : elles n'apparaissent pas
+            dans le suivi du coach et ne comptent dans aucune statistique.
+        </p>
+        <button
+            type="button"
+            id="test-reset"
+            class="mt-2 px-3 py-1.5 rounded-lg bg-white border border-violet-300 text-violet-800 text-[11px] font-bold hover:bg-violet-50">
+            Vider les réponses de test
+        </button>
+    </div>
+
+    <div
         id="lock-warning"
         class="hidden mb-5 p-4 rounded-xl bg-sky-100 border border-sky-300 text-sky-900 font-bold text-sm">
         🔒 Le covoiturage a été confirmé par le coach.
@@ -1231,45 +1585,59 @@ db.ref('rangueil_data/matches')
 
         </div>
 
-        <div id="my-assignment"></div>
-
         <!-- Mode de déplacement -->
-        <div class="space-y-3 mb-5">
+        <p class="block font-bold text-slate-700 mb-2">
+            Mon déplacement
+        </p>
 
-            <label class="flex items-center gap-3 text-xl">
+        <div class="grid grid-cols-2 gap-2 mb-5">
+
+            <label class="cursor-pointer">
                 <input
                     type="radio"
                     name="transport"
-                    value="driver">
-
-                🚗 Je conduis
+                    value="driver"
+                    class="sr-only peer">
+                <div class="h-full rounded-xl border-2 border-slate-200 bg-white p-3 text-center transition peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-800 peer-focus-visible:ring-2 peer-focus-visible:ring-sky-400">
+                    <div class="text-2xl">🚗</div>
+                    <div class="text-sm font-bold mt-1">Je conduis</div>
+                </div>
             </label>
 
-            <label class="flex items-center gap-3 text-xl">
+            <label class="cursor-pointer">
                 <input
                     type="radio"
                     name="transport"
-                    value="passenger">
-
-                👤 Je suis passager
+                    value="passenger"
+                    class="sr-only peer">
+                <div class="h-full rounded-xl border-2 border-slate-200 bg-white p-3 text-center transition peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-800 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-400">
+                    <div class="text-2xl">👤</div>
+                    <div class="text-sm font-bold mt-1">Je suis passager</div>
+                </div>
             </label>
 
-            <label class="flex items-center gap-3 text-xl">
+            <label class="cursor-pointer">
                 <input
                     type="radio"
                     name="transport"
-                    value="direct">
-
-                   📍 J'y vais directement
+                    value="direct"
+                    class="sr-only peer">
+                <div class="h-full rounded-xl border-2 border-slate-200 bg-white p-3 text-center transition peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-800 peer-focus-visible:ring-2 peer-focus-visible:ring-amber-400">
+                    <div class="text-2xl">📍</div>
+                    <div class="text-sm font-bold mt-1">J'y vais directement</div>
+                </div>
             </label>
 
-            <label class="flex items-center gap-3 text-xl">
+            <label class="cursor-pointer">
                 <input
                     type="radio"
                     name="transport"
-                    value="absent">
-
-                ❌ Absent
+                    value="absent"
+                    class="sr-only peer">
+                <div class="h-full rounded-xl border-2 border-slate-200 bg-white p-3 text-center transition peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-800 peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">
+                    <div class="text-2xl">❌</div>
+                    <div class="text-sm font-bold mt-1">Absent</div>
+                </div>
             </label>
 
         </div>
@@ -1278,7 +1646,7 @@ db.ref('rangueil_data/matches')
             id="driver-zone"
             class="hidden mb-5">
 
-            <label class="block font-bold text-slate-700 mb-2">
+            <label class="block font-bold text-slate-700 mb-2" for="available-seats">
                 Nombre de places disponibles
             </label>
 
@@ -1295,13 +1663,31 @@ db.ref('rangueil_data/matches')
 
             </select>
 
+            <div id="my-assignment" class="mt-3"></div>
+
+        </div>
+
+        <div
+            id="passenger-zone"
+            class="hidden mb-5">
+
+            <p class="block font-bold text-slate-700 mb-2">
+                Avec quel conducteur ?
+            </p>
+
+            <div id="passenger-cars" class="space-y-2"></div>
+
+            <p class="mt-2 text-[11px] text-slate-500">
+                Ta place sera confirmée par le conducteur.
+            </p>
+
         </div>
 
         <button
             id="save-btn"
             class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-4 rounded-xl">
 
-            ✅ Valider ma réponse
+            ✅ Valider ma sélection
 
         </button>
 

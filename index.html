@@ -449,6 +449,19 @@
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
         </div>
 
+        <select
+            id="effectif-sort"
+            onchange="setEffectifSort(this.value)"
+            title="Trier les joueurs de l'effectif"
+            class="allow-public w-full sm:w-auto text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <option value="default">Classement : équipe & prénom</option>
+            <option value="gap">📉 Écart séances − matchs (assidus peu utilisés)</option>
+            <option value="presence-desc">Séances : du plus assidu au moins assidu</option>
+            <option value="presence-asc">Séances : du moins assidu au plus assidu</option>
+            <option value="match-asc">Matchs : du moins utilisé au plus utilisé</option>
+            <option value="match-desc">Matchs : du plus utilisé au moins utilisé</option>
+        </select>
+
         <button
             id="effectif-add-btn"
             onclick="openEffectifAdd()"
@@ -457,6 +470,9 @@
             <span>Ajouter</span>
         </button>
     </div>
+
+    <!-- Contenu rempli par updateEffectifSortHint() selon le classement choisi -->
+    <p id="effectif-sort-hint" class="hidden mt-2 text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2"></p>
 
 </div>
 
@@ -593,6 +609,18 @@
                     Suivi des réponses et organisation du déplacement
                 </p>
             </div>
+
+            <!-- Lien de test (staff) : réponses isolées, hors statistiques -->
+            <a id="transport-covoiturage-test-link"
+               href="#"
+               target="_blank"
+               rel="noopener"
+               title="Ouvre la page covoiturage en mode test : les réponses vont dans une base d'essai et ne comptent dans aucune statistique"
+               style="display:none"
+               class="shrink-0 items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg border border-slate-200 transition">
+                <i class="fa-solid fa-flask"></i>
+                Test
+            </a>
 
             <!-- Ouverture de la page publique telle que la voient parents et joueurs -->
             <a id="transport-covoiturage-link"
