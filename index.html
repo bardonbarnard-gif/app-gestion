@@ -8,9 +8,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
     
-    <meta name="theme-color" content="#0284c7">
+    <meta name="theme-color" content="#06121f">
+    <meta name="color-scheme" content="light">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Rangueil FC">
@@ -20,7 +23,7 @@
     
 
 </head>
-<body class="text-slate-800 pb-20 md:pb-10">
+<body class="app-body text-slate-800 pb-24 md:pb-10">
 
 <div id="pin-screen">
     <div class="pin-card">
@@ -80,10 +83,10 @@
 
 </div>
 
-    <header class="blue-gradient text-white sticky top-0 z-50 shadow-md">
-        <div class="max-w-7xl mx-auto px-3 py-2 flex justify-between items-center">
+    <header class="app-header text-white sticky top-0 z-50">
+        <div class="app-header-inner">
             <div class="flex items-center gap-3 min-w-0">
-                <div class="w-11 h-11 sm:w-14 sm:h-14 shrink-0">
+                <div class="brand-mark w-11 h-11 sm:w-14 sm:h-14 shrink-0">
 
     <img
         src="rangueil HQ.png"
@@ -114,40 +117,42 @@
 
 </div>
 
-     <nav class="hidden md:block bg-sky-950/40 backdrop-blur-sm border-t border-sky-500/20 px-2 py-2">
-    <div class="grid grid-cols-2 md:flex md:flex-nowrap gap-2 mx-auto max-w-7xl">
-        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition bg-white/20 text-white">
+</div>
+
+     <nav class="app-nav hidden md:block">
+    <div class="app-nav-track">
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-btn bg-white/20 text-white">
             <i class="fa-solid fa-chart-pie"></i><span>Tableau</span>
         </button>
 
-        <button onclick="switchTab('effectif')" id="tab-effectif" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+        <button onclick="switchTab('effectif')" id="tab-effectif" class="nav-btn">
             <i class="fa-solid fa-users"></i><span>Effectif & Stats</span>
         </button>
 
-        <button onclick="switchTab('matchs')" id="tab-matchs" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+        <button onclick="switchTab('matchs')" id="tab-matchs" class="nav-btn">
             <i class="fa-solid fa-trophy"></i><span>Matchs</span>
         </button>
-        <button onclick="switchTab('entrainements')" id="tab-entrainements" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+        <button onclick="switchTab('entrainements')" id="tab-entrainements" class="nav-btn">
             <i class="fa-solid fa-stopwatch"></i><span>Séances</span>
         </button>
         <button onclick="switchTab('calendrier')"
         id="tab-calendrier"
-        class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+        class="nav-btn">
     <i class="fa-solid fa-calendar-days"></i>
     <span>Calendrier</span>
 </button>
-        <button onclick="switchTab('district')" id="tab-district" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+        <button onclick="switchTab('district')" id="tab-district" class="nav-btn">
             <i class="fa-solid fa-ranking-star"></i><span>District</span>
         </button>
 
-        <button onclick="switchTab('staff')" id="tab-staff" class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10">
+        <button onclick="switchTab('staff')" id="tab-staff" class="nav-btn">
             <i class="fa-solid fa-user-tie"></i><span>Staff</span>
         </button>
         
         <button
     onclick="switchTab('admin')"
     id="tab-admin"
-    class="nav-btn text-xs font-semibold px-3 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sky-100 hover:bg-white/10 admin-only">
+    class="nav-btn admin-only">
 
     <i class="fa-solid fa-gear"></i>
     <span>Administration</span>
@@ -1029,74 +1034,89 @@
 
 <section id="sec-calendrier" class="space-y-4 hidden">
 
-    <div class="flex justify-between items-center mb-4">
+    <!-- En-tête du calendrier -->
+    <div class="cal-hero">
 
-    <h2 class="text-base font-bold">
-        📅 Calendrier
-    </h2>
+        <div class="cal-hero-main">
 
-    <div class="flex items-center gap-2">
+            <span class="cal-hero-icon" aria-hidden="true">
+                <i class="fa-solid fa-calendar-days"></i>
+            </span>
 
-        <button
-    onclick="generateWeeklyPlanning()"
-    class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
+            <div class="min-w-0">
+                <h2 class="screen-title">Calendrier</h2>
+                <p class="screen-sub">Matchs, séances et événements du club</p>
+            </div>
 
-    📋 Planning WhatsApp
-
-</button>
-
-            <button
-            onclick="openEventModal()"
-            class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
-
-            ➕ Evènement
-
-        </button>
-
-        <button onclick="previousMonth()"
-                class="px-3 py-2 bg-slate-100 rounded-lg">
-            ◀
-        </button>
-
-        <span id="calendar-month-title"
-              class="font-bold text-slate-700">
-        </span>
-
-        <button onclick="nextMonth()"
-                class="px-3 py-2 bg-slate-100 rounded-lg">
-            ▶
-        </button>
-
-    </div>
-
-</div>
         </div>
 
-        <div class="mb-3">
+        <div class="cal-hero-actions">
 
-    <select id="calendar-team-filter"
-            onchange="renderCalendar()"
-            class="border border-slate-200 rounded-lg px-3 py-2 text-xs">
+            <button type="button" onclick="generateWeeklyPlanning()" class="cal-action cal-action-wa">
+                <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+                <span>Planning WhatsApp</span>
+            </button>
 
-        <option value="all">
-            🌍 Toutes les équipes
-        </option>
+            <button type="button" onclick="openEventModal()" class="cal-action cal-action-add">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                <span>Événement</span>
+            </button>
 
-    </select>
-
-</div>
-
-        <div id="calendar-grid"></div>
+        </div>
 
     </div>
 
-    <div class="bg-white p-4 rounded-xl card-shadow">
+    <!-- Mois et filtre par équipe -->
+    <div class="cal-toolbar">
 
-        <h3 class="font-bold mb-3">
-            📋 Agenda du jour sélectionné
-        </h3>
+        <div class="cal-month">
 
-        <div id="calendar-events-list"></div>
+            <button type="button" onclick="previousMonth()" class="cal-nav-btn" aria-label="Mois précédent">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+            </button>
+
+            <span id="calendar-month-title" class="cal-month-title" aria-live="polite">—</span>
+
+            <button type="button" onclick="nextMonth()" class="cal-nav-btn" aria-label="Mois suivant">
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </button>
+
+        </div>
+
+        <div class="cal-filter">
+            <i class="fa-solid fa-filter" aria-hidden="true"></i>
+            <select id="calendar-team-filter" onchange="renderCalendar()" aria-label="Filtrer par équipe">
+                <option value="all">🌍 Toutes les équipes</option>
+            </select>
+        </div>
+
+    </div>
+
+    <div class="cal-legend" aria-hidden="true">
+        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-match"></span>Match</span>
+        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-training"></span>Séance</span>
+        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-event"></span>Événement</span>
+        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-tournament"></span>Tournoi</span>
+        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-club"></span>Vie du club</span>
+    </div>
+
+    <!-- Grille du mois et agenda du jour sélectionné -->
+    <div class="cal-layout">
+
+        <div class="card cal-grid-card">
+            <div id="calendar-grid"></div>
+        </div>
+
+        <div class="card card-pad cal-agenda-card">
+
+            <div class="cal-agenda-head">
+                <h3 class="card-title"><i class="fa-solid fa-list-check" aria-hidden="true"></i>Agenda</h3>
+                <span id="calendar-selected-label" class="cal-agenda-date">—</span>
+            </div>
+
+            <div id="calendar-events-list"></div>
+
+        </div>
 
     </div>
 
@@ -1202,21 +1222,6 @@
 
             <p class="text-xs text-slate-500 mt-2">
                 Création et gestion des équipes.
-            </p>
-
-        </div>
-
-        <div
-            id="admin-fff-card"
-            onclick="openAdminModule('fff')"
-            class="bg-white p-4 rounded-xl border border-slate-100 card-shadow cursor-pointer hover:border-sky-300 hover:shadow-lg transition">
-
-            <h3 class="font-bold text-slate-800 text-lg">
-                🌐 Sync FFF
-            </h3>
-
-            <p class="text-xs text-slate-500 mt-2">
-                Import auto des matchs officiels du club et des scores.
             </p>
 
         </div>
@@ -1921,11 +1926,25 @@
 <!-- Navigation mobile -->
 <div class="md:hidden fixed bottom-0 left-0 right-0 mob-bottom-nav z-50">
 
-    <div class="grid grid-cols-8">
+    <div class="mob-dock">
+
+        <button
+            type="button"
+            id="mob-more-btn"
+            class="mob-nav-btn"
+            onclick="toggleMobMore()"
+            title="Plus de sections"
+            aria-haspopup="dialog"
+            aria-controls="mob-more-sheet">
+
+            <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+            <span>Plus</span>
+
+        </button>
 
         <button onclick="switchTab('dashboard')" id="mob-tab-dashboard" class="mob-nav-btn active">
             <i class="fa-solid fa-chart-pie"></i>
-            <span>Tab.</span>
+            <span>Tableau</span>
         </button>
 
         <button onclick="switchTab('matchs')" id="mob-tab-matchs" class="mob-nav-btn">
@@ -1972,7 +1991,59 @@
 
 </div>
 
-    <div id="modal-carpool-qr" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-carpool-qr-title">
+    <!-- Feuille « Plus » de la navigation mobile -->
+<div id="mob-more-backdrop" class="mob-more-backdrop" onclick="closeMobMore()" aria-hidden="true"></div>
+
+<div id="mob-more-sheet" class="mob-more-sheet" role="dialog" aria-modal="true" aria-label="Autres sections" aria-hidden="true">
+
+    <div class="mob-more-handle" aria-hidden="true"></div>
+
+    <div class="mob-more-head">
+        <p>Autres sections</p>
+        <button type="button" onclick="closeMobMore()" aria-label="Fermer">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <div class="mob-more-grid">
+
+        <button type="button" onclick="switchTab('calendrier')" class="mob-more-item">
+            <span class="mob-more-ic"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i></span>
+            <span>
+                <strong>Calendrier</strong>
+                <small>Matchs & événements</small>
+            </span>
+        </button>
+
+        <button type="button" onclick="switchTab('district')" class="mob-more-item">
+            <span class="mob-more-ic"><i class="fa-solid fa-ranking-star" aria-hidden="true"></i></span>
+            <span>
+                <strong>District</strong>
+                <small>Classements officiels</small>
+            </span>
+        </button>
+
+        <button type="button" onclick="switchTab('staff')" class="mob-more-item">
+            <span class="mob-more-ic"><i class="fa-solid fa-user-tie" aria-hidden="true"></i></span>
+            <span>
+                <strong>Staff</strong>
+                <small>Éducateurs & dirigeants</small>
+            </span>
+        </button>
+
+        <button type="button" onclick="switchTab('admin')" class="mob-more-item admin-only">
+            <span class="mob-more-ic"><i class="fa-solid fa-gear" aria-hidden="true"></i></span>
+            <span>
+                <strong>Administration</strong>
+                <small>Comptes & paramètres</small>
+            </span>
+        </button>
+
+    </div>
+
+</div>
+
+<div id="modal-carpool-qr" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-carpool-qr-title">
 
     <div class="modal-card max-w-md p-5 space-y-4 accent-sky text-center">
 
@@ -2035,6 +2106,54 @@
 <script src="js/feuille-base64.js"></script>
 <script src="js/feuille-pdf.js"></script>
 <script src="js/app.js"></script>
+<script>
+/* Navigation mobile : dock à 5 entrées + feuille « Plus » */
+(function () {
+    var MORE_TABS = ['calendrier', 'district', 'staff', 'admin'];
+    var MORE_LABELS = { calendrier: 'Calendrier', district: 'District', staff: 'Staff', admin: 'Admin' };
+    var moreBtn = document.getElementById('mob-more-btn');
+    var sheet = document.getElementById('mob-more-sheet');
+
+    window.openMobMore = function () {
+        document.body.classList.add('mob-more-open');
+        if (sheet) sheet.setAttribute('aria-hidden', 'false');
+    };
+
+    window.closeMobMore = function () {
+        document.body.classList.remove('mob-more-open');
+        if (sheet) sheet.setAttribute('aria-hidden', 'true');
+    };
+
+    window.toggleMobMore = function () {
+        if (document.body.classList.contains('mob-more-open')) {
+            window.closeMobMore();
+        } else {
+            window.openMobMore();
+        }
+    };
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') window.closeMobMore();
+    });
+
+    function syncMore(tab) {
+        if (!moreBtn) return;
+        var isMore = MORE_TABS.indexOf(tab) !== -1;
+        moreBtn.classList.toggle('is-current', isMore);
+        var label = moreBtn.querySelector('span');
+        if (label) label.textContent = isMore ? (MORE_LABELS[tab] || 'Plus') : 'Plus';
+    }
+
+    if (typeof window.switchTab === 'function') {
+        var baseSwitchTab = window.switchTab;
+        window.switchTab = function (tab) {
+            baseSwitchTab(tab);
+            syncMore(tab);
+            window.closeMobMore();
+        };
+    }
+})();
+</script>
     
     <template id="function-template">
 
