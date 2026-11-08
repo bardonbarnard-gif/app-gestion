@@ -919,6 +919,26 @@ function driverCars() {
 
 }
 
+// Initiales pour les pastilles d'avatar
+function carpoolInitials(name) {
+
+    const parts = String(name || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+
+    if (!parts.length) return '?';
+
+    const first = parts[0].charAt(0) || '';
+    const last =
+        parts.length > 1
+            ? parts[parts.length - 1].charAt(0)
+            : '';
+
+    return (first + last).toUpperCase();
+
+}
+
 function renderPassengerCars() {
 
     const container =
@@ -953,34 +973,68 @@ function renderPassengerCars() {
 
         const picked = chosenDriver === c.id;
 
+        const dots = Array
+            .from({ length: c.seats })
+            .map((_, i) => `
+                <span class="w-1.5 h-1.5 rounded-full ${i < c.current.length
+                    ? 'bg-emerald-500'
+                    : 'bg-slate-300'}"></span>`)
+            .join('');
+
         return `
             <button
                 type="button"
                 data-driver="${c.id}"
-                class="w-full text-left rounded-xl border-2 p-3 transition ${picked
-                    ? 'border-emerald-500 bg-emerald-50'
-                    : 'border-slate-200 bg-white hover:border-emerald-300'}">
+                class="w-full text-left rounded-2xl border-2 p-3 transition ${picked
+                    ? 'border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-100'
+                    : 'border-slate-200 bg-white hover:border-emerald-300 hover:shadow-sm'}">
 
-                <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-3">
 
-                    <span class="font-bold text-slate-800 text-sm">🚗 ${c.name}</span>
+                    <span class="w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-xs font-black ${picked
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-slate-100 text-slate-600'}">
+                        ${carpoolInitials(c.name)}
+                    </span>
 
-                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${c.free > 0
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-slate-100 text-slate-500'}">
-                        ${c.free} place(s) libre(s)
+                    <div class="min-w-0 flex-1">
+
+                        <p class="font-extrabold text-slate-800 text-sm truncate">
+                            🚗 ${c.name}
+                        </p>
+
+                        <p class="text-[11px] text-slate-600 truncate">
+                            ${c.current.length
+                                ? c.current.map(playerShort).join(', ')
+                                : 'Personne pour le moment'}
+                        </p>
+
+                    </div>
+
+                    <div class="shrink-0 text-right">
+
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${c.free > 0
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-slate-100 text-slate-500'}">
+                            ${c.free} libre(s)
+                        </span>
+
+                        <div class="mt-1.5 flex items-center justify-end gap-1">
+                            ${dots}
+                        </div>
+
+                    </div>
+
+                    <span class="w-6 h-6 shrink-0 rounded-full border-2 flex items-center justify-center text-[12px] font-black ${picked
+                        ? 'bg-emerald-500 border-emerald-500 text-white'
+                        : 'border-slate-300 text-transparent'}">
+                        ✓
                     </span>
 
                 </div>
 
-                <p class="mt-1 text-[11px] text-slate-600">
-                    ${c.current.length
-                        ? c.current.map(playerShort).join(', ')
-                        : 'Personne pour le moment'}
-                </p>
-
                 ${c.requests.length ? `
-                <p class="mt-1 text-[11px] font-semibold text-amber-700">
+                <p class="mt-2 flex items-center gap-1 text-[11px] font-bold text-amber-700">
                     🙋 ${c.requests.join(', ')} souhaite(nt) monter
                 </p>` : ''}
 
@@ -1185,26 +1239,40 @@ function renderMyAssignment() {
 
     const candidates = passengerCandidates();
 
+    const pct = seats > 0
+        ? Math.min(100, Math.round(chosenPassengers.length / seats * 100))
+        : 0;
+
+    const full = seats > 0 && remain === 0;
+
     let html = `
-        <div class="p-3 rounded-xl bg-sky-50 border border-sky-200">
+        <div class="rounded-2xl border border-sky-200 bg-gradient-to-b from-sky-50 to-white p-3 shadow-sm">
 
-            <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center justify-between gap-2">
 
-                <p class="font-bold text-slate-700 text-sm">
-                    👥 Mes passagers
+                <p class="flex items-center gap-2 font-extrabold text-slate-800 text-sm">
+                    <span class="w-7 h-7 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center">👥</span>
+                    Mes passagers
                 </p>
 
-                <span class="text-xs font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full">
-                    ${chosenPassengers.length} / ${seats} places
+                <span class="text-[11px] font-extrabold px-2.5 py-1 rounded-full ${full
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-sky-100 text-sky-700'}">
+                    ${chosenPassengers.length} / ${seats}${full ? ' · complet' : ' places'}
                 </span>
 
+            </div>
+
+            <div class="mt-2 h-1.5 rounded-full bg-slate-200/70 overflow-hidden">
+                <div class="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400 transition-all duration-300"
+                     style="width:${pct}%"></div>
             </div>
     `;
 
     if (seats <= 0) {
 
         html += `
-            <p class="text-xs text-slate-500">
+            <p class="mt-3 text-xs text-slate-500">
                 Choisis d'abord le nombre de places de ta voiture.
             </p>
         `;
@@ -1212,45 +1280,100 @@ function renderMyAssignment() {
     } else if (candidates.length === 0) {
 
         html += `
-            <p class="text-xs text-slate-500">
+            <p class="mt-3 text-xs text-slate-500">
                 Aucun passager à placer pour le moment.
             </p>
         `;
 
     } else {
 
-        html += '<div class="space-y-1.5">';
+        const pickedCount =
+            chosenPassengers.length;
 
-        candidates.forEach(c => {
+        const groups = [
+            {
+                title: '🙋 Demandes reçues',
+                hint: 'ils ont demandé ta voiture',
+                items: candidates.filter(c => c.requested)
+            },
+            {
+                title: 'Joueurs sans voiture',
+                hint: 'à prendre si tu as de la place',
+                items: candidates.filter(c => !c.requested)
+            }
+        ].filter(g => g.items.length);
 
-            const picked = chosenPassengers.includes(c.id);
-
-            const disabled = !picked && remain <= 0;
+        groups.forEach(g => {
 
             html += `
-                <label class="flex items-center gap-3 px-3 py-2 rounded-xl border bg-white ${picked
-                    ? 'border-sky-400 ring-1 ring-sky-200'
-                    : 'border-slate-200'} ${disabled ? 'opacity-40' : 'cursor-pointer'}">
-
-                    <input
-                        type="checkbox"
-                        class="w-4 h-4 accent-sky-600"
-                        data-candidate="${c.id}"
-                        ${picked ? 'checked' : ''}
-                        ${disabled ? 'disabled' : ''}>
-
-                    <span class="text-sm font-semibold text-slate-700">${c.name}</span>
-
-                    ${c.requested
-                        ? '<span class="ml-auto text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">🙋 demande</span>'
-                        : ''}
-
-                </label>
+                <p class="mt-3 mb-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                    ${g.title}
+                    <span class="font-bold normal-case tracking-normal text-slate-400">
+                        · ${g.hint}
+                    </span>
+                </p>
+                <div class="space-y-1.5">
             `;
 
-        });
+            g.items.forEach(c => {
 
-        html += '</div>';
+                const picked =
+                    chosenPassengers.includes(c.id);
+
+                const disabled =
+                    !picked && pickedCount >= seats;
+
+                html += `
+                    <label class="flex items-center gap-3 px-2.5 py-2 rounded-xl border-2 transition ${picked
+                        ? 'border-emerald-400 bg-emerald-50 cursor-pointer'
+                        : disabled
+                            ? 'border-slate-100 bg-slate-50 opacity-50'
+                            : 'border-slate-200 bg-white hover:border-sky-300 cursor-pointer'}">
+
+                        <input
+                            type="checkbox"
+                            class="sr-only"
+                            data-candidate="${c.id}"
+                            ${picked ? 'checked' : ''}
+                            ${disabled ? 'disabled' : ''}>
+
+                        <span class="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-[11px] font-black ${picked
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-slate-100 text-slate-600'}">
+                            ${carpoolInitials(c.name)}
+                        </span>
+
+                        <span class="min-w-0 flex-1">
+
+                            <span class="block text-sm font-bold text-slate-800 truncate">
+                                ${c.name}
+                            </span>
+
+                            ${c.requested ? `
+                            <span class="block text-[10px] font-bold ${picked
+                                ? 'text-emerald-700'
+                                : 'text-amber-700'}">
+                                ${picked
+                                    ? '✓ demande acceptée'
+                                    : '🙋 a demandé ta voiture'}
+                            </span>` : ''}
+
+                        </span>
+
+                        <span class="w-5 h-5 shrink-0 rounded-full border-2 flex items-center justify-center text-[11px] font-black ${picked
+                            ? 'bg-emerald-500 border-emerald-500 text-white'
+                            : 'border-slate-300 text-transparent'}">
+                            ✓
+                        </span>
+
+                    </label>
+                `;
+
+            });
+
+            html += '</div>';
+
+        });
 
         if (remain > 0) {
 
@@ -1671,7 +1794,8 @@ db.ref('rangueil_data/matches')
             id="passenger-zone"
             class="hidden mb-5">
 
-            <p class="block font-bold text-slate-700 mb-2">
+            <p class="flex items-center gap-2 font-extrabold text-slate-800 text-sm mb-2">
+                <span class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">🚗</span>
                 Avec quel conducteur ?
             </p>
 
