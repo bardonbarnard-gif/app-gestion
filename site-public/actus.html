@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Actualités — Rangueil FC</title>
+    <meta name="description" content="La vie du Rangueil FC et la revue de presse football : RMC Sport, L'Équipe, SOFOOT, Foot Mercato et District Haute-Garonne.">
+    <meta name="theme-color" content="#0284c7">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Actualités — Rangueil FC">
+    <meta property="og:description" content="Les actualités du club et l'actualité du football.">
+    <meta property="og:image" content="assets/logo.svg">
+    <link rel="icon" type="image/png" href="assets/logo.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/site.css">
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script defer src="js/config.js"></script>
+    <script defer src="js/demo-data.js"></script>
+    <script defer src="js/data.js"></script>
+    <script defer src="js/site.js"></script>
+</head>
+<body data-page="news">
+
+<a class="skip-link" href="#main">Aller au contenu</a>
+<div id="site-header"></div>
+
+<main id="main">
+
+    <header class="page-head">
+        <div class="container">
+            <p class="eyebrow" style="color:#0284c7">Infos</p>
+            <h1>Actualités</h1>
+            <p>La vie du club, les événements et une sélection de l'actualité football distillée par la presse spécialisée.</p>
+        </div>
+    </header>
+
+    <section class="section">
+        <div class="container">
+
+            <div class="tabs" id="news-tabs" style="margin-bottom:18px">
+                <button class="tab is-active" type="button" data-pane="club">La vie du club</button>
+                <button class="tab" type="button" data-pane="press">Revue de presse</button>
+            </div>
+
+            <div data-pane-content="club">
+                <div class="grid grid--3" id="news-club">
+                    <div class="skeleton"></div>
+                    <div class="skeleton"></div>
+                    <div class="skeleton"></div>
+                </div>
+            </div>
+
+            <div data-pane-content="press" style="display:none" id="news-press">
+                <div class="skeleton"></div>
+                <div class="skeleton" style="margin-top:10px"></div>
+            </div>
+
+        </div>
+    </section>
+
+</main>
+
+<div id="site-footer"></div>
+
+</body>
+</html>

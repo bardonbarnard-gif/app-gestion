@@ -1,0 +1,33 @@
+| Valeur Firebase | Couleur         |
+| --------------- | --------------- |
+| sky             | Bleu ciel       |senior 1
+| blue            | Bleu            |u14
+| indigo          | Indigo          |senior 2
+| violet          | Violet          |u10
+| purple          | Pourpre         |Fun Foot
+| fuchsia         | Fuchsia         |
+| pink            | Rose            |fem senior
+| rose            | Rose foncé      |
+| red             | Rouge           |
+| orange          | Orange          |u11
+| amber           | Ambre           |u12
+| yellow          | Jaune           |u13
+| lime            | Vert citron     |
+| green           | Vert            |u9
+| emerald         | Vert émeraude   |u15
+| teal            | Bleu-vert       |
+| cyan            | Cyan            |u7
+| slate           | Gris bleuté     |
+| gray            | Gris            |u8
+| zinc            | Gris zinc       |u18
+| neutral         | Gris neutre     |
+| stone           | Gris pierre     |
+| skyDark         | Bleu ciel foncé |
+| blueDark        | Bleu foncé      |
+| indigoDark      | Indigo foncé    |
+| greenDark       | Vert foncé      |
+| emeraldDark     | Émeraude foncé  |
+| purpleDark      | Pourpre foncé   |
+| redDark         | Rouge foncé     |
+| orangeDark      | Orange foncé    |u17
+| tealDark        | Bleu-vert foncé |

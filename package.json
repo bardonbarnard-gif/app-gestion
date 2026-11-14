@@ -1,0 +1,17 @@
+{
+  "name": "rangueil-fc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rangueil FC — application interne du club et site public statique",
+  "scripts": {
+    "build:css": "tailwindcss -i ./css/tailwind.src.css -o ./css/tailwind.css --minify",
+    "watch:css": "tailwindcss -i ./css/tailwind.src.css -o ./css/tailwind.css --watch",
+    "test:browser": "node browser-test.mjs",
+    "serve": "node proxy-local.js"
+  },
+  "devDependencies": {
+    "acorn": "^8.19.0",
+    "puppeteer-core": "^25.17.0",
+    "tailwindcss": "^3.4.17"
+  }
+}

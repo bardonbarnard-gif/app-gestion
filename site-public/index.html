@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rangueil FC — Site officiel du club</title>
+    <meta name="description" content="Calendrier, résultats, équipes et actualités du Rangueil FC, club de football à Toulouse. Retrouvez les matchs du week-end et l'espace famille.">
+    <meta name="theme-color" content="#0284c7">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Rangueil FC">
+    <meta property="og:title" content="Rangueil FC — Site officiel du club">
+    <meta property="og:description" content="Calendrier, résultats, équipes et actualités du club de football de Rangueil à Toulouse.">
+    <meta property="og:image" content="assets/logo.svg">
+    <link rel="icon" type="image/png" href="assets/logo.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/site.css">
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script defer src="js/config.js"></script>
+    <script defer src="js/demo-data.js"></script>
+    <script defer src="js/data.js"></script>
+    <script defer src="js/site.js"></script>
+</head>
+<body data-page="home">
+
+<a class="skip-link" href="#main">Aller au contenu</a>
+<div id="site-header"></div>
+
+<main id="main">
+
+    <section class="hero">
+        <div class="container hero__inner">
+            <img class="hero__logo" src="assets/logo.svg" alt="Logo du Rangueil FC">
+            <p class="eyebrow">Club de football · Toulouse Rangueil</p>
+            <h1 class="hero__title">Le football à Rangueil,<br>de l'école de foot aux seniors.</h1>
+            <p class="hero__lead">
+                Calendrier, résultats, équipes et actualités du club. Un espace famille pour
+                retrouver les prochains matchs et organiser les déplacements.
+            </p>
+            <div class="hero__actions">
+                <a class="btn btn--primary" href="calendrier.html">Voir le calendrier</a>
+                <a class="btn btn--ghost" href="espace-famille.html">Espace famille</a>
+            </div>
+            <div class="hero__stats" id="hero-stats"></div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <div class="section-head">
+                <div>
+                    <h2>Prochains matchs</h2>
+                    <p>Le programme des équipes du club.</p>
+                </div>
+                <a href="calendrier.html">Tout le calendrier →</a>
+            </div>
+            <div id="home-next">
+                <div class="skeleton"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section section--tight">
+        <div class="container">
+            <div class="section-head">
+                <div>
+                    <h2>Derniers résultats</h2>
+                    <p>Les rencontres récemment jouées.</p>
+                </div>
+                <a href="calendrier.html">Tous les résultats →</a>
+            </div>
+            <div class="stack" id="home-results">
+                <div class="skeleton"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section section--tight">
+        <div class="container">
+            <div class="section-head">
+                <div>
+                    <h2>La vie du club</h2>
+                    <p>Infos, événements et annonces.</p>
+                </div>
+                <a href="actus.html">Toutes les actus →</a>
+            </div>
+            <div class="grid grid--3" id="home-news">
+                <div class="skeleton"></div>
+                <div class="skeleton"></div>
+                <div class="skeleton"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section section--tight">
+        <div class="container">
+            <div class="section-head">
+                <div>
+                    <h2>Nos équipes</h2>
+                    <p>De l'école de foot aux seniors.</p>
+                </div>
+                <a href="equipes.html">Effectifs →</a>
+            </div>
+            <div class="chips" id="home-teams"></div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <div class="section-head">
+                <div>
+                    <h2>Entraînements</h2>
+                    <p>Créneaux habituels au complexe du Rangueil.</p>
+                </div>
+                <a href="infos.html">Infos pratiques →</a>
+            </div>
+            <div class="info-grid" id="home-slots"></div>
+        </div>
+    </section>
+
+    <section class="section section--tight" style="padding-bottom:50px">
+        <div class="container">
+            <div class="card card--pad" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
+                <div>
+                    <h2 style="margin:0;font-size:17px;font-weight:800">Envie de rejoindre le club ?</h2>
+                    <p style="margin:4px 0 0;font-size:13px;color:#64748b">
+                        Inscriptions ouvertes toute la saison, une séance d'essai est toujours possible.
+                    </p>
+                </div>
+                <a class="btn btn--brand" href="infos.html">S'inscrire au club</a>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<div id="site-footer"></div>
+
+</body>
+</html>

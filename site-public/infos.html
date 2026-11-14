@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Le club, inscriptions &amp; contacts — Rangueil FC</title>
+    <meta name="description" content="Informations pratiques du Rangueil FC : terrains, entraînements, inscriptions, contacts et questions fréquentes.">
+    <meta name="theme-color" content="#0284c7">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Le club, inscriptions &amp; contacts — Rangueil FC">
+    <meta property="og:description" content="Tout ce qu'il faut savoir pour rejoindre ou contacter le club.">
+    <meta property="og:image" content="assets/logo.svg">
+    <link rel="icon" type="image/png" href="assets/logo.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/site.css">
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script defer src="js/config.js"></script>
+    <script defer src="js/demo-data.js"></script>
+    <script defer src="js/data.js"></script>
+    <script defer src="js/site.js"></script>
+</head>
+<body data-page="infos">
+
+<a class="skip-link" href="#main">Aller au contenu</a>
+<div id="site-header"></div>
+
+<main id="main">
+
+    <header class="page-head">
+        <div class="container">
+            <p class="eyebrow" style="color:#0284c7">Le club</p>
+            <h1>Infos pratiques</h1>
+            <p>Terrains, entraînements, inscriptions et contacts du Rangueil FC.</p>
+        </div>
+    </header>
+
+    <section class="section">
+        <div class="container">
+            <div class="info-grid" id="infos-identity">
+                <div class="skeleton"></div>
+                <div class="skeleton"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section section--tight">
+        <div class="container">
+            <div class="grid">
+                <div class="card card--pad">
+                    <h2 style="margin:0 0 12px;font-size:17px;font-weight:800">Entraînements</h2>
+                    <div class="info-grid" id="infos-slots"></div>
+                </div>
+                <div class="card card--pad">
+                    <h2 style="margin:0 0 12px;font-size:17px;font-weight:800">Nous trouver</h2>
+                    <div class="prose">
+                        <p>Le club évolue au complexe sportif du Rangueil, à Toulouse. Les équipes jeunes s'entraînent sur le terrain synthétique, les seniors sur le terrain honneur.</p>
+                    </div>
+                    <div class="actions">
+                        <a class="btn btn--brand" id="infos-map" href="#" target="_blank" rel="noopener">Ouvrir dans Google Maps</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <div class="grid">
+                <div class="card card--pad prose">
+                    <h2>Inscriptions</h2>
+                    <p>Les inscriptions sont ouvertes à partir de fin août et restent possibles toute la saison dans la limite des places disponibles. Une séance d'essai gratuite est proposée avant toute inscription.</p>
+                    <h3>Pièces à fournir</h3>
+                    <ul>
+                        <li>Formulaire de licence FFF rempli et signé</li>
+                        <li>Photo d'identité récente</li>
+                        <li>Justificatif de domicile</li>
+                        <li>Certificat médical de non contre-indication (ou questionnaire de santé selon l'âge)</li>
+                        <li>Autorisation parentale et droit à l'image pour les mineurs</li>
+                    </ul>
+                    <h3>Tarifs</h3>
+                    <p>La cotisation dépend de la catégorie. Le détail est communiqué au moment de l'inscription ; des facilités de paiement sont possibles. Le club accompagne les familles en difficulté.</p>
+                </div>
+
+                <div class="card card--pad">
+                    <h2 style="margin:0 0 12px;font-size:17px;font-weight:800">Contacts</h2>
+                    <div id="infos-contacts"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section section--tight" style="padding-bottom:50px">
+        <div class="container">
+            <div class="section-head">
+                <div>
+                    <h2>Questions fréquentes</h2>
+                    <p>Les réponses aux demandes les plus courantes.</p>
+                </div>
+            </div>
+
+            <div class="faq">
+                <details>
+                    <summary>À partir de quel âge peut-on inscrire un enfant ?</summary>
+                    <p>Le club accueille les enfants dès la catégorie U7 (environ 6 ans révolus dans l'année). Les plus jeunes peuvent être orientés vers une structure partenaire si le groupe est complet.</p>
+                </details>
+                <details>
+                    <summary>Faut-il acheter les équipements ?</summary>
+                    <p>Le club fournit la tenue d'entraînement et le maillot pour les matchs. Les crampons et protège-tibias restent à la charge des familles.</p>
+                </details>
+                <details>
+                    <summary>Comment suivre les convocations et le covoiturage ?</summary>
+                    <p>Les convocations sont publiées dans l'application interne du club. L'<a href="espace-famille.html">espace famille</a> donne accès aux prochains matchs de votre équipe et aux liens de covoiturage, avec le code à 4 chiffres transmis par l'éducateur.</p>
+                </details>
+                <details>
+                    <summary>Les photos des enfants sont-elles publiées ?</summary>
+                    <p>Aucune photo identifiable n'est publiée sans autorisation écrite des responsables légaux. L'autorisation peut être retirée à tout moment en contactant le club.</p>
+                </details>
+                <details>
+                    <summary>Comment devenir bénévole ?</summary>
+                    <p>Le club vit grâce à ses bénévoles : buvette, table de marque, transport, événements. Écrivez-nous ou venez nous voir un samedi au complexe.</p>
+                </details>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<div id="site-footer"></div>
+
+</body>
+</html>

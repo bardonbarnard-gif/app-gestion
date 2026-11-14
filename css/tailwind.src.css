@@ -1,0 +1,6 @@
+/* Point d'entrée du build Tailwind.
+   Générer les styles : npm run build:css  (ou npm run watch:css en développement)
+   Le résultat compilé est css/tailwind.css, chargé par index.html et covoiturage.html. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

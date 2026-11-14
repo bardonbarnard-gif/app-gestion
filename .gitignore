@@ -1,0 +1,20 @@
+# --- Système ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Outils / agents de dev ---
+.freebuff/
+.opencode/
+.vercel/
+node_modules/
+npm-debug.log*
+*.log
+
+# --- Bibliothèque de séances (130 PDF, ~11 Mo) ---
+# Sauvegardée sur OneDrive ; décommenter la ligne suivante pour la versionner.
+Bibliothèque séance/
+
+# --- Divers ---
+*.tmp
+*.bak

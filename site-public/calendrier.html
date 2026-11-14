@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calendrier &amp; résultats — Rangueil FC</title>
+    <meta name="description" content="Tous les matchs des équipes du Rangueil FC : dates, heures, lieux et résultats. Filtrez par équipe.">
+    <meta name="theme-color" content="#0284c7">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Calendrier &amp; résultats — Rangueil FC">
+    <meta property="og:description" content="Le programme des équipes du club de football de Rangueil à Toulouse.">
+    <meta property="og:image" content="assets/logo.svg">
+    <link rel="icon" type="image/png" href="assets/logo.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/site.css">
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script defer src="js/config.js"></script>
+    <script defer src="js/demo-data.js"></script>
+    <script defer src="js/data.js"></script>
+    <script defer src="js/site.js"></script>
+</head>
+<body data-page="calendar">
+
+<a class="skip-link" href="#main">Aller au contenu</a>
+<div id="site-header"></div>
+
+<main id="main">
+
+    <header class="page-head">
+        <div class="container">
+            <p class="eyebrow" style="color:#0284c7">Saison en cours</p>
+            <h1>Calendrier &amp; résultats</h1>
+            <p>Tous les matchs du club. Filtrez par équipe, basculez entre programme et résultats, ouvrez la fiche d'un match pour l'adresse et l'itinéraire.</p>
+        </div>
+    </header>
+
+    <section class="section">
+        <div class="container">
+            <div class="toolbar">
+                <div class="chips" id="calendar-chips"></div>
+                <div class="tabs" id="calendar-tabs"></div>
+            </div>
+            <div id="calendar-list">
+                <div class="skeleton"></div>
+                <div class="skeleton" style="margin-top:10px"></div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<div id="site-footer"></div>
+
+</body>
+</html>

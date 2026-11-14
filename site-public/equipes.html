@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Équipes &amp; effectifs — Rangueil FC</title>
+    <meta name="description" content="Les équipes du Rangueil FC, de l'école de foot aux seniors, et leurs effectifs.">
+    <meta name="theme-color" content="#0284c7">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Équipes &amp; effectifs — Rangueil FC">
+    <meta property="og:description" content="Découvrez les équipes du club et leurs effectifs.">
+    <meta property="og:image" content="assets/logo.svg">
+    <link rel="icon" type="image/png" href="assets/logo.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/site.css">
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script defer src="js/config.js"></script>
+    <script defer src="js/demo-data.js"></script>
+    <script defer src="js/data.js"></script>
+    <script defer src="js/site.js"></script>
+</head>
+<body data-page="teams">
+
+<a class="skip-link" href="#main">Aller au contenu</a>
+<div id="site-header"></div>
+
+<main id="main">
+
+    <header class="page-head">
+        <div class="container">
+            <p class="eyebrow" style="color:#0284c7">Le club</p>
+            <h1>Équipes &amp; effectifs</h1>
+            <p>Les joueurs sont affichés avec leur prénom et l'initiale du nom, conformément aux autorisations du club.</p>
+        </div>
+    </header>
+
+    <section class="section">
+        <div class="container">
+            <div class="toolbar">
+                <div class="search">
+                    <span aria-hidden="true">🔍</span>
+                    <input id="teams-search" type="search" placeholder="Rechercher un joueur ou une équipe…" aria-label="Rechercher un joueur ou une équipe">
+                </div>
+            </div>
+            <div class="grid" id="teams-content">
+                <div class="skeleton"></div>
+                <div class="skeleton"></div>
+                <div class="skeleton"></div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<div id="site-footer"></div>
+
+</body>
+</html>

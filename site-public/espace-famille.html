@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Espace famille — Rangueil FC</title>
+    <meta name="description" content="Espace famille du Rangueil FC : prochains matchs de votre équipe et organisation du covoiturage avec le code transmis par l'éducateur.">
+    <meta name="theme-color" content="#0284c7">
+    <meta name="robots" content="noindex, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Espace famille — Rangueil FC">
+    <meta property="og:description" content="Retrouvez les prochains matchs de votre équipe et le covoiturage.">
+    <meta property="og:image" content="assets/logo.svg">
+    <link rel="icon" type="image/png" href="assets/logo.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/site.css">
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script defer src="js/config.js"></script>
+    <script defer src="js/demo-data.js"></script>
+    <script defer src="js/data.js"></script>
+    <script defer src="js/site.js"></script>
+</head>
+<body data-page="family">
+
+<a class="skip-link" href="#main">Aller au contenu</a>
+<div id="site-header"></div>
+
+<main id="main">
+
+    <header class="page-head">
+        <div class="container">
+            <p class="eyebrow" style="color:#0284c7">Parents &amp; joueurs</p>
+            <h1>Espace famille</h1>
+            <p>Le programme de votre équipe et les liens de covoiturage, avec le code à 4 chiffres transmis par l'éducateur.</p>
+        </div>
+    </header>
+
+    <section class="section">
+        <div class="container" style="max-width:760px">
+
+            <div id="family-gate">
+                <form class="gate" id="family-form">
+                    <div class="gate__icon" aria-hidden="true">🔒</div>
+                    <h2>Votre espace famille</h2>
+                    <p>Entrez le code à 4 chiffres du club.</p>
+
+                    <input
+                        id="family-pin"
+                        type="password"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        maxlength="4"
+                        pattern="[0-9]{4}"
+                        placeholder="••••"
+                        aria-label="Code à 4 chiffres"
+                        required>
+
+                    <button class="btn btn--brand btn--block" type="submit" id="family-submit">
+                        Accéder à mon espace
+                    </button>
+
+                    <p class="gate__error" id="family-error"></p>
+
+                    <p class="gate__note">
+                        C'est le même code que l'application du club. Code oublié : contactez l'éducateur de votre équipe.
+                        <br>Les convocations et compositions restent dans l'application, accessible depuis votre espace.
+                    </p>
+                </form>
+            </div>
+
+            <div id="family-app" style="display:none"></div>
+
+        </div>
+    </section>
+
+</main>
+
+<div id="site-footer"></div>
+
+</body>
+</html>

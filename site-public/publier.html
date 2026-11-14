@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Publier sur le site — Rangueil FC</title>
+    <meta name="description" content="Espace staff : publication des équipes, du calendrier et des actualités vers le site public.">
+    <meta name="theme-color" content="#0284c7">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/png" href="assets/logo.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/site.css">
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script defer src="js/config.js"></script>
+    <script defer src="js/data.js"></script>
+    <script defer src="js/site.js"></script>
+    <script defer src="js/publier.js"></script>
+</head>
+<body data-page="publish">
+
+<a class="skip-link" href="#main">Aller au contenu</a>
+<div id="site-header"></div>
+
+<main id="main">
+
+    <header class="page-head">
+        <div class="container">
+            <p class="eyebrow" style="color:#0284c7">Espace staff</p>
+            <h1>Publier sur le site</h1>
+            <p>Reprend les équipes, le calendrier et les effectifs de l'application du club, puis les copie dans un espace public. Aucune donnée privée n'est recopiée.</p>
+        </div>
+    </header>
+
+    <section class="section">
+        <div class="container" style="max-width:960px">
+
+            <div id="pub-gate">
+                <form class="gate" id="pub-form">
+                    <div class="gate__icon" aria-hidden="true">🗝️</div>
+                    <h2>Accès réservé au staff</h2>
+                    <p>Entrez le code PIN de l'application du club.</p>
+
+                    <input
+                        id="pub-pin"
+                        type="password"
+                        inputmode="numeric"
+                        maxlength="4"
+                        pattern="[0-9]{4}"
+                        placeholder="••••"
+                        aria-label="Code à 4 chiffres"
+                        required>
+
+                    <button class="btn btn--brand btn--block" type="submit" id="pub-submit">Déverrouiller</button>
+                    <p class="gate__error" id="pub-error"></p>
+
+                    <p class="gate__note">
+                        Cette page n'est pas référencée. Elle écrit uniquement dans
+                        <code>rangueil_data/pub</code>, jamais dans les données de l'application.
+                    </p>
+                </form>
+            </div>
+
+            <div id="pub-app" style="display:none">
+
+                <div class="card card--pad">
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+                        <div>
+                            <p class="eyebrow" style="color:#0284c7;margin:0">Connecté</p>
+                            <p id="pub-who" style="margin:2px 0 0;font-weight:800;font-size:14px"></p>
+                        </div>
+                        <button class="btn btn--line btn--sm" id="pub-logout" type="button">Se déconnecter</button>
+                    </div>
+
+                    <div class="notice notice--warn" id="pub-role-warning" style="display:none;margin-top:12px">
+                        <span>Ce code n'est pas un code administrateur. Vérifiez que vous publiez bien les données attendues.</span>
+                    </div>
+
+                    <div class="info-grid" id="pub-counters" style="margin-top:14px"></div>
+
+                    <p style="margin:14px 0 0;font-size:12px;color:#64748b">
+                        Dernière publication : <strong id="pub-last">jamais</strong>
+                    </p>
+
+                    <div class="actions">
+                        <button class="btn btn--brand" id="pub-publish" type="button">Publier sur le site</button>
+                        <button class="btn btn--line" id="pub-reload" type="button">Recharger depuis l'app</button>
+                        <a class="btn btn--line" href="index.html">Voir le site</a>
+                    </div>
+
+                    <div id="pub-status" class="notice" style="margin-top:12px">
+                        <span>Lecture des données…</span>
+                    </div>
+                </div>
+
+                <div class="card card--pad" style="margin-top:16px">
+                    <h2 style="margin:0 0 10px;font-size:15px;font-weight:800">Aperçu par équipe</h2>
+                    <div id="pub-teams"></div>
+                </div>
+
+                <div class="card card--pad" style="margin-top:16px">
+                    <h2 style="margin:0 0 4px;font-size:15px;font-weight:800">Actualités du club</h2>
+                    <p style="margin:0 0 12px;font-size:12px;color:#64748b">
+                        Les actualités existantes sont conservées. Ajoutez-en une puis publiez.
+                    </p>
+
+                    <div id="pub-news"></div>
+
+                    <div class="form-grid" style="margin-top:14px">
+                        <div class="field field--full">
+                            <label for="news-title">Titre</label>
+                            <input id="news-title" type="text" placeholder="Ex. Retour sur le week-end">
+                        </div>
+                        <div class="field">
+                            <label for="news-date">Date</label>
+                            <input id="news-date" type="date">
+                        </div>
+                        <div class="field">
+                            <label for="news-link">Lien (facultatif)</label>
+                            <input id="news-link" type="url" placeholder="https://…">
+                        </div>
+                        <div class="field field--full">
+                            <label for="news-body">Texte</label>
+                            <textarea id="news-body" placeholder="Quelques lignes pour les familles et les licenciés…"></textarea>
+                        </div>
+                        <div class="field field--full">
+                            <button class="btn btn--soft" id="news-add" type="button">Ajouter l'actualité</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="notice notice--warn" style="margin-top:16px">
+                    <span>
+                        Les données publiées sont visibles par tous : équipes, calendrier, résultats et
+                        noms au format « Prénom N. ». Aucun numéro de licence, téléphone ou information
+                        médicale n'est copié.
+                    </span>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+</main>
+
+<div id="site-footer"></div>
+
+</body>
+</html>
