@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rangueil FC - Administration Terrain</title>
+    <link rel="icon" type="image/png" href="rangueil HQ.png">
     
     <link rel="stylesheet" href="css/tailwind.css">
     <link rel="stylesheet" href="css/styles.css">
@@ -667,14 +668,12 @@
 
     <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100 space-y-4">
 
-        <div>
-            <h2 class="text-base font-bold text-slate-800">
-                Résultats, Buteurs, Passes & Debrief
-            </h2>
-
-            <p class="text-xs text-slate-500">
-                Scores et causeries d'après-match
-            </p>
+        <div class="section-heading">
+            <span class="section-heading-icon" aria-hidden="true"><i class="fa-solid fa-chart-column"></i></span>
+            <div>
+                <h2 class="text-base font-bold text-slate-800">Résultats, Buteurs, Passes & Debrief</h2>
+                <p class="text-xs text-slate-500">Scores et causeries d'après-match</p>
+            </div>
         </div>
 
         <div class="space-y-3" id="matches-results-list"></div>
@@ -822,9 +821,12 @@
             <div id="training-list-view">
                 <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                        <div>
-                            <h2 class="text-base font-bold text-slate-800">📅 Entraînements</h2>
-                            <p class="text-xs text-slate-500" id="training-days-label">Mardi · Vendredi · 18h00 – 20h00</p>
+                        <div class="section-heading">
+                            <span class="section-heading-icon" aria-hidden="true"><i class="fa-solid fa-calendar-check"></i></span>
+                            <div>
+                                <h2 class="text-base font-bold text-slate-800">Entraînements</h2>
+                                <p class="text-xs text-slate-500" id="training-days-label">Mardi · Vendredi · 18h00 – 20h00</p>
+                            </div>
                         </div>
                         <div class="flex items-center space-x-2">
                             <button onclick="openModalTraining()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center space-x-1 whitespace-nowrap">
@@ -966,8 +968,8 @@
 
         <button
             onclick="generateBalancedTeams()"
-            class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold">
-            ⚽ Générer les équipes
+            class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-2">
+            <i class="fa-solid fa-shuffle" aria-hidden="true"></i>Générer les équipes
         </button>
 
     </div>
@@ -985,34 +987,35 @@
 
     <div class="flex flex-col sm:flex-row justify-between items-center gap-3 mb-3">
 
-        <h3 class="text-sm font-bold text-slate-800">
-            🗣️ Appel de la séance
+        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <span class="section-heading-icon section-heading-icon--sm" aria-hidden="true"><i class="fa-solid fa-clipboard-check"></i></span>
+            Appel de la séance
         </h3>
 
        <div class="flex flex-wrap gap-2">
 
     <button
         onclick="setAllTrainingPresent()"
-        class="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold">
-        ✅ Tous présents
+        class="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5">
+        <i class="fa-solid fa-user-check" aria-hidden="true"></i>Tous présents
     </button>
 
     <button
         onclick="setAllTrainingAbsent()"
-        class="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold">
-        ❌ Tous absents
+        class="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5">
+        <i class="fa-solid fa-user-xmark" aria-hidden="true"></i>Tous absents
     </button>
 
     <button
         onclick="resetTrainingAttendance()"
-        class="px-3 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-xs font-bold">
-        🔄 Réinitialiser
+        class="px-3 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5">
+        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>Réinitialiser
     </button>
 
     <button
         onclick="generateBalancedTeams()"
-        class="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold">
-        ⚽ Générer les équipes
+        class="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5">
+        <i class="fa-solid fa-shuffle" aria-hidden="true"></i>Générer les équipes
     </button>
 
 </div>
@@ -1026,7 +1029,10 @@
 
                 <!-- Taux de présence joueurs -->
                 <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
-                    <h3 class="text-sm font-bold text-slate-800 mb-3">📊 Assiduité des joueurs</h3>
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <span class="section-heading-icon section-heading-icon--sm" aria-hidden="true"><i class="fa-solid fa-chart-simple"></i></span>
+                        <h3 class="text-sm font-bold text-slate-800">Assiduité des joueurs</h3>
+                    </div>
                     <div class="space-y-2" id="training-attendance-bars"></div>
                 </div>
             </div>
@@ -1128,9 +1134,12 @@
 
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
 
-            <div>
-                <h2 class="text-base font-bold text-slate-800">🏆 District Haute-Garonne</h2>
-                <p class="text-xs text-slate-500" id="district-subtitle">Calendriers et classements officiels par équipe</p>
+            <div class="section-heading">
+                <span class="section-heading-icon" aria-hidden="true"><i class="fa-solid fa-ranking-star"></i></span>
+                <div>
+                    <h2 class="text-base font-bold text-slate-800">District Haute-Garonne</h2>
+                    <p class="text-xs text-slate-500" id="district-subtitle">Calendriers et classements officiels par équipe</p>
+                </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
@@ -1164,64 +1173,74 @@
 
 <section id="sec-admin" class="space-y-4 hidden">
 
-    <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
-
-        <h2 class="text-base font-bold text-slate-800">
-            ⚙️ Administration
-        </h2>
-
-        <p class="text-xs text-slate-500">
-            Gestion du club, des accès et de la maintenance.
-        </p>
-
+    <div class="admin-hero">
+        <div class="admin-hero-main">
+            <span class="admin-hero-icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+            <div class="min-w-0">
+                <p class="admin-hero-eyebrow">Espace administrateur</p>
+                <h2 class="screen-title">Administration</h2>
+                <p class="screen-sub">Gestion du club, des accès et de la maintenance.</p>
+            </div>
+        </div>
+        <div class="admin-hero-side" aria-hidden="true">
+            <span><i class="fa-solid fa-users-gear"></i> Accès</span>
+            <span><i class="fa-solid fa-shield-halved"></i> Équipes</span>
+            <span><i class="fa-solid fa-screwdriver-wrench"></i> Maintenance</span>
+        </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="admin-module-grid">
 
-        <div
+        <button
+            type="button"
             id="admin-access-card"
             onclick="openAdminModule('access')"
-            class="bg-white p-4 rounded-xl border border-slate-100 card-shadow cursor-pointer hover:border-sky-300 hover:shadow-lg transition">
+            class="admin-module-card admin-module-card--sky">
 
-            <h3 class="font-bold text-slate-800 text-lg">
-                🪪 Comptes d'accès
-            </h3>
+            <span class="admin-module-icon" aria-hidden="true"><i class="fa-solid fa-users-gear"></i></span>
 
-            <p class="text-xs text-slate-500 mt-2">
-                Gestion des comptes, PIN et permissions.
-            </p>
+            <span class="admin-module-body">
+                <strong>Comptes d'accès</strong>
+                <small>Comptes, codes PIN et permissions des éducateurs.</small>
+            </span>
 
-        </div>
+            <i class="fa-solid fa-arrow-right admin-module-arrow" aria-hidden="true"></i>
 
-        
-<div
+        </button>
+
+        <button
+            type="button"
             id="admin-teams-card"
-    onclick="openAdminModule('teams')"
-    class="bg-white p-4 rounded-xl border border-slate-100 card-shadow cursor-pointer hover:border-sky-300 hover:shadow-lg transition">
+            onclick="openAdminModule('teams')"
+            class="admin-module-card admin-module-card--emerald">
 
-            <h3 class="font-bold text-slate-800 text-lg">
-                ⚽ Équipes
-            </h3>
+            <span class="admin-module-icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
 
-            <p class="text-xs text-slate-500 mt-2">
-                Création et gestion des équipes.
-            </p>
+            <span class="admin-module-body">
+                <strong>Équipes</strong>
+                <small>Création, couleurs et effectif cible par équipe.</small>
+            </span>
 
-        </div>
+            <i class="fa-solid fa-arrow-right admin-module-arrow" aria-hidden="true"></i>
 
-        <div
+        </button>
+
+        <button
+            type="button"
             id="admin-maintenance-card"
-            class="bg-white p-4 rounded-xl border border-slate-100 card-shadow">
+            onclick="openAdminMaintenance()"
+            class="admin-module-card admin-module-card--amber">
 
-            <h3 class="font-bold text-slate-800 text-lg">
-                🛠 Maintenance
-            </h3>
+            <span class="admin-module-icon" aria-hidden="true"><i class="fa-solid fa-screwdriver-wrench"></i></span>
 
-            <p class="text-xs text-slate-500 mt-2">
-                Outils d'administration du club.
-            </p>
+            <span class="admin-module-body">
+                <strong>Maintenance</strong>
+                <small>Recalcul des statistiques, sauvegarde et synchronisation.</small>
+            </span>
 
-        </div>
+            <i class="fa-solid fa-arrow-right admin-module-arrow" aria-hidden="true"></i>
+
+        </button>
 
     </div>
 
@@ -1236,9 +1255,12 @@
 
             <div class="bg-white p-4 rounded-xl card-shadow border border-slate-100">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                    <div>
-                        <h2 class="text-base font-bold text-slate-800">Gestion du Staff & Dirigeants</h2>
-                        <p class="text-xs text-slate-500">Éducateurs, dirigeants, accompagnateurs et rôles officiels</p>
+                    <div class="section-heading">
+                        <span class="section-heading-icon" aria-hidden="true"><i class="fa-solid fa-user-tie"></i></span>
+                        <div>
+                            <h2 class="text-base font-bold text-slate-800">Gestion du Staff & Dirigeants</h2>
+                            <p class="text-xs text-slate-500">Éducateurs, dirigeants, accompagnateurs et rôles officiels</p>
+                        </div>
                     </div>
                    
                 </div>
