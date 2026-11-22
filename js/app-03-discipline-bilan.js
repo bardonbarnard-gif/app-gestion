@@ -1060,8 +1060,10 @@ else {
                     month: '2-digit',
                     year: 'numeric'
                 }) : '--/--/--';
+                const lastTeamName = state.teams?.[lastMatch.team]?.name || lastMatch.team || 'Équipe';
+                const lastLocation = String(lastMatch.location || '').toLowerCase().startsWith('ext') ? 'Extérieur' : 'Domicile';
                 lastBadge.innerHTML = getMatchResultBadge(lastMatch.scoreHome, lastMatch.scoreAway);
-                lastCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>${lastMatch.team || 'Équipe'} vs ${lastMatch.opponent}</span><span class="bg-slate-100 px-2 py-0.5 rounded text-xs font-extrabold text-slate-700">${lastMatch.scoreHome} - ${lastMatch.scoreAway}</span></div><p class="text-[11px] text-slate-500">Joué le ${lastMatchDate}</p>${lastMatch.debrief ? `<p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded border mt-1">📝 ${lastMatch.debrief}</p>` : ''}</div>`;
+                lastCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center gap-2 font-bold text-slate-800 text-sm"><span class="min-w-0 truncate">${escapeHtml(lastTeamName)} vs ${escapeHtml(lastMatch.opponent || 'Adversaire')}</span><span class="shrink-0 bg-slate-100 px-2 py-0.5 rounded text-xs font-extrabold text-slate-700">${escapeHtml(lastMatch.scoreHome)} - ${escapeHtml(lastMatch.scoreAway)}</span></div><p class="text-[11px] text-slate-500"><i class="fa-regular fa-calendar mr-1" aria-hidden="true"></i>Joué le ${lastMatchDate} · <i class="fa-solid fa-location-dot mx-1" aria-hidden="true"></i>${lastLocation}</p>${lastMatch.debrief ? `<p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded border mt-1"><i class="fa-solid fa-clipboard-list text-slate-400 mr-1" aria-hidden="true"></i>${escapeHtml(lastMatch.debrief)}</p>` : ''}</div>`;
             } else {
                 lastBadge.innerHTML = ""; lastCont.innerHTML = `<p class="text-slate-400 italic py-2">Aucun match récent.</p>`;
             }
@@ -1080,8 +1082,9 @@ else {
                     month: '2-digit',
                     year: 'numeric'
                 }) : '--/--/--';
+                const nextLocation = String(nextMatch.location || '').toLowerCase().startsWith('ext') ? 'Extérieur' : 'Domicile';
                 nextBadge.innerHTML = getMatchTypeBadge(nextMatch.type || 'Championnat');
-                nextCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center font-bold text-slate-800 text-sm"><span>${nextTeamName} vs ${nextMatch.opponent}</span><span class="text-sky-600 font-bold">${nextMatch.location || 'Domicile'}</span></div><p class="text-[11px] text-slate-500">📅 ${nextMatchDate} à ${nextMatch.heure || '14:30'}</p></div>`;
+                nextCont.innerHTML = `<div class="space-y-1.5 pt-1"><div class="flex justify-between items-center gap-2 font-bold text-slate-800 text-sm"><span class="min-w-0 truncate">${escapeHtml(nextTeamName)} vs ${escapeHtml(nextMatch.opponent || 'Adversaire')}</span><span class="shrink-0 text-sky-600 font-bold">${nextLocation}</span></div><p class="text-[11px] text-slate-500"><i class="fa-regular fa-calendar mr-1" aria-hidden="true"></i>${nextMatchDate} à ${escapeHtml(nextMatch.heure || '14:30')}</p></div>`;
             } else {
                 nextBadge.innerHTML = ""; nextCont.innerHTML = `<p class="text-slate-400 italic py-2">Aucun match programmé.</p>`;
             }

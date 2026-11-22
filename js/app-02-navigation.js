@@ -1,6 +1,20 @@
 /* Rangueil FC - Navigation, couleurs d'equipe et affichage des noms
    Partie 2/15 de l'application interne. Decoupage mecanique de l'ancien js/app.js
    (aucun code modifie : l'ordre de chargement dans index.html fait foi). */
+
+// Échappement systématique des données affichées via innerHTML.
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[char]);
+}
+
+window.escapeHtml = escapeHtml;
+
 function logoutUser() {
 
     sessionStorage.removeItem("currentUserData");
@@ -264,6 +278,7 @@ return colorMap[colorName] || colorMap.slate;
             const activeMobBtn = document.getElementById(`mob-tab-${tabId}`);
             if (activeMobBtn) activeMobBtn.classList.add('active');
             activeSection = tabId;
+            document.body.dataset.activeTab = tabId;
             renderSection(tabId);
         }
 

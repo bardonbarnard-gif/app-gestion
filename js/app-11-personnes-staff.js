@@ -406,6 +406,42 @@ function getTeamFamily(teamKey) {
 
     return "Seniors";
 }
+function getStaffInitials(name) {
+    return String(name || '?')
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(part => part[0])
+        .join('')
+        .toUpperCase() || '?';
+}
+
+function staffSectionHeader(title, icon, count) {
+    return `
+        <div class="col-span-full">
+            <div class="staff-section-head">
+                <span class="staff-section-icon" aria-hidden="true"><i class="fa-solid ${icon}"></i></span>
+                <span class="staff-section-title">${escapeHtml(title)}</span>
+                <span class="staff-section-count">${count}</span>
+            </div>
+        </div>
+    `;
+}
+
+function staffMemberCard(member, icon) {
+    return `
+        <div class="staff-card">
+            <span class="staff-avatar" aria-hidden="true">${escapeHtml(getStaffInitials(member.name))}</span>
+            <div class="staff-body">
+                <div class="staff-name">${escapeHtml(member.name || 'Nom inconnu')}</div>
+                <span class="staff-role">
+                    <i class="fa-solid ${icon}" aria-hidden="true"></i>${escapeHtml(member.functionName || 'Fonction')}
+                </span>
+            </div>
+        </div>
+    `;
+}
+
 async function renderStaffV2() {
 
     const container =
@@ -542,19 +578,7 @@ if (!exists) {
 
 });
  
-directionContainer.innerHTML += `
-
-<div class="col-span-full">
-
-    <h2 class="text-xl font-bold mb-4">
-
-        👔 Direction
-
-    </h2>
-
-</div>
-
-`;
+directionContainer.innerHTML += staffSectionHeader('Direction', 'fa-crown', direction.length);
 const directionOrder = {
     "Président": 1,
     "Vice-président": 2,
@@ -570,35 +594,11 @@ direction.sort((a, b) =>
 );
 direction.forEach(member => {
 
-    directionContainer.innerHTML += `
-
-    <div class="bg-white p-4 rounded-xl border">
-
-        <div class="font-bold">
-
-            ${member.name}
-
-        </div>
-
-        <div class="text-sky-700 mt-1">
-
-            👔 ${member.functionName}
-
-        </div>
-
-    </div>
-
-    `;
+    directionContainer.innerHTML += staffMemberCard(member, 'fa-crown');
 
 });
 
-functionsContainer.innerHTML += `
-<div class="col-span-full mt-6">
-    <h2 class="text-xl font-bold mb-4">
-        ⚽ Organisation Sportive
-    </h2>
-</div>
-`;
+functionsContainer.innerHTML += staffSectionHeader('Organisation sportive', 'fa-futbol', sportManagement.length);
 
 const sportOrder = {
     "Directeur Sportif": 1,
@@ -614,30 +614,12 @@ sportManagement.sort((a, b) =>
 
 sportManagement.forEach(member => {
 
-    functionsContainer.innerHTML += `
-        <div class="bg-white p-4 rounded-xl border">
-
-            <div class="font-bold text-slate-800">
-                ${member.name}
-            </div>
-
-            <div class="text-sm text-sky-700 mt-1">
-                ⚽ ${member.functionName}
-            </div>
-
-        </div>
-    `;
+    functionsContainer.innerHTML += staffMemberCard(member, 'fa-futbol');
 
 });
 
 
-functionsContainer.innerHTML += `
-<div class="col-span-full mt-6">
-    <h2 class="text-xl font-bold mb-4">
-        ⚙️ Fonctions Club
-    </h2>
-</div>
-`;
+functionsContainer.innerHTML += staffSectionHeader('Fonctions club', 'fa-people-group', clubFunctions.length);
 
 clubFunctions.forEach(member => {
 
@@ -651,29 +633,16 @@ clubFunctions.forEach(member => {
             .join(", ");
 
     functionsContainer.innerHTML += `
-
-    <div class="bg-white p-4 rounded-xl border">
-
-        <div class="font-bold text-slate-800">
-
-            ${member.name}
-
+        <div class="staff-card">
+            <span class="staff-avatar" aria-hidden="true">${escapeHtml(getStaffInitials(member.name))}</span>
+            <div class="staff-body">
+                <div class="staff-name">${escapeHtml(member.name || 'Nom inconnu')}</div>
+                <span class="staff-role">
+                    <i class="fa-solid fa-people-group" aria-hidden="true"></i>${escapeHtml(member.functionName || 'Fonction')}
+                </span>
+                ${scopes ? `<div class="staff-scope"><i class="fa-solid fa-location-dot" aria-hidden="true"></i>${escapeHtml(scopes)}</div>` : ''}
+            </div>
         </div>
-
-        <div class="text-sm text-sky-700 mt-1">
-
-           👔 ${member.functionName}
-
-        </div>
-
-        <div class="text-xs text-slate-500 mt-1">
-
-            📍 ${scopes}
-
-        </div>
-
-    </div>
-
     `;
 
 });
@@ -713,40 +682,41 @@ Object.entries(teamGroups).forEach(([poleName, teams]) => {
 
         let membersHtml = "";
 
-members
-    .filter(member =>
-        member.functionName !== "Responsable Catégorie" &&
-        member.functionName !== "Responsable catégorie"
-    )
+const visibleMembers = members.filter(member =>
+    member.functionName !== "Responsable Catégorie" &&
+    member.functionName !== "Responsable catégorie"
+);
+
+visibleMembers
     .forEach(member => {
 
         membersHtml += `
-            <div class="bg-slate-50 p-3 rounded-lg">
-
-                <div class="font-bold text-slate-800">
-                    ${member.name}
+            <div class="staff-card">
+                <span class="staff-avatar" aria-hidden="true">${escapeHtml(getStaffInitials(member.name))}</span>
+                <div class="staff-body">
+                    <div class="staff-name">${escapeHtml(member.name || 'Nom inconnu')}</div>
+                    <span class="staff-role">
+                        <i class="fa-solid fa-clipboard-user" aria-hidden="true"></i>${escapeHtml(member.functionName || 'Fonction')}
+                    </span>
                 </div>
-
-                <div class="text-sm text-sky-700">
-                    ${member.functionName}
-                </div>
-
             </div>
         `;
 
     });
 
 teamsHtml += `
-    <div class="ml-4 border-l-4 border-sky-200 pl-4">
+    <div class="ml-2 sm:ml-4 border-l-4 border-sky-200 pl-2 sm:pl-4">
 
-        <details class="bg-white border rounded-xl overflow-hidden">
+        <details class="staff-team" open>
 
-            <summary class="cursor-pointer p-3 font-semibold text-slate-800">
-                ⚽ ${teamName}
+            <summary>
+                <i class="fa-solid fa-futbol" aria-hidden="true"></i>
+                <span>${escapeHtml(teamName)}</span>
+                <span class="staff-team-count">${visibleMembers.length}</span>
             </summary>
 
-            <div class="p-4 border-t flex flex-col gap-2">
-                ${membersHtml}
+            <div class="p-3 flex flex-col gap-2">
+                ${membersHtml || '<div class="staff-team-empty">Aucun membre rattaché à cette équipe.</div>'}
             </div>
 
         </details>
@@ -762,8 +732,8 @@ teamsHtml += `
 
         <details open class="bg-slate-100 rounded-xl overflow-hidden">
 
-            <summary class="cursor-pointer p-4 font-bold text-slate-900">
-                ⚽ ${poleName}
+            <summary class="cursor-pointer p-4 font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-layer-group text-sky-600" aria-hidden="true"></i>${escapeHtml(poleName)}
             </summary>
 
             <div class="p-4 flex flex-col gap-4">

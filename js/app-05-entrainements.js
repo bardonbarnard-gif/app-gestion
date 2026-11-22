@@ -20,7 +20,8 @@ function getTrainingScopeTeams() {
         function getTrainingSessionStats(s) {
             const today = new Date(); today.setHours(0, 0, 0, 0);
             const sDate = s.date ? new Date(s.date + 'T12:00:00') : null;
-            const isPast = !!(sDate && sDate < today);
+            const isUndated = !s.date;
+            const isPast = !isUndated && !!sDate && sDate < today;
             const presences = Object.values(s.presence || {});
             const nbPresent = presences.filter(v => v === 'present' || v === 'retard').length;
             const nbTotal = state.players.filter(p =>
@@ -28,15 +29,16 @@ function getTrainingScopeTeams() {
             ).length;
             const pct = nbTotal > 0 ? Math.round((nbPresent / nbTotal) * 100) : 0;
             const isComplete = nbTotal > 0 && presences.length >= nbTotal;
-            return { isPast, presences, nbPresent, nbTotal, pct, isComplete };
+            return { isUndated, isPast, presences, nbPresent, nbTotal, pct, isComplete };
         }
 
         function matchTrainingStatus(s, status) {
             if (status === 'all') return true;
             const stats = getTrainingSessionStats(s);
-            if (status === 'upcoming') return !stats.isPast;
-            if (status === 'past') return stats.isPast;
-            if (status === 'tocomplete') return stats.isPast && !stats.isComplete;
+            if (status === 'upcoming') return !stats.isUndated && !stats.isPast;
+            if (status === 'past') return !stats.isUndated && stats.isPast;
+            if (status === 'undated') return stats.isUndated;
+            if (status === 'tocomplete') return !stats.isUndated && stats.isPast && !stats.isComplete;
             return true;
         }
 
@@ -97,9 +99,13 @@ function getTrainingScopeTeams() {
 
             const statusEl = document.getElementById('training-status-filters');
             if (!statusEl) return;
-            const counts = { all: allSessions.length, upcoming: 0, tocomplete: 0, past: 0 };
+            const counts = { all: allSessions.length, upcoming: 0, tocomplete: 0, past: 0, undated: 0 };
             allSessions.forEach(s => {
                 const stats = getTrainingSessionStats(s);
+                if (stats.isUndated) {
+                    counts.undated++;
+                    return;
+                }
                 if (stats.isPast) {
                     counts.past++;
                     if (!stats.isComplete) counts.tocomplete++;
@@ -113,6 +119,9 @@ function getTrainingScopeTeams() {
                 { key: 'tocomplete', label: 'À compléter', count: counts.tocomplete },
                 { key: 'past', label: 'Passées', count: counts.past }
             ];
+            if (counts.undated > 0) {
+                chips.push({ key: 'undated', label: 'Sans date', count: counts.undated });
+            }
             statusEl.innerHTML = chips.map(c => {
                 const active = trainingStatusFilter === c.key;
                 return `<button type="button" onclick="setTrainingStatusFilter('${c.key}')" class="px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 active:bg-slate-100'}">${c.label}<span class="ml-1 ${active ? 'text-white/60' : 'text-slate-400'}">${c.count}</span></button>`;
@@ -129,9 +138,11 @@ function getTrainingScopeTeams() {
             const all = getTrainingSessionsForUser().filter(trainingSessionMatches);
             const future = all.filter(s => s.date && new Date(s.date + 'T12:00:00') >= today)
                               .sort((a, b) => new Date(a.date) - new Date(b.date));
-            const past   = all.filter(s => !s.date || new Date(s.date + 'T12:00:00') < today)
+            const past   = all.filter(s => s.date && new Date(s.date + 'T12:00:00') < today)
                               .sort((a, b) => new Date(b.date) - new Date(a.date));
-            const sessions = [...future, ...past];
+            const undated = all.filter(s => !s.date)
+                               .sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'fr'));
+            const sessions = [...future, ...past, ...undated];
             const nextUpcomingId = future.length ? future[0].id : null;
 
             const container = document.getElementById('training-sessions-list');
@@ -156,22 +167,28 @@ function getTrainingScopeTeams() {
 
             // Séparateurs
             let html = '';
-            let shownUpcoming = false, shownPast = false;
+            let shownUpcoming = false, shownPast = false, shownUndated = false;
 
             sessions.forEach((s, i) => {
                 const sDate = s.date ? new Date(s.date + 'T12:00:00') : null;
-                const isPast = !!(sDate && sDate < today);
+                const isUndated = !s.date;
+                const isPast = !isUndated && !!(sDate && sDate < today);
                 const isNext = s.id === nextUpcomingId;
 
-                if (!isPast) {
+                if (isUndated) {
+                    if (!shownUndated) {
+                        html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-amber-600 mb-1 mt-4"><i class="fa-solid fa-calendar-xmark mr-1" aria-hidden="true"></i>Séances sans date · ${undated.length}</p>`;
+                        shownUndated = true;
+                    }
+                } else if (!isPast) {
                     if (isNext) {
-                        html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-sky-500 mb-1 mt-1">⚡ Prochain entraînement</p>`;
+                        html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-sky-500 mb-1 mt-1"><i class="fa-solid fa-bolt mr-1" aria-hidden="true"></i>Prochain entraînement</p>`;
                     } else if (!shownUpcoming) {
-                        html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1 mt-3">📅 À venir · ${future.length - 1}</p>`;
+                        html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1 mt-3"><i class="fa-regular fa-calendar mr-1" aria-hidden="true"></i>À venir · ${future.length}</p>`;
                         shownUpcoming = true;
                     }
                 } else if (!shownPast) {
-                    html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1 mt-4">🕓 Séances passées · ${past.length}</p>`;
+                    html += `<p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1 mt-4"><i class="fa-solid fa-clock-rotate-left mr-1" aria-hidden="true"></i>Séances passées · ${past.length}</p>`;
                     shownPast = true;
                 }
 
@@ -217,7 +234,7 @@ const nbTotal = playersForTraining.length;
     </p>
 
     <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${teamColors.badge}">
-        ⚽ ${state.teams?.[s.team]?.name || s.team || 'Équipe'}
+        <i class="fa-solid fa-futbol mr-1" aria-hidden="true"></i>${state.teams?.[s.team]?.name || s.team || 'Équipe'}
     </span>
 </div>
                                     ${hasPdf ? '<span class="text-[10px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded"><i class="fa-solid fa-file-pdf mr-0.5"></i>PDF</span>' : ''}
@@ -282,22 +299,32 @@ const nbTotal = playersForTraining.length;
                     totalPossible += possible;
                 });
             const avgPct = totalPossible > 0 ? Math.round((totalPresences / totalPossible) * 100) : null;
-            const avgColor = avgPct === null ? 'text-slate-400' : avgPct >= 75 ? 'text-emerald-600' : avgPct >= 50 ? 'text-amber-600' : 'text-red-500';
+            const avgTone = avgPct === null ? 'sky' : avgPct >= 75 ? 'emerald' : avgPct >= 50 ? 'amber' : 'red';
+            const avgIcon = 'fa-chart-simple';
 
             const bar = document.getElementById('training-stats-bar');
             if (!bar) return;
             bar.innerHTML = `
-                <div class="card p-3 text-center">
-                    <p class="text-2xl font-extrabold text-sky-600">${nbSessions}</p>
-                    <p class="text-[11px] text-slate-500 mt-0.5">Séances</p>
+                <div class="training-stat training-stat--sky">
+                    <span class="training-stat-icon" aria-hidden="true"><i class="fa-solid fa-calendar-check"></i></span>
+                    <div>
+                        <p class="training-stat-value">${nbSessions}</p>
+                        <p class="training-stat-label">Séances passées</p>
+                    </div>
                 </div>
-                <div class="card p-3 text-center">
-                    <p class="text-2xl font-extrabold ${avgColor}">${avgPct === null ? '—' : avgPct + '%'}</p>
-                    <p class="text-[11px] text-slate-500 mt-0.5">Présence moy.</p>
+                <div class="training-stat training-stat--${avgTone}">
+                    <span class="training-stat-icon" aria-hidden="true"><i class="fa-solid ${avgIcon}"></i></span>
+                    <div>
+                        <p class="training-stat-value">${avgPct === null ? '—' : avgPct + '%'}</p>
+                        <p class="training-stat-label">Présence moyenne</p>
+                    </div>
                 </div>
-                <div class="card p-3 text-center">
-                    <p class="text-2xl font-extrabold text-slate-700">${totalPresences}</p>
-                    <p class="text-[11px] text-slate-500 mt-0.5">Présences tot.</p>
+                <div class="training-stat training-stat--indigo">
+                    <span class="training-stat-icon" aria-hidden="true"><i class="fa-solid fa-user-check"></i></span>
+                    <div>
+                        <p class="training-stat-value">${totalPresences}</p>
+                        <p class="training-stat-label">Présences cumulées</p>
+                    </div>
                 </div>`;
         }
 
@@ -1087,13 +1114,15 @@ function duplicateTraining() {
                 const scoreH = m.scoreHome !== undefined && m.scoreHome !== "" ? m.scoreHome : "-";
                 const scoreA = m.scoreAway !== undefined && m.scoreAway !== "" ? m.scoreAway : "-";
                 
-                // Format date en DD-MM-YYYY
-                let formattedDate = '--/--/--';
+                // Date lisible en français (ex. « sam. 28 nov. 2026 »)
+                let formattedDate = 'Date à définir';
                 if (m.date) {
-                    const dateParts = m.date.split('-');
-                    if (dateParts.length === 3) {
-                        formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
-                    }
+                    const parsedDate = new Date(m.date + 'T12:00:00');
+                    formattedDate = Number.isNaN(parsedDate.getTime())
+                        ? m.date
+                        : parsedDate.toLocaleDateString('fr-FR', {
+                            weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+                        });
                 }
 
                 // Match passé ou score déjà saisi
@@ -1101,6 +1130,7 @@ function duplicateTraining() {
 
                 // Déterminer si l'équipe joue à domicile ou à l'extérieur
                 const isHome = m.location?.toLowerCase().includes('domicile') || m.location?.toLowerCase().includes('home');
+                const locationLabel = isHome ? 'Domicile' : 'Extérieur';
                 
                 // Construire l'affichage du match: "Équipe - Opponent" ou "Opponent - Équipe"
                 let matchTitle = '';
@@ -1126,7 +1156,11 @@ else if (m.type === 'Amical') {
                         <div class="w-10 h-10 rounded-lg ${teamColors.bgButton} text-white flex items-center justify-center font-extrabold text-sm shadow-sm"><i class="fa-solid ${matchIcon}"></i></div>
                         <div>
                             <div class="flex items-center space-x-2"><span class="font-bold ${teamColors.textBold} text-sm">${matchTitle}</span>${getMatchTypeBadge(m.type || 'Championnat')}</div>
-                            <div class="text-[11px] ${teamColors.textLight} mt-0.5">📍 ${m.location || 'Domicile'} • 📅 ${formattedDate} à ${m.heure || '14:30'}</div>
+                            <div class="text-[11px] ${teamColors.textLight} mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <span><i class="fa-solid fa-location-dot mr-1" aria-hidden="true"></i>${locationLabel}</span>
+                                <span class="opacity-40" aria-hidden="true">•</span>
+                                <span><i class="fa-regular fa-calendar mr-1" aria-hidden="true"></i>${formattedDate} à ${m.heure || '14:30'}</span>
+                            </div>
                         </div>
                     </div>`;
 

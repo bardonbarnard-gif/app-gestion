@@ -95,13 +95,16 @@ function checkAdminAccessUI() {
     if (role === "admin") {
         if (!adminBtn) {
             adminBtn = document.createElement("button");
+            adminBtn.type = "button";
             adminBtn.id = "open-admin-console-btn";
-            adminBtn.innerHTML = '<i class="fa-solid fa-gear mr-1"></i> Gérer les accès';
-            adminBtn.className = "fixed bottom-4 right-4 bg-slate-900 text-white px-4 py-2 rounded-full shadow-2xl text-xs font-bold z-40 hover:bg-slate-800 transition flex items-center cursor-pointer";
+            adminBtn.innerHTML = '<i class="fa-solid fa-users-gear" aria-hidden="true"></i><span>Gérer les accès</span>';
+            adminBtn.className = "admin-fab";
+            adminBtn.title = "Ouvrir la console de gestion des accès";
+            adminBtn.setAttribute("aria-label", "Ouvrir la console de gestion des accès");
             adminBtn.onclick = () => toggleAdminModal(true);
             document.body.appendChild(adminBtn);
         } else {
-            adminBtn.style.display = "flex";
+            adminBtn.style.display = "";
         }
     } else if (adminBtn) {
         adminBtn.style.display = "none";

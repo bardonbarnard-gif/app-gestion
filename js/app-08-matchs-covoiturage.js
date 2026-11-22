@@ -1789,6 +1789,9 @@ function openAdminModule(module) {
 
 }
 
+    setTimeout(() => {
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
 }
 
 function renderAdminTeamsModule() {
@@ -1804,28 +1807,28 @@ function renderAdminTeamsModule() {
 
     let html = `
 
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
 
-        <h2 class="text-lg font-bold text-slate-800">
-            ⚽ Équipes
-        </h2>
+        <div class="section-heading">
+            <span class="section-heading-icon section-heading-icon--sm" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+            <div>
+                <h2 class="text-lg font-bold text-slate-800">Équipes</h2>
+                <p class="text-[11px] text-slate-500">Couleurs, noms et effectif cible</p>
+            </div>
+        </div>
 
         <div class="flex gap-2">
 
             <button
                 onclick="openModalTeam()"
-                class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
-
-                ➕ Nouvelle équipe
-
+                class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold inline-flex items-center gap-1.5">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>Nouvelle équipe
             </button>
 
             <button
                 onclick="closeAdminModule()"
-                class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold">
-
-                ← Retour
-
+                class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 text-slate-700">
+                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>Retour
             </button>
 
         </div>
@@ -1841,21 +1844,21 @@ function renderAdminTeamsModule() {
 
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-2">
 
-                    <div class="flex justify-between items-center">
+                    <div class="flex flex-wrap justify-between items-center gap-3">
 
-                        <div>
+                        <div class="min-w-0">
 
-                            <div class="font-bold">
-                                ${key}
+                            <div class="font-bold text-slate-800">
+                                ${escapeHtml(team.name || key)}
                             </div>
 
-                            <div class="text-xs text-slate-500">
-                                ${team.name}
+                            <div class="text-[11px] text-slate-500 mt-0.5">
+                                Clé technique : ${escapeHtml(key)}
                             </div>
 
                             <div class="mt-1.5 inline-flex items-center gap-1.5 bg-sky-100 text-sky-700 px-2 py-0.5 rounded-md text-[10px] font-bold">
-                                <i class="fa-solid fa-clipboard-list"></i>
-                                Feuille : ${team.targetConvocations || 14} joueurs
+                                <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i>
+                                Feuille : ${escapeHtml(team.targetConvocations || 14)} joueurs
                             </div>
 
                         </div>
@@ -1863,18 +1866,22 @@ function renderAdminTeamsModule() {
                         <div class="flex gap-2">
 
     <button
-        onclick="editTeam('${key}')"
-        class="bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-1 rounded-lg text-xs">
+        onclick="editTeam('${escapeHtml(key)}')"
+        title="Modifier l'équipe"
+        aria-label="Modifier l'équipe ${escapeHtml(team.name || key)}"
+        class="bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-1.5 rounded-lg text-xs">
 
-        ✏️
+        <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
 
     </button>
 
     <button
-        onclick="deleteTeam('${key}')"
-        class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded-lg text-xs">
+        onclick="deleteTeam('${escapeHtml(key)}')"
+        title="Supprimer l'équipe"
+        aria-label="Supprimer l'équipe ${escapeHtml(team.name || key)}"
+        class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg text-xs">
 
-        🗑️
+        <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
 
     </button>
 
@@ -1886,6 +1893,10 @@ function renderAdminTeamsModule() {
 
             `;
         });
+
+    if (!Object.keys(state.teams || {}).length) {
+        html += `<div class="text-center text-xs text-slate-400 italic py-8">Aucune équipe enregistrée pour le moment.</div>`;
+    }
 
     container.innerHTML = html;
 }
@@ -1917,54 +1928,71 @@ async function renderAdminAccounts() {
             )
         );
 
-let html = `
-    <div class="flex justify-between items-center mb-4">
+    // On ne reconstruit l'en-tête et la recherche qu'une seule fois :
+    // la liste est mise à jour à part pour ne pas voler le focus pendant la saisie.
+    if (!document.getElementById("admin-accounts-list")) {
 
-        <h2 class="text-lg font-bold text-slate-800">
-            🪪 Comptes d'accès
-            <span class="text-slate-500 text-sm">
-                (${accountsList.length})
-            </span>
-        </h2>
+        container.innerHTML = `
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+
+        <div class="section-heading">
+            <span class="section-heading-icon section-heading-icon--sm" aria-hidden="true"><i class="fa-solid fa-users-gear"></i></span>
+            <div>
+                <h2 class="text-lg font-bold text-slate-800">
+                    Comptes d'accès
+                    <span id="admin-accounts-count" class="text-slate-500 text-sm">(${accountsList.length})</span>
+                </h2>
+                <p class="text-[11px] text-slate-500">Éducateurs, dirigeants et bénévoles</p>
+            </div>
+        </div>
 
         <div class="flex gap-2">
 
             <button
                 onclick="openNewAccountForm()"
-                class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
-                ➕ Nouveau compte
+                class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold inline-flex items-center gap-1.5">
+                <i class="fa-solid fa-user-plus" aria-hidden="true"></i>Nouveau compte
             </button>
 
             <button
                 onclick="closeAdminModule()"
-                class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold">
-                ← Retour
+                class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 text-slate-700">
+                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>Retour
             </button>
 
         </div>
 
     </div>
 
-    <div class="mb-4">
+    <div class="mb-4 relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" aria-hidden="true"></i>
         <input
             type="text"
             id="account-search"
-            placeholder="🔍 Rechercher un nom, une fonction ou un PIN..."
+            placeholder="Rechercher un nom, une fonction ou un PIN…"
             oninput="renderAdminAccounts()"
-            class="w-full border rounded-xl p-3">
+            class="w-full border border-slate-200 rounded-xl p-3 pl-9 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
     </div>
+
+    <div id="admin-accounts-list" class="space-y-3"></div>
 `;
+    }
 
-const search =
-    (
-        document.getElementById(
-            "account-search"
-        )?.value || ""
-    ).toLowerCase();
+    const countEl = document.getElementById("admin-accounts-count");
+    if (countEl) countEl.textContent = `(${accountsList.length})`;
 
-            
+    const search =
+        (
+            document.getElementById(
+                "account-search"
+            )?.value || ""
+        ).trim().toLowerCase();
 
-       
+    const list = document.getElementById("admin-accounts-list");
+    if (!list) return;
+
+    let rows = "";
+
     accountsList
     .filter(([pin, user]) => {
 
@@ -1981,55 +2009,66 @@ const search =
     })
     .forEach(([pin, user]) => {
 
-            html += `
+        const name = user.name || "Compte sans nom";
+        const initials = name
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(part => part[0])
+            .join("")
+            .toUpperCase() || "?";
 
-<div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3">
+        const functionsHtml = (user.functions || [])
+            .map(f => {
 
-    <div class="flex justify-between items-start">
+                const scopes =
+                    (f.scopes || [])
+                    .map(scope =>
+                        state.teams?.[scope]?.name || scope
+                    )
+                    .join(", ");
 
-        <div>
+                return `
+                    <div class="mt-1">
+                        <span class="staff-role">
+                            <i class="fa-solid fa-user-tag" aria-hidden="true"></i>${escapeHtml(f.functionName || "Fonction")}
+                        </span>
+                        ${scopes ? `<div class="staff-scope"><i class="fa-solid fa-location-dot" aria-hidden="true"></i>${escapeHtml(scopes)}</div>` : ""}
+                    </div>
+                `;
 
-            <div class="font-bold text-slate-800 text-lg">
-                ${user.name || ""}
-            </div>
+            })
+            .join("");
 
-            <div class="text-xs text-slate-500 mt-2">
+        rows += `
 
-                ${
-    (user.functions || [])
-        .map(f => {
+<div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
 
-            const scopes =
-                (f.scopes || [])
-                .map(scope =>
-                    state.teams?.[scope]?.name || scope
-                )
-                .join(", ");
+    <div class="flex flex-wrap justify-between items-start gap-3">
 
-            return `
-                👔 ${f.functionName}
-                ${scopes ? `<br><span class="ml-6 text-slate-400">📍 ${scopes}</span>` : ""}
-            `;
+        <div class="flex items-start gap-3 min-w-0">
 
-        })
-        .join("<br><br>")
-}
+            <span class="staff-avatar" aria-hidden="true">${escapeHtml(initials)}</span>
 
+            <div class="min-w-0">
+                <div class="font-bold text-slate-800 text-sm">
+                    ${escapeHtml(name)}
+                </div>
+                <div class="text-[10.5px] text-slate-500 mt-1">
+                    Code PIN : <span class="font-bold tracking-wider">••${escapeHtml(String(pin).slice(-2))}</span>
+                </div>
+                ${functionsHtml || '<div class="text-[11px] text-slate-400 italic mt-1">Aucune fonction renseignée</div>'}
             </div>
 
         </div>
 
-        <div class="flex gap-2 mt-3">
+        <button
+            onclick="editCoachAccount('${escapeHtml(pin)}')"
+            class="bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shrink-0">
 
-            <button
-                onclick="editCoachAccount('${pin}')"
-                class="bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-1 rounded-lg text-xs font-bold">
+            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>Modifier
 
-                ✏️ Modifier
-
-            </button>
-
-        </div>
+        </button>
 
     </div>
 
@@ -2037,12 +2076,131 @@ const search =
 
             `;
 
-        }
-    );
+    });
 
-    container.innerHTML = html;
+    list.innerHTML = rows || `
+        <div class="text-center text-xs text-slate-400 italic py-8">
+            <i class="fa-solid fa-user-slash text-lg block mb-2 opacity-60" aria-hidden="true"></i>
+            Aucun compte ne correspond à cette recherche.
+        </div>`;
 
 }
+
+// ---------- Maintenance : recalcul, sauvegarde et rechargement ----------
+function openAdminMaintenance() {
+
+    const container =
+        document.getElementById(
+            "admin-module-container"
+        );
+
+    if (!container) return;
+
+    container.classList.remove("hidden");
+
+    container.innerHTML = `
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+
+            <div class="section-heading">
+                <span class="section-heading-icon section-heading-icon--sm" aria-hidden="true"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800">Maintenance</h2>
+                    <p class="text-[11px] text-slate-500">Outils de contrôle et de sauvegarde des données</p>
+                </div>
+            </div>
+
+            <button
+                onclick="closeAdminModule()"
+                class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 text-slate-700">
+                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>Retour
+            </button>
+
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+            <button
+                onclick="adminRecalculateStats()"
+                class="text-left bg-white p-4 rounded-xl border border-slate-200 hover:border-sky-300 hover:shadow-md transition">
+                <span class="admin-module-icon mb-3" aria-hidden="true"><i class="fa-solid fa-calculator"></i></span>
+                <span class="block font-bold text-slate-800 text-sm">Recalculer les statistiques</span>
+                <span class="block text-[11px] text-slate-500 mt-1">Buts, passes et classements à partir des bilans de match.</span>
+            </button>
+
+            <button
+                onclick="adminExportBackup()"
+                class="text-left bg-white p-4 rounded-xl border border-slate-200 hover:border-sky-300 hover:shadow-md transition">
+                <span class="admin-module-icon mb-3" aria-hidden="true"><i class="fa-solid fa-download"></i></span>
+                <span class="block font-bold text-slate-800 text-sm">Exporter une sauvegarde</span>
+                <span class="block text-[11px] text-slate-500 mt-1">Télécharge un fichier JSON avec toutes les données du club.</span>
+            </button>
+
+            <button
+                onclick="adminReloadData()"
+                class="text-left bg-white p-4 rounded-xl border border-slate-200 hover:border-sky-300 hover:shadow-md transition">
+                <span class="admin-module-icon mb-3" aria-hidden="true"><i class="fa-solid fa-arrows-rotate"></i></span>
+                <span class="block font-bold text-slate-800 text-sm">Recharger l'application</span>
+                <span class="block text-[11px] text-slate-500 mt-1">Récupère les dernières données enregistrées dans Firebase.</span>
+            </button>
+
+        </div>
+
+        <p class="mt-4 text-[10px] text-slate-400 leading-relaxed">
+            <i class="fa-solid fa-circle-info mr-1" aria-hidden="true"></i>
+            La sauvegarde contient les effectifs, matchs, séances, cartons et réglages. Conservez-la dans un dossier sécurisé.
+        </p>
+    `;
+
+    setTimeout(() => {
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+}
+
+function adminRecalculateStats() {
+    try {
+        recalculateGlobalStats();
+        saveStateToFirebase();
+        showToast("Statistiques recalculées et enregistrées.");
+    } catch (error) {
+        console.error("Recalcul des statistiques :", error);
+        showToast("Le recalcul a échoué.", "error");
+    }
+}
+
+function adminExportBackup() {
+    try {
+        const payload = {
+            exportedAt: new Date().toISOString(),
+            app: "Rangueil FC",
+            data: state
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const stamp = new Date().toISOString().slice(0, 10);
+        link.href = url;
+        link.download = `rangueil-fc-sauvegarde-${stamp}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showToast("Sauvegarde téléchargée.");
+    } catch (error) {
+        console.error("Export de sauvegarde :", error);
+        showToast("L'export a échoué.", "error");
+    }
+}
+
+function adminReloadData() {
+    showToast("Rechargement des données…");
+    setTimeout(() => window.location.reload(), 350);
+}
+
+window.openAdminModule = openAdminModule;
+window.openAdminMaintenance = openAdminMaintenance;
+window.adminRecalculateStats = adminRecalculateStats;
+window.adminExportBackup = adminExportBackup;
+window.adminReloadData = adminReloadData;
 
 function closeAdminModule() {
 
