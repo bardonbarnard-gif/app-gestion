@@ -568,7 +568,8 @@ body {
     inset: 0;
     width: 100%;
     height: 100%;
-    display: block;
+    /* Ne pas forcer display ici : les classes Tailwind md:hidden / md:block
+       choisissent le tracé portrait (mobile) ou paysage (PC). */
 }
 
 /* Un joueur (ou une place libre) sur le terrain */
